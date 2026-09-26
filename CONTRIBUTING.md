@@ -45,16 +45,28 @@ The resulting lockfile installs fine with `npm ci` on npm 10.
 
 ## Evaluating prompt changes
 
-`npm run eval` runs `init` and `plan` for real on every repository in `test/fixtures/repos`, using the brief in `scripts/eval-briefs/<fixture>.md`, and saves the results under `eval/<date>[-label]/`:
+`npm run eval` runs `init` and `plan` for real on every repository in `test/fixtures/repos`, using the brief in `scripts/eval/briefs/<fixture>.md`, and saves the results under `eval/<label>/` (or `eval/<date>/` without a label):
 
 ```sh
-npm run eval -- --backend claude --lang en
+npm run eval -- --backend claude --lang en --label my-change
 npm run eval -- --backend opencode --only go-service,node-app --label shorter-roadmap
 ```
 
-Each fixture gets `prompt.md` (the exact prompt), `plan.log`, `output/` (every generated file) and `meta.json` (exit code, file and task counts, duration, the `analyst.md` hash and the tool commit), plus a `summary.md` for the run. Options: `--backend`, `--lang`, `--targets`, `--only`, `--label` and `--out`.
+Each fixture gets `prompt.md` (the exact prompt), `plan.log`, `output/` (every generated file) and `meta.json`. The run gets a `summary.md` with one row per fixture and a total row:
 
-When you change `src/prompts/analyst.md`, commit an eval run from before and after so the plans can be compared, for example with `git diff --no-index eval/<before> eval/<after>`. The runs call a real AI, so they cost whatever the chosen backend costs.
+| Metric | Meaning |
+| --- | --- |
+| Tasks | task files written |
+| Tasks with verification | tasks whose Verification has at least one command in a `sh` block |
+| file:line refs valid | backticked `path:line` citations whose file exists and has that line |
+| Cited paths that exist | backticked path citations that exist after the plan (future files count as missing) |
+| Questions (blocking) | questions returned by the analyst |
+| Continuations, format retries | how often the answer was cut off or malformed |
+| Minutes, cost | wall time, and cost when the backend reports it (claude) |
+
+The header records the backend, the models the backend reported, the `analyst.md` hash and the tool commit. Options: `--backend`, `--lang`, `--targets`, `--only`, `--label` and `--out`.
+
+Only `eval/baseline/` is committed; other runs stay local (see `.gitignore`). To judge a change to `src/prompts/analyst.md`, run the eval with the same backend and compare its `summary.md` with `eval/baseline/summary.md`, or diff the outputs with `git diff --no-index eval/baseline eval/<label>`. The runs call a real AI, so they cost whatever the chosen backend costs.
 
 ## Project layout
 
@@ -70,7 +82,7 @@ src/artifacts/        managed merge, diffs, confirmation and writes
 src/tasks/            task files, selection, status, verification, run logs
 src/review/           task diff and reviewer
 src/prompts/          analyst, task, review, retry and fix-format prompts
-scripts/eval.mjs      runs plan on the fixtures and saves the outputs under eval/
+scripts/eval/         eval runner, metrics and fixture briefs
 test/                 unit and end-to-end tests
 ```
 
