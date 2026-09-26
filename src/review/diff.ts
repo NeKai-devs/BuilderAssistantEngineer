@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { readTextIfExists } from "../core/fs.js";
-import { excluded, git } from "../core/git.js";
+import { DIFF_FLAGS, excluded, git, unquotePath } from "../core/git.js";
 import { isBinaryPath, isLockfile } from "../digest/files.js";
 import { truncateText } from "../digest/format.js";
 import { GATE_EXCLUDED, type TaskChanges } from "./changes.js";
@@ -12,14 +12,7 @@ export type ReviewDiff = { text: string; shown: string[]; omitted: string[]; gen
 
 const MAX_DIFF_CHARS = 60_000;
 const MIN_PARTIAL_CHARS = 2_000;
-const CHUNK_HEADER = /^diff --git a\/(.+) b\/(.+)$/;
-const GENERATED = [
-  /(^|\/)(dist|build|out|coverage|target|\.next|\.nuxt)\//,
-  /\.min\.[a-z]+$/i,
-  /\.map$/i,
-  /(^|\/)__snapshots__\//,
-  /\.snap$/i,
-];
+const GENERATED = [/\.min\.(js|css|mjs)$/i, /\.(js|css)\.map$/i];
 const DOCS = [/^docs\//, /\.(md|mdx|rst|adoc|txt)$/i];
 
 export async function reviewDiff(
@@ -28,21 +21,18 @@ export async function reviewDiff(
   changes: TaskChanges,
   scope: string[],
   budget = MAX_DIFF_CHARS,
-): Promise<ReviewDiff> {
+): Promise<ReviewDiff | undefined> {
   const own = new Set(changes.files);
   const raw = await git(cwd, [
-    "-c",
-    "core.quotePath=false",
     "diff",
-    "--no-color",
-    "--no-ext-diff",
-    "--no-renames",
+    ...DIFF_FLAGS,
     ref,
     "--",
     ".",
     ...GATE_EXCLUDED.map(excluded),
   ]);
-  const tracked = splitDiff(raw ?? "").filter((piece) => own.has(piece.path));
+  if (raw === undefined) return undefined;
+  const tracked = splitDiff(raw).filter((piece) => own.has(piece.path));
   const created = await Promise.all(changes.untracked.map((path) => newFilePiece(cwd, path)));
   return fitBudget([...tracked, ...created], scope, budget);
 }
@@ -88,12 +78,22 @@ export function fitBudget(pieces: DiffPiece[], scope: string[], budget: number):
 export function splitDiff(diff: string): DiffPiece[] {
   const pieces: DiffPiece[] = [];
   for (const chunk of diff.split(/^(?=diff --git )/m)) {
-    const header = CHUNK_HEADER.exec(chunk.split("\n", 1)[0] ?? "");
-    if (!header) continue;
-    const path = /^\+\+\+ b\/(.+)$/m.exec(chunk)?.[1] ?? /^--- a\/(.+)$/m.exec(chunk)?.[1];
-    pieces.push({ path: path ?? header[2] ?? "", text: chunk.trimEnd() });
+    if (!chunk.startsWith("diff --git ")) continue;
+    const target = /^\+\+\+ (.+)$/m.exec(chunk)?.[1];
+    const source = /^--- (.+)$/m.exec(chunk)?.[1];
+    const named = [target, source]
+      .map((raw) => (raw ? unquotePath(raw.replace(/\t$/, "")) : undefined))
+      .find((path) => path !== undefined && path !== "/dev/null");
+    const path = named ? named.replace(/^[ab]\//, "") : headerPath(chunk.split("\n", 1)[0] ?? "");
+    if (path) pieces.push({ path, text: chunk.trimEnd() });
   }
   return pieces;
+}
+
+function headerPath(header: string): string | undefined {
+  const quoted = /^diff --git "a\/(?:[^"\\]|\\.)*" ("b\/(?:[^"\\]|\\.)*")$/.exec(header)?.[1];
+  if (quoted) return unquotePath(quoted).slice(2);
+  return /^diff --git a\/(.+) b\/\1$/.exec(header)?.[1];
 }
 
 function rank(path: string, scope: string[]): number {

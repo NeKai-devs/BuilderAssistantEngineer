@@ -66,8 +66,12 @@ export function ignoreMatcher(sources: IgnoreSource[]): IgnoreMatcher {
   };
 }
 
-export async function untrackedFiles(cwd: string, isIgnored: IgnoreMatcher): Promise<string[]> {
-  const entries = (await gitPaths(cwd, ["ls-files", "--others", "--directory", "--", "."])) ?? [];
+export async function untrackedFiles(
+  cwd: string,
+  isIgnored: IgnoreMatcher,
+): Promise<string[] | undefined> {
+  const entries = await gitPaths(cwd, ["ls-files", "--others", "--directory", "--", "."]);
+  if (!entries) return undefined;
   const found: string[] = [];
   for (const entry of entries) {
     if (!entry.endsWith("/")) {

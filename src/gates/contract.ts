@@ -1,12 +1,30 @@
 import type { Dirent } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { gitPaths, isGitRepo } from "../core/git.js";
 import { asRecord, parseObject } from "../core/json.js";
 import { scanFiles } from "../digest/walk.js";
+import { type IgnoreSource, ignoreMatcher, untrackedFiles } from "./ignore-rules.js";
+import {
+  AGENT_FILES,
+  BAE_SCRATCH,
+  type ContractKind,
+  createdIsViolation,
+  executedBy,
+  GIT_FILES,
+  isRunnerConfig,
+  kindOf,
+  repoProtected,
+  sectionsOf,
+  setupReferences,
+  shadowCandidates,
+  WATCHED_DIRS,
+} from "./protected-files.js";
 
-export type ContractKind = "task" | "tasks" | "bae" | "agents" | "gitignore" | "scripts" | "runner";
+export type { ContractKind } from "./protected-files.js";
+export { isAcceptableKind, TASKS_DIR } from "./protected-files.js";
+
 export type ContractChange = {
   path: string;
   kind: ContractKind;
@@ -15,75 +33,97 @@ export type ContractChange = {
   restored: string | null;
 };
 export type Protected = Record<string, string>;
-
-export const TASKS_DIR = "docs/plan/tasks";
-const WATCHED_DIRS = [".bae", ".claude/agents", ".opencode/agent", ".opencode/agents", TASKS_DIR];
-const AGENT_FILES = [".claude/settings.json", "opencode.json", "opencode.jsonc"];
-const BAE_SCRATCH = [".bae/tmp/", ".bae/runs/"];
-const PACKAGE_KEYS = ["jest", "mocha", "ava"];
-const RUNNER_FILES = [
-  /^vitest\.(config|workspace)\.[cm]?[jt]s$/,
-  /^jest\.config\.([cm]?[jt]s|json)$/,
-  /^playwright\.config\.[cm]?[jt]s$/,
-  /^cypress\.config\.[cm]?[jt]s$/,
-  /^karma\.conf\.[cm]?[jt]s$/,
-  /^\.mocharc(\.(c?js|jsonc?|ya?ml))?$/,
-  /^pytest\.ini$/,
-  /^phpunit\.xml(\.dist)?$/,
-  /^\.rspec$/,
-];
-const VITE_CONFIG = /^vite\.config\.[cm]?[jt]s$/;
-const VITE_TEST = /\btest\s*:/;
-const RUNNER_SECTIONS: Record<string, string> = {
-  "pyproject.toml": "[tool.pytest.ini_options]",
-  "setup.cfg": "[tool:pytest]",
-  "tox.ini": "[pytest]",
+export type ContractInputs = { suite: string[]; verification: string[]; own: string[] };
+export type Collected = { protected: Protected; shadows: string[] };
+export type ContractState = {
+  protected: Protected;
+  shadows: string[];
+  ignore: IgnoreSource[];
+  taskPath: string;
 };
+
 const LOG_HEADING = /^##[ \t]+(log|registro|bitácora|bitacora)[ \t]*$/i;
 const SECTION_HEADING = /^##(?!#)/;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const MAX_PROTECTED_CHARS = 1_000_000;
-const ACCEPTABLE = new Set<ContractKind>(["gitignore", "scripts", "runner"]);
+const PACKAGE_KEYS = ["jest", "mocha", "ava"];
 
-export function isAcceptableKind(kind: ContractKind): boolean {
-  return ACCEPTABLE.has(kind);
-}
-
-export async function collectProtected(cwd: string, runners: string[] = []): Promise<Protected> {
+export async function collectProtected(
+  cwd: string,
+  inputs: ContractInputs = { suite: [], verification: [], own: [] },
+): Promise<Collected> {
+  const listing = await repoFiles(cwd);
+  const scripts = asRecord(
+    parseObject((await readTextIfExists(absolute(cwd, "package.json"))) ?? "")?.scripts,
+  );
+  const suite = executedBy(inputs.suite, scripts);
+  const verification = executedBy(inputs.verification, scripts);
+  const own = new Set(inputs.own);
   const candidates = [
     ...(await watchedFiles(cwd)),
-    ...(await repoFiles(cwd)).filter((path) => repoProtected(path)),
-    ...runners,
+    ...listing.filter(repoProtected),
+    ...suite.files,
+    ...verification.files.filter((path) => !own.has(path)),
+    ...(await gitFiles(cwd)),
   ];
   const result: Protected = {};
   for (const path of [...new Set(candidates)].sort()) {
-    const text = await readTextIfExists(absolute(cwd, path));
+    const text = await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
     if (text === undefined || text.length > MAX_PROTECTED_CHARS || !tracked(path, text)) continue;
     result[path] = text;
+    if (!isRunnerConfig(path)) continue;
+    for (const reference of setupReferences(path, text)) {
+      const setup = await readTextIfExists(absolute(cwd, reference)).catch(() => undefined);
+      if (setup !== undefined && setup.length <= MAX_PROTECTED_CHARS) result[reference] = setup;
+    }
   }
-  return result;
+  const existing = new Set(listing);
+  const shadows = shadowCandidates({
+    files: [],
+    modules: [...suite.modules, ...verification.modules],
+    make: suite.make || verification.make,
+  }).filter((entry) =>
+    entry.endsWith("/")
+      ? !listing.some((path) => path.startsWith(entry))
+      : !existing.has(entry) && !Object.hasOwn(result, entry),
+  );
+  return { protected: result, shadows };
 }
 
-export async function checkContract(
-  cwd: string,
-  captured: Protected,
-  taskPath: string,
-): Promise<ContractChange[]> {
+export async function checkContract(cwd: string, state: ContractState): Promise<ContractChange[]> {
+  const captured = state.protected;
   const changes: ContractChange[] = [];
   for (const [path, before] of Object.entries(captured)) {
-    const after = await readTextIfExists(absolute(cwd, path));
-    const change = compare(path, kindOf(path, taskPath), before, after);
+    const after = await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
+    const change = compare(path, kindOf(path, state.taskPath), before, after);
     if (change) changes.push(change);
   }
+  const created = (path: string, kind: ContractKind): ContractChange => ({
+    path,
+    kind,
+    change: "created",
+    detail: "",
+    restored: null,
+  });
   for (const path of await watchedFiles(cwd)) {
+    if (!Object.hasOwn(captured, path)) changes.push(created(path, kindOf(path, state.taskPath)));
+  }
+  for (const path of await gitFiles(cwd)) {
     if (Object.hasOwn(captured, path)) continue;
-    changes.push({
-      path,
-      kind: kindOf(path, taskPath),
-      change: "created",
-      detail: "",
-      restored: null,
-    });
+    if ((await readTextIfExists(absolute(cwd, path)).catch(() => undefined)) !== undefined) {
+      changes.push(created(path, "gitdir"));
+    }
+  }
+  const reported = new Set(changes.map((change) => change.path));
+  for (const path of await currentFiles(cwd, state.ignore)) {
+    if (reported.has(path) || Object.hasOwn(captured, path)) continue;
+    if (
+      state.shadows.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry))
+    ) {
+      changes.push(created(path, "shadow"));
+    } else if (createdIsViolation(path)) {
+      changes.push(created(path, kindOf(path, state.taskPath)));
+    }
   }
   return changes;
 }
@@ -99,10 +139,9 @@ export async function restoreContract(cwd: string, changes: ContractChange[]): P
 export function taskContract(text: string): string {
   const unix = text.replace(/\r\n/g, "\n");
   const match = FRONTMATTER.exec(unix);
-  const front = (match?.[1] ?? "")
-    .split("\n")
-    .filter((line) => !/^status[ \t]*:/.test(line))
-    .join("\n");
+  const lines = (match?.[1] ?? "").split("\n");
+  const status = lines.findIndex((line) => /^status[ \t]*:/.test(line));
+  const front = lines.filter((_, index) => index !== status).join("\n");
   const body = match ? unix.slice(match[0].length) : unix;
   return `${front}\n---\n${splitLog(body).kept.join("\n")}`.replace(/\s+$/, "");
 }
@@ -154,16 +193,17 @@ function compare(
     const detail = keys.join(", ");
     return { ...base, detail, change: "modified", restored: restorePackage(before, after) };
   }
-  const header = RUNNER_SECTIONS[baseName(path)];
-  if (kind === "runner" && header) {
-    const section = sectionOf(before, header) ?? "";
-    if (sectionOf(after, header) === section) return undefined;
-    return {
-      ...base,
-      detail: header,
-      change: "modified",
-      restored: replaceSection(after, header, section),
-    };
+  const headers = sectionsOf(path);
+  if (kind === "runner" && headers) {
+    const changed = headers.filter(
+      (header) => (sectionOf(after, header) ?? "") !== (sectionOf(before, header) ?? ""),
+    );
+    if (changed.length === 0) return undefined;
+    const restored = changed.reduce(
+      (text, header) => replaceSection(text, header, sectionOf(before, header) ?? ""),
+      after,
+    );
+    return { ...base, detail: changed.join(", "), change: "modified", restored };
   }
   if (unix(before) === unix(after)) return undefined;
   return { ...base, change: "modified", restored: before };
@@ -219,99 +259,6 @@ function replaceSection(text: string, header: string, section: string): string {
   return [...lines.slice(0, start), ...(section ? [section] : []), ...rest].join("\n");
 }
 
-function kindOf(path: string, taskPath: string): ContractKind {
-  if (path === taskPath) return "task";
-  if (path.startsWith(`${TASKS_DIR}/`)) return "tasks";
-  if (path.startsWith(".bae/")) return "bae";
-  if (path.startsWith(".claude/") || path.startsWith(".opencode/") || AGENT_FILES.includes(path)) {
-    return "agents";
-  }
-  const name = baseName(path);
-  if (name === ".gitignore") return "gitignore";
-  if (name === "package.json") return "scripts";
-  return "runner";
-}
-
-export async function referencedFiles(cwd: string, commands: string[]): Promise<string[]> {
-  const scripts = asRecord(
-    parseObject((await readTextIfExists(absolute(cwd, "package.json"))) ?? "")?.scripts,
-  );
-  const seen = new Set<string>();
-  const pending = [...commands];
-  const found = new Set<string>();
-  while (pending.length > 0) {
-    const command = pending.shift() ?? "";
-    if (seen.has(command)) continue;
-    seen.add(command);
-    for (const segment of command.split(/&&|\|\||[;|]/)) {
-      const words = segment
-        .trim()
-        .split(/\s+/)
-        .map((word) => word.replace(/^["']|["']$/g, ""));
-      const script = npmScript(words);
-      if (script && typeof scripts[script] === "string") pending.push(scripts[script] as string);
-      if (words[0] === "make") found.add("Makefile");
-      for (const word of words.filter(looksLikePath)) found.add(word.replace(/^\.\//, ""));
-    }
-  }
-  const present = await Promise.all(
-    [...found].map(async (path) =>
-      (await readTextIfExists(absolute(cwd, path))) === undefined ? [] : [path],
-    ),
-  );
-  return present.flat();
-}
-
-function npmScript(words: string[]): string | undefined {
-  if (!["npm", "pnpm", "yarn", "bun"].includes(words[0] ?? "")) return undefined;
-  const rest = words.slice(1).filter((word) => !word.startsWith("-"));
-  if (rest[0] === "run" || rest[0] === "run-script") return rest[1];
-  return rest[0] === "test" || rest[0] === "t" ? "test" : undefined;
-}
-
-function looksLikePath(word: string): boolean {
-  if (word.includes("..") || word.startsWith("/") || /^[a-z]+:/i.test(word)) return false;
-  return /^(\.\/)?[\w@.-]+(\/[\w@.-]+)*\.(c?js|mjs|ts|mts|cts|py|sh|bash|rb|php|pl)$/.test(word);
-}
-
-function repoProtected(path: string): boolean {
-  if (path.split("/").includes("node_modules")) return false;
-  const name = baseName(path);
-  return (
-    name === ".gitignore" ||
-    name === "package.json" ||
-    VITE_CONFIG.test(name) ||
-    Object.hasOwn(RUNNER_SECTIONS, name) ||
-    RUNNER_FILES.some((pattern) => pattern.test(name))
-  );
-}
-
-function tracked(path: string, text: string): boolean {
-  const name = baseName(path);
-  if (VITE_CONFIG.test(name)) return VITE_TEST.test(text);
-  const header = RUNNER_SECTIONS[name];
-  return header === undefined || sectionOf(text, header) !== undefined;
-}
-
-async function watchedFiles(cwd: string): Promise<string[]> {
-  const files = (await Promise.all(WATCHED_DIRS.map((dir) => walk(cwd, dir)))).flat();
-  const agents = await Promise.all(
-    AGENT_FILES.map(async (path) =>
-      (await readTextIfExists(absolute(cwd, path))) === undefined ? [] : [path],
-    ),
-  );
-  return [...files, ...agents.flat()].filter(
-    (path) => !BAE_SCRATCH.some((prefix) => path.startsWith(prefix)),
-  );
-}
-
-async function repoFiles(cwd: string): Promise<string[]> {
-  if (await isGitRepo(cwd)) {
-    return (await gitPaths(cwd, ["ls-files", "--cached", "--others", "--exclude-standard"])) ?? [];
-  }
-  return (await scanFiles(cwd)).files.map((file) => file.path);
-}
-
 async function walk(cwd: string, dir: string): Promise<string[]> {
   if (BAE_SCRATCH.some((prefix) => `${dir}/`.startsWith(prefix))) return [];
   const entries = await listDir(absolute(cwd, dir));
@@ -337,10 +284,46 @@ function absolute(cwd: string, path: string): string {
   return join(cwd, ...path.split("/"));
 }
 
-function baseName(path: string): string {
-  return path.split("/").at(-1) ?? path;
-}
-
 function unix(text: string): string {
   return text.replace(/\r\n/g, "\n");
+}
+
+function tracked(path: string, text: string): boolean {
+  const headers = sectionsOf(path);
+  return headers === undefined || headers.some((header) => sectionOf(text, header) !== undefined);
+}
+
+async function watchedFiles(cwd: string): Promise<string[]> {
+  const files = (await Promise.all(WATCHED_DIRS.map((dir) => walk(cwd, dir)))).flat();
+  const agents = await Promise.all(
+    AGENT_FILES.map(async (path) =>
+      (await readTextIfExists(absolute(cwd, path)).catch(() => undefined)) === undefined
+        ? []
+        : [path],
+    ),
+  );
+  return [...files, ...agents.flat()].filter(
+    (path) => !BAE_SCRATCH.some((prefix) => path.startsWith(prefix)),
+  );
+}
+
+async function gitFiles(cwd: string): Promise<string[]> {
+  const info = await stat(join(cwd, ".git")).catch(() => undefined);
+  return info?.isDirectory() ? GIT_FILES.map((name) => `.git/${name}`) : [];
+}
+
+async function repoFiles(cwd: string): Promise<string[]> {
+  if (await isGitRepo(cwd)) {
+    return (await gitPaths(cwd, ["ls-files", "--cached", "--others", "--exclude-standard"])) ?? [];
+  }
+  return (await scanFiles(cwd)).files.map((file) => file.path);
+}
+
+async function currentFiles(cwd: string, ignore: IgnoreSource[]): Promise<string[]> {
+  if (!(await isGitRepo(cwd))) return (await scanFiles(cwd)).files.map((file) => file.path);
+  const [tracked, untracked] = await Promise.all([
+    gitPaths(cwd, ["ls-files", "--cached"]),
+    untrackedFiles(cwd, ignoreMatcher(ignore)),
+  ]);
+  return [...(tracked ?? []), ...(untracked ?? [])];
 }

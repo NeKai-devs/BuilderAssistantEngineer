@@ -3,7 +3,16 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readTextIfExists } from "../core/fs.js";
-import { EMPTY_TREE, excluded, git, gitPaths, isGitRepo, verifyCommit } from "../core/git.js";
+import {
+  DIFF_FLAGS,
+  EMPTY_TREE,
+  excluded,
+  git,
+  gitPaths,
+  isGitRepo,
+  unquotePath,
+  verifyCommit,
+} from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
 import { isBinaryPath } from "../digest/files.js";
 import type { Capture } from "../gates/capture.js";
@@ -20,14 +29,14 @@ export type TaskChanges = {
 };
 export type ChangeView =
   | { ok: true; ref: string; changes: TaskChanges; before: Set<string> }
-  | { ok: false; reason: "noGit" | "noBase" };
+  | { ok: false; reason: "noGit" | "noBase" | "gitError" };
 
 const MAX_NEW_FILE_BYTES = 1_000_000;
 const MAX_SUSPICIOUS_LINES = 5_000;
 const MAX_LINE_CHARS = 2_000;
 const SUSPICIOUS =
   /AKIA|gh[pousr]_|github_pat_|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@/i;
-const TARGET_FILE = /^\+\+\+ (?:b\/)?(.+)$/;
+const TARGET_FILE = /^\+\+\+ (.+)$/;
 export const GATE_EXCLUDED = [BAE_DIR, TASKS_DIR];
 
 export async function taskChanges(cwd: string, capture: Capture): Promise<ChangeView> {
@@ -38,28 +47,21 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
   const [names, deleted, patch, untracked] = await Promise.all([
     gitPaths(cwd, ["diff", "--name-only", "--no-renames", ref, ...pathspec]),
     gitPaths(cwd, ["diff", "--name-only", "--no-renames", "--diff-filter=D", ref, ...pathspec]),
-    git(cwd, [
-      "-c",
-      "core.quotePath=false",
-      "diff",
-      "--no-color",
-      "--no-ext-diff",
-      "--no-renames",
-      "-U0",
-      ref,
-      ...pathspec,
-    ]),
+    git(cwd, ["diff", ...DIFF_FLAGS, "-U0", ref, ...pathspec]),
     untrackedFiles(cwd, ignoreMatcher(capture.ignore)),
   ]);
+  if (!names || !deleted || patch === undefined || !untracked) {
+    return { ok: false, reason: "gitError" };
+  }
   const created = untracked.filter((path) => !isExcluded(path));
   const contents = await Promise.all(created.map((path) => newFileText(cwd, path)));
   const all: TaskChanges = {
-    files: [...new Set([...(names ?? []), ...created])].sort(),
+    files: [...new Set([...names, ...created])].sort(),
     added: [
-      ...addedLines(patch ?? ""),
+      ...addedLines(patch),
       ...created.map((path, index) => ({ path, text: contents[index] ?? "" })),
     ],
-    deleted: deleted ?? [],
+    deleted,
     untracked: created,
   };
   const before = await unchangedSince(cwd, capture.snapshot, all.files);
@@ -78,7 +80,7 @@ export function addedLines(patch: string): AddedText[] {
     }
     const target = inHeader ? TARGET_FILE.exec(line) : null;
     if (target) {
-      current = target[1];
+      current = stripPrefix(unquotePath((target[1] ?? "").replace(/\t$/, "")));
       inHeader = false;
       continue;
     }
@@ -87,6 +89,10 @@ export function addedLines(patch: string): AddedText[] {
     }
   }
   return [...byFile].map(([path, added]) => ({ path, text: added.join("\n") }));
+}
+
+function stripPrefix(path: string): string {
+  return path.startsWith("b/") ? path.slice(2) : path;
 }
 
 function withoutPaths(changes: TaskChanges, skip: Set<string>): TaskChanges {

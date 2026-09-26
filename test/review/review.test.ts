@@ -37,6 +37,7 @@ describe("reviewDiff", () => {
     const view = await taskChanges(cwd, capture);
     if (!view.ok) throw new Error("expected git");
     const diff = await reviewDiff(cwd, view.ref, view.changes, []);
+    if (!diff) throw new Error("expected a diff");
     expect(diff.text).toMatch(/^<<<DIFF [0-9a-f]{12}>>>\n/);
     expect(diff.text).toContain("-one");
     expect(diff.text).toContain("+two");
@@ -53,14 +54,14 @@ describe("reviewDiff", () => {
         piece("docs/guide.md", 500),
         piece("src/other.ts", 500),
         piece("src/feature.ts", 500),
-        piece("dist/bundle.js", 500),
+        piece("dist/bundle.min.js", 500),
       ],
       ["src/feature.ts"],
       3_000,
     );
     expect(diff.shown).toEqual(["src/feature.ts", "src/other.ts", "docs/guide.md"]);
     expect(diff.omitted).toEqual(["package-lock.json"]);
-    expect(diff.generated).toEqual(["dist/bundle.js"]);
+    expect(diff.generated).toEqual(["dist/bundle.min.js"]);
     expect(diff.text).toContain("Not shown, over the size budget: package-lock.json");
   });
 

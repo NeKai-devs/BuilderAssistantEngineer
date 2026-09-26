@@ -21,6 +21,11 @@ export type ReviewResult = {
 };
 
 const MAX_AGENTS_MD = 20_000;
+const REASONS = {
+  noGit: "review.noGit",
+  noBase: "review.noBase",
+  gitError: "review.gitError",
+} as const;
 
 export function capturedTask(capture: Capture): Task {
   return parseTask(capture.path, capture.task);
@@ -36,7 +41,7 @@ export async function reviewTask(
   const task = capturedTask(capture);
   const view = await taskChanges(ctx.cwd, capture);
   if (!view.ok) {
-    const reason = t(view.reason === "noGit" ? "review.noGit" : "review.noBase");
+    const reason = t(REASONS[view.reason]);
     return view.reason === "noGit"
       ? { status: "skipped", findings: [], reason }
       : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
@@ -54,6 +59,10 @@ export async function reviewTask(
     };
   }
   const diff = await reviewDiff(ctx.cwd, view.ref, view.changes, scopePaths(task));
+  if (!diff) {
+    const reason = t("review.gitError");
+    return { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
+  }
   const prompt = renderPrompt(capturedPrompt(capture, "review"), {
     reviewer: capture.reviewer,
     agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),

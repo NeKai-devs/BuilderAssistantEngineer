@@ -25,6 +25,7 @@ import {
   type SuiteCheck,
   type SuiteCommand,
 } from "./regression.js";
+import { guardState } from "./state-guard.js";
 
 export type Approval = { granted: boolean };
 export type Checks = { commands: string[]; script: string[]; suite: SuiteCommand[] };
@@ -36,6 +37,7 @@ export type GateRun = {
   acceptance: Acceptance;
   allowSkip: boolean;
   unattended: boolean;
+  tampered: string[];
 };
 export type Gate = {
   passed: boolean;
@@ -61,8 +63,22 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     regressions: [],
     skips,
   });
+  const tampered = run.tampered.splice(0);
+  if (tampered.length > 0) {
+    const reason = t("state.tampered", { files: tampered.join(", ") });
+    ctx.prompter.warn(reason);
+    return fail("contract", `## ${t("contract.title")}\n\n${reason}`, reason);
+  }
   const contract = await enforceContract(ctx, capture, acceptance);
   if (contract.blocked) return fail("contract", contract.report, t("contract.failed"));
+  const recheck = async (): Promise<string | undefined> => {
+    const changed = await guard.verify();
+    const again = await enforceContract(ctx, capture, acceptance);
+    if (changed.length === 0 && !again.blocked) return undefined;
+    const state = changed.length > 0 ? t("state.tampered", { files: changed.join(", ") }) : "";
+    if (state) ctx.prompter.warn(state);
+    return joinSections([state, again.report]);
+  };
   const bash = await bashPath();
   const refused = refusal(checks, {
     unattended: run.unattended,
@@ -82,14 +98,19 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     ctx.prompter.note(all.map((command) => `$ ${command}`).join("\n"), t("verify.commands"));
     for (const item of findUnsafe(all)) ctx.prompter.warn(t("verify.unsafeWarning", item));
     if (!ctx.flags.yes && !(await ctx.prompter.confirm(t("verify.confirm"), true))) {
+      ctx.prompter.warn(t("verify.declined"));
       return fail("declined", t("verify.declined"), t("verify.declined"), false);
     }
     approval.granted = true;
   }
   const fix = capturedTask(capture).meta.tests === "fix";
+  let guard = await guardState(ctx.cwd);
   const regression =
     suite.length > 0 ? await regressionStage(ctx, suite, baseline, fix) : undefined;
   const sections = [contract.report, regression?.report];
+  const afterSuite = await recheck();
+  if (afterSuite)
+    return fail("contract", joinSections([...sections, afterSuite]), t("contract.failed"));
   if (regression && !regression.passed) {
     return {
       ...fail("regression", joinSections(sections), t("regression.failed")),
@@ -111,6 +132,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     ...(fix ? [] : (regression?.preexisting ?? []).map((check) => check.command)),
     ...excluded,
   ]);
+  guard = await guardState(ctx.cwd);
   const verification = await runVerification(ctx.cwd, checks.script, {
     bash,
     onOutput: ctx.print,
@@ -118,6 +140,10 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     excused,
   });
   sections.push(verificationReport(verification));
+  const afterVerification = await recheck();
+  if (afterVerification) {
+    return fail("contract", joinSections([...sections, afterVerification]), t("contract.failed"));
+  }
   if (!verification.passed) {
     const reason = t("verify.failed", {
       command: verification.failed ?? "Verification",

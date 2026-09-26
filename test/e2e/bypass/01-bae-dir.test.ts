@@ -27,7 +27,9 @@ describe("bypass 01: the gate never reads state the agent can write in .bae/", (
     const lesson = () => '{"root_cause": "Broke the suite.", "rule": "Keep the suite green."}';
     const run = await next(cwd, ["--headless", "--yes"], [cheat, cheat, cheat, lesson]);
     expect(run.code).toBe(1);
-    expect(run.log).toContain(`Regression: \`${test}\` exits with 1 after the task.`);
+    expect(run.log).toContain(
+      ".bae/runs/T-001/baseline.json: Changed bae's own configuration or prompts. Removed.",
+    );
     expect(await statusOf(cwd)).toBe("blocked");
   });
 
@@ -50,9 +52,7 @@ describe("bypass 01: the gate never reads state the agent can write in .bae/", (
     );
     const run = await next(cwd, ["--yes"], [cheat, REVIEW_PASS]);
     expect(run.code).toBe(1);
-    expect(run.log).toMatch(
-      /src\/backdoor\.ts: Adds what looks like a credential \(AWS access key\)/,
-    );
+    expect(run.log).toContain(".bae/runs/T-001/snapshot.json: Changed bae's own configuration");
     expect(run.calls).toHaveLength(1);
   });
 

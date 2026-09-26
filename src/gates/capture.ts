@@ -3,17 +3,17 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type Config, configSchema } from "../config/schema.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
-import { headCommit, isGitRepo } from "../core/git.js";
+import { flaggedFiles, headCommit, isGitRepo } from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
 import { loadPrompt, type Prompt } from "../core/prompt-loader.js";
 import { repoState } from "../core/state.js";
 import { findReviewer } from "../review/reviewer.js";
-import { inScope, scopePaths } from "../review/scope.js";
+import { scopePaths } from "../review/scope.js";
 import { hashPaths, takeSnapshot } from "../review/snapshot.js";
 import { runDir } from "../tasks/runs.js";
 import type { Task } from "../tasks/schema.js";
 import { verificationCommands } from "../tasks/schema.js";
-import { collectProtected, referencedFiles, TASKS_DIR } from "./contract.js";
+import { collectProtected, TASKS_DIR } from "./contract.js";
 import { captureIgnore } from "./ignore-rules.js";
 import { suiteBaselineSchema, suiteCommands } from "./regression.js";
 
@@ -42,6 +42,8 @@ const captureSchema = z.object({
   reviewer: z.string(),
   agentsMd: z.string().optional(),
   protected: z.record(z.string(), z.string()),
+  shadows: z.array(z.string()).default([]),
+  flagged: z.array(z.string()).default([]),
   baseline: suiteBaselineSchema.optional(),
   skips: z.array(z.string()).default([]),
   late: z.boolean().optional(),
@@ -115,6 +117,7 @@ export async function readActive(cwd: string): Promise<string | undefined> {
 export async function trustAgentsMd(cwd: string, capture: Capture, trusted: string): Promise<void> {
   const current = await readTextIfExists(join(cwd, AGENTS_MD));
   capture.agentsMd = trusted;
+  if (current !== undefined) capture.protected[AGENTS_MD] = current;
   if (current === trusted) Object.assign(capture.snapshot, await hashPaths(cwd, [AGENTS_MD]));
   await saveCapture(cwd, capture);
 }
@@ -147,16 +150,11 @@ async function captureContract(cwd: string, config: Config, task: Task) {
     ) as Capture["prompts"],
     reviewer: await findReviewer(cwd, config.backend),
     ...(agentsMd === undefined ? {} : { agentsMd }),
-    protected: await collectProtected(cwd, await runnerFiles(cwd, config, task)),
+    ...(await collectProtected(cwd, {
+      suite: suiteCommands(config).map((item) => item.command),
+      verification: verificationCommands(task.body),
+      own: scopePaths(task),
+    })),
+    flagged: (await flaggedFiles(cwd)) ?? [],
   };
-}
-
-async function runnerFiles(cwd: string, config: Config, task: Task): Promise<string[]> {
-  const scope = scopePaths(task);
-  const suite = await referencedFiles(
-    cwd,
-    suiteCommands(config).map((item) => item.command),
-  );
-  const own = await referencedFiles(cwd, verificationCommands(task.body));
-  return [...suite, ...own.filter((path) => !inScope(path, scope))];
 }

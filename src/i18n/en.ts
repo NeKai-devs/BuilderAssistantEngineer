@@ -306,6 +306,18 @@ export const en = {
     "Verification only runs commands that already failed before the task, so it checks nothing about this task.",
   "evidence.linesFailed":
     "The plan cites lines that do not exist, even after asking the analyst to fix them:\n{{list}}\nThe plan was not written; the rejected answer is in {{path}}. Run plan again.",
+  "state.tampered":
+    "Code run for this task changed bae's own state outside the repository ({{files}}); it was restored and the attempt fails.",
+  "review.gitError":
+    "Review failed: git could not list the task's changes (a broken index, config or filter), so the checks cannot see them.",
+  "contract.memory": "Changed an agent memory file, which agents and reviewers read.",
+  "contract.git": "Changed git attributes, which decide how the review sees files.",
+  "contract.gitdir": "Changed the repository's git settings in .git, which the checks rely on.",
+  "contract.toolchain":
+    "Changed a package manager or tool setting that decides how the checks run.",
+  "contract.shadow": "Added a file that would run instead of the project's own tool.",
+  "contract.indexFlags":
+    "Marked files as unchanged in the git index (assume-unchanged or skip-worktree), which hides them from the review: {{files}}. The flags were cleared.",
 } as const;
 
 export type MessageKey = keyof typeof en;

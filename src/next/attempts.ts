@@ -12,6 +12,7 @@ import {
 } from "../gates/capture.js";
 import { enforceContract } from "../gates/enforce.js";
 import { type Gate, type GateRun, runGate } from "../gates/gate.js";
+import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
 import { capturedTask } from "../review/run.js";
 import {
@@ -44,7 +45,7 @@ export async function attemptOnce(
   const launched = await launch(ctx, run, startedAt, false, () =>
     backend.run(prompt, { cwd: ctx.cwd, interactive: true }),
   );
-  if (!launched.ok) return notDone(ctx, capture, launched.reason);
+  if (!launched.ok) return notDone(ctx, capture);
   const result = await gate(ctx, run);
   await writeRunLog(ctx.cwd, capture.id, result.report);
   const outcome = result.passed ? "done" : result.stage === "refused" ? "blocked" : "failed";
@@ -52,7 +53,7 @@ export async function attemptOnce(
   if (result.passed) return complete(ctx, capture);
   if (outcome === "blocked") return block(ctx, capture, result.reason ?? "");
   await learnFromReviews(ctx, capture, result);
-  return notDone(ctx, capture, result.reason);
+  return notDone(ctx, capture);
 }
 
 export async function headlessLoop(
@@ -80,9 +81,7 @@ export async function headlessLoop(
       backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print, timeoutMs }),
     );
     if (!launched.ok) {
-      return left === 0
-        ? block(ctx, capture, launched.reason)
-        : notDone(ctx, capture, launched.reason);
+      return left === 0 ? block(ctx, capture, launched.reason) : notDone(ctx, capture);
     }
     const result = await gate(ctx, run);
     await writeRunLog(ctx.cwd, capture.id, `# Attempt ${attempt}\n\n${result.report}`);
@@ -92,7 +91,7 @@ export async function headlessLoop(
     await record(ctx, run, startedAt, true, { outcome, gate: result });
     if (result.passed) return complete(ctx, capture);
     if (blocked) return block(ctx, capture, result.reason ?? "");
-    if (!result.retryable) return notDone(ctx, capture, result.reason);
+    if (!result.retryable) return notDone(ctx, capture);
     await learnFromReviews(ctx, capture, result);
     prompt = renderPrompt(capturedPrompt(capture, "retry"), {
       task: capture.task,
@@ -113,19 +112,25 @@ async function launch(
   go: () => Promise<unknown>,
 ): Promise<Launched> {
   await markActive(ctx.cwd, run.capture.id);
+  const guard = await guardState(ctx.cwd);
+  let failure: unknown;
+  let failed = false;
   try {
     await go();
   } catch (error) {
-    await enforceContract(ctx, run.capture, run.acceptance);
-    await clearActive(ctx.cwd);
-    const reason = error instanceof Error ? error.message : String(error);
-    await record(ctx, run, startedAt, headless, { outcome: "failed", stage: "agent", reason });
-    if (!(error instanceof UserError)) throw error;
-    ctx.prompter.warn(reason);
-    return { ok: false, reason };
+    failure = error;
+    failed = true;
   }
+  run.tampered.push(...(await guard.verify()));
   await setTaskStatus(ctx.cwd, capturedTask(run.capture), "in_progress");
-  return { ok: true };
+  if (!failed) return { ok: true };
+  await enforceContract(ctx, run.capture, run.acceptance);
+  await clearActive(ctx.cwd);
+  const reason = failure instanceof Error ? failure.message : String(failure);
+  await record(ctx, run, startedAt, headless, { outcome: "failed", stage: "agent", reason });
+  if (!(failure instanceof UserError)) throw failure;
+  ctx.prompter.warn(reason);
+  return { ok: false, reason };
 }
 
 async function gate(ctx: CommandContext, run: GateRun): Promise<Gate> {
@@ -173,8 +178,7 @@ async function block(ctx: CommandContext, capture: Capture, reason: string): Pro
   return false;
 }
 
-function notDone(ctx: CommandContext, capture: Capture, reason?: string): boolean {
-  if (reason) ctx.prompter.info(reason);
+function notDone(ctx: CommandContext, capture: Capture): boolean {
   ctx.prompter.outro(t("next.notDone", { id: capture.id, command: `${CLI} next` }));
   return false;
 }

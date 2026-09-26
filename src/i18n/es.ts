@@ -316,4 +316,17 @@ export const es: Messages = {
     "La Verificación solo ejecuta comandos que ya fallaban antes de la tarea, así que no comprueba nada de esta tarea.",
   "evidence.linesFailed":
     "El plan cita líneas que no existen, incluso después de pedir al analista que las corrija:\n{{list}}\nEl plan no se escribió; la respuesta rechazada está en {{path}}. Vuelve a correr plan.",
+  "state.tampered":
+    "Código ejecutado para esta tarea cambió el estado propio de bae fuera del repositorio ({{files}}); se restauró y el intento falla.",
+  "review.gitError":
+    "Revisión fallida: git no pudo listar los cambios de la tarea (índice, configuración o filtro rotos), así que los chequeos no pueden verlos.",
+  "contract.memory": "Cambió un archivo de memoria de agentes, que leen los agentes y el revisor.",
+  "contract.git": "Cambió atributos de git, que deciden cómo ve la revisión los archivos.",
+  "contract.gitdir":
+    "Cambió la configuración de git del repositorio en .git, de la que dependen los chequeos.",
+  "contract.toolchain":
+    "Cambió una configuración del gestor de paquetes o de una herramienta que decide cómo corren los chequeos.",
+  "contract.shadow": "Añadió un archivo que se ejecutaría en lugar de la herramienta del proyecto.",
+  "contract.indexFlags":
+    "Marcó archivos como sin cambios en el índice de git (assume-unchanged o skip-worktree), lo que los oculta de la revisión: {{files}}. Se quitaron las marcas.",
 };

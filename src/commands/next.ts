@@ -51,6 +51,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     acceptance,
     allowSkip,
     unattended,
+    tampered: [],
   };
   const prompt = await taskPrompt(ctx, capture, tasks);
   if (options.headless && !headless) ctx.prompter.warn(t("next.headlessNeedsAgent"));

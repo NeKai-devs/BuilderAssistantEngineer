@@ -23,7 +23,9 @@ import {
   suiteCommands,
   unusableBaseline,
 } from "../gates/regression.js";
+import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
+import { capturedTask } from "../review/run.js";
 import { recordAttempt } from "../tasks/attempts.js";
 import { type Task, verificationCommands, verificationScript } from "../tasks/schema.js";
 import { setTaskStatus } from "../tasks/status.js";
@@ -48,6 +50,7 @@ export async function recoverInterrupted(
   await clearActive(ctx.cwd);
   if (!capture) return;
   const contract = await enforceContract(ctx, capture, acceptance);
+  await setTaskStatus(ctx.cwd, capturedTask(capture), "in_progress");
   if (contract.blocked) ctx.prompter.warn(t("contract.recovered", { id }));
 }
 
@@ -114,7 +117,14 @@ async function recordBaseline(
     allowOrStop(ctx, options, skips, t("regression.declinedStop"));
     return { skipped: true, commands: {}, excluded: [] };
   }
+  const guard = await guardState(ctx.cwd);
   const results = await runSuite(ctx.cwd, suite, ctx.print);
+  const tampered = await guard.verify();
+  if (tampered.length > 0) {
+    ctx.prompter.warn(t("state.tampered", { files: tampered.join(", ") }));
+    ctx.prompter.outro(t("skip.stopped"));
+    throw new ExitCode(1);
+  }
   for (const result of results.filter((item) => item.exitCode !== 0)) {
     ctx.prompter.warn(
       t("regression.preexisting", { command: result.command, code: result.exitCode }),

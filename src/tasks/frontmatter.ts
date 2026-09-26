@@ -17,9 +17,14 @@ export function setFrontmatterFields(text: string, fields: Record<string, string
   if (!match) return text;
   let lines = (match[1] ?? "").split(/\r?\n/);
   for (const [key, value] of Object.entries(fields)) {
-    const index = lines.findIndex((line) => LINE.exec(line)?.[1] === key);
-    if (index === -1) lines = [...lines, `${key}: ${value}`];
-    else lines[index] = `${key}: ${value}`;
+    const first = lines.findIndex((line) => LINE.exec(line)?.[1] === key);
+    lines =
+      first === -1
+        ? [...lines, `${key}: ${value}`]
+        : lines.flatMap((line, index) => {
+            if (index === first) return [`${key}: ${value}`];
+            return LINE.exec(line)?.[1] === key ? [] : [line];
+          });
   }
   return `---\n${lines.join("\n")}\n---\n${text.slice(match[0].length)}`;
 }
