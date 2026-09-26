@@ -234,4 +234,5 @@ export const es: Messages = {
   "status.regressions": "regresiones atrapadas: {{count}}",
   "status.time": "tiempo por tarea hecha: {{average}} de media, {{total}} en total",
   "status.taskRuns": "{{attempts}} intento(s), {{time}}",
+  "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
 };

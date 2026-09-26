@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Backend } from "../../src/backends/types.js";
 import { main } from "../../src/cli.js";
 import { readConfig, writeConfig, writeInterview } from "../../src/config/store.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
@@ -246,6 +247,39 @@ describe("plan", () => {
       formatRetries: 0,
       tasks: 2,
     });
+  });
+
+  it("repairs loose markers and a missing final END FILE locally instead of asking again", async () => {
+    const cwd = await setup();
+    const answer = planOutput()
+      .replace("<<<END SUMMARY>>>", "<<< end summary >>>")
+      .replace(/<<<END FILE>>>$/, "");
+    const prompts: string[] = [];
+    const backend: Backend = {
+      name: "claude",
+      run: async (prompt, options) => {
+        prompts.push(prompt);
+        options.onInfo?.({ truncated: false });
+        return answer;
+      },
+    };
+    const ui = fakePrompter([]);
+    const code = await main(["node", "bae", "plan", "--yes"], cwd, {
+      prompter: ui.prompter,
+      createBackend: () => backend,
+      env: {},
+      print: () => {},
+    });
+    expect(code).toBe(0);
+    expect(prompts).toHaveLength(1);
+    expect(await exists(cwd, ".claude/commands/next.md")).toBe(true);
+    const report = JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"));
+    expect(report).toMatchObject({ formatRetries: 0, continuations: 0 });
+    expect(report.repairs).toEqual([
+      "normalized 1 marker(s) with extra spaces or lowercase",
+      "closed the last FILE block (.claude/commands/next.md) that was missing <<<END FILE>>>",
+    ]);
+    expect(ui.log.join("\n")).toContain("info: Repaired the answer locally:");
   });
 
   it("retries once when the answer is malformed", async () => {

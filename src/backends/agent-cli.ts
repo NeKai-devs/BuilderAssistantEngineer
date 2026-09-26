@@ -134,7 +134,12 @@ function parseClaudeJson(result: CommandResult): Parsed {
   if (!data || typeof data.result !== "string") return { text: result.stdout, info: {} };
   const models = Object.keys(asRecord(data.modelUsage));
   const cost = typeof data.total_cost_usd === "number" ? data.total_cost_usd : undefined;
-  return { text: data.result, info: { model: models.join(", ") || undefined, costUsd: cost } };
+  const truncated =
+    typeof data.stop_reason === "string" ? data.stop_reason === "max_tokens" : undefined;
+  return {
+    text: data.result,
+    info: { model: models.join(", ") || undefined, costUsd: cost, truncated },
+  };
 }
 
 function stderrModel(result: CommandResult, pattern: RegExp): string | undefined {

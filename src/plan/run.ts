@@ -14,11 +14,13 @@ import { t } from "../i18n/index.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
 import { describeUnverified, findUnverified, type Unverified } from "./evidence.js";
 import { type ParsedPlan, PLAN_FORMAT, parseFileBlocks, parsePlan, renderPlan } from "./parser.js";
+import { repairPlan } from "./repair.js";
 import { newPlanStats, type PlanStats, recordInfo, writePlanReport } from "./report.js";
 
 export type PlanRequest = { priorPlan: string; knownTaskIds: string[] };
 
 type Parse = (text: string) => ParsedPlan;
+type Ending = { truncated?: boolean };
 
 const MAX_CONTINUATIONS = 3;
 const MAX_REPO_FILES_CHARS = 20_000;
@@ -73,12 +75,17 @@ async function requestPlan(
   stats: PlanStats,
 ): Promise<ParsedPlan> {
   return ctx.prompter.spinner(t("plan.analyzing"), (update) => {
+    const ending: Ending = {};
     const options: RunOptions = {
       cwd: ctx.cwd,
       access: "read",
       stream: progress(update),
-      onInfo: (info) => recordInfo(stats, info),
+      onInfo: (info) => {
+        recordInfo(stats, info);
+        if (info.truncated !== undefined) ending.truncated = info.truncated;
+      },
     };
+    const repair = (text: string) => repairAnswer(ctx, text, ending, stats);
     return runWithFormatRetry({
       backend,
       prompt,
@@ -90,20 +97,33 @@ async function requestPlan(
         stats.formatErrors.push(error.message);
         ctx.prompter.warn(t("format.retrying"));
       },
-      complete: (text) => continueTruncated(ctx, backend, prompt, text, options, stats),
+      complete: (text) => continueTruncated(ctx, backend, { prompt, text, options, stats, repair }),
     });
   });
+}
+
+function repairAnswer(ctx: CommandContext, text: string, ending: Ending, stats: PlanStats) {
+  const repaired = repairPlan(text, ending.truncated);
+  if (repaired.repairs.length > 0) {
+    stats.repairs.push(...repaired.repairs);
+    ctx.prompter.info(t("format.repaired", { repairs: repaired.repairs.join("; ") }));
+  }
+  return repaired.text;
 }
 
 async function continueTruncated(
   ctx: CommandContext,
   backend: Backend,
-  prompt: string,
-  text: string,
-  options: RunOptions,
-  stats: PlanStats,
+  answer: {
+    prompt: string;
+    text: string;
+    options: RunOptions;
+    stats: PlanStats;
+    repair: (text: string) => string;
+  },
 ): Promise<string> {
-  let current = text;
+  const { prompt, options, stats, repair } = answer;
+  let current = repair(answer.text);
   for (let round = 0; round < MAX_CONTINUATIONS; round++) {
     const cut = findTruncation(current);
     if (!cut) return current;
@@ -115,7 +135,7 @@ async function continueTruncated(
       next_marker: cut.marker,
     });
     const more = await backend.run(request, options);
-    current = mergeContinuation(cut.complete, more);
+    current = repair(mergeContinuation(cut.complete, more));
   }
   return current;
 }
@@ -169,7 +189,7 @@ async function fixPaths(
     onInfo: (info) => recordInfo(stats, info),
   });
   const replaced = new Map(
-    parseFileBlocks(reply)
+    parseFileBlocks(repairPlan(reply, undefined).text)
       .filter((file) => sources.has(file.path))
       .map((file) => [file.path, file]),
   );

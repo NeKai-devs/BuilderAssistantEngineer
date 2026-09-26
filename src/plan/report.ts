@@ -13,6 +13,7 @@ export type PlanStats = {
   formatErrors: string[];
   evidenceRetries: number;
   unverifiedPaths: string[];
+  repairs: string[];
 };
 
 export type PlanReport = PlanStats & {
@@ -36,6 +37,7 @@ export function newPlanStats(backend: string): PlanStats {
     formatErrors: [],
     evidenceRetries: 0,
     unverifiedPaths: [],
+    repairs: [],
   };
 }
 

@@ -59,11 +59,12 @@ describe("agent CLI backends", () => {
     ]);
   });
 
-  it("reads claude's JSON result, model and cost", async () => {
+  it("reads claude's JSON result, model, cost and whether the output limit cut it", async () => {
     const stdout = JSON.stringify({
       type: "result",
       result: "PLAN",
       total_cost_usd: 0.25,
+      stop_reason: "max_tokens",
       modelUsage: { "claude-opus-5-5": {} },
     });
     const { runner } = fakeRunner({ stdout });
@@ -76,7 +77,7 @@ describe("agent CLI backends", () => {
     });
     expect(output).toBe("PLAN");
     expect(chunks).toEqual(["PLAN"]);
-    expect(infos).toEqual([{ model: "claude-opus-5-5", costUsd: 0.25 }]);
+    expect(infos).toEqual([{ model: "claude-opus-5-5", costUsd: 0.25, truncated: true }]);
   });
 
   it("reads the model opencode prints on stderr", async () => {
