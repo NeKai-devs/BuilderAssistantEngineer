@@ -1,4 +1,5 @@
 import { execa } from "execa";
+import { findExecutable } from "./which.js";
 
 export type CommandResult = {
   exitCode: number;
@@ -19,6 +20,7 @@ export async function runCommand(
   args: string[],
   options: CommandOptions,
 ): Promise<CommandResult> {
+  if (!(await findExecutable(file))) return missing(file);
   const subprocess = execa(file, args, {
     cwd: options.cwd,
     input: options.input,
@@ -42,7 +44,12 @@ export async function runInteractive(
   args: string[],
   options: { cwd: string },
 ): Promise<CommandResult> {
+  if (!(await findExecutable(file))) return missing(file);
   const result = await execa(file, args, { cwd: options.cwd, stdio: "inherit", reject: false });
   const notFound = "code" in result && result.code === "ENOENT";
   return { exitCode: result.exitCode ?? -1, stdout: "", stderr: result.message ?? "", notFound };
+}
+
+function missing(file: string): CommandResult {
+  return { exitCode: -1, stdout: "", stderr: `${file}: command not found`, notFound: true };
 }
