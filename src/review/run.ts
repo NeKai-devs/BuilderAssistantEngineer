@@ -9,7 +9,7 @@ import { t } from "../i18n/index.js";
 import { parseTask, type Task } from "../tasks/schema.js";
 import { taskChanges } from "./changes.js";
 import { reviewDiff } from "./diff.js";
-import { mechanicalReview } from "./mechanical.js";
+import { type MechanicalFacts, mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
 import { scopePaths } from "./scope.js";
 
@@ -31,6 +31,7 @@ export async function reviewTask(
   capture: Capture,
   notes: ReviewFinding[] = [],
   acceptance: Acceptance = newAcceptance(),
+  facts: MechanicalFacts = { testsGrew: false },
 ): Promise<ReviewResult> {
   const task = capturedTask(capture);
   const view = await taskChanges(ctx.cwd, capture);
@@ -43,7 +44,7 @@ export async function reviewTask(
   if (view.changes.files.length === 0) {
     return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
   }
-  const mechanical = mechanicalReview(task, view.changes, acceptance);
+  const mechanical = mechanicalReview(task, view.changes, acceptance, facts);
   if (!mechanical.passed) {
     return {
       status: "fail",

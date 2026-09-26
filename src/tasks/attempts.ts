@@ -11,6 +11,7 @@ export const GATE_STAGES = [
   "declined",
   "verification",
   "regression",
+  "integrity",
   "handoff",
   "review",
 ] as const;

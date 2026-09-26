@@ -49,10 +49,11 @@ export function isAcceptableKind(kind: ContractKind): boolean {
   return ACCEPTABLE.has(kind);
 }
 
-export async function collectProtected(cwd: string): Promise<Protected> {
+export async function collectProtected(cwd: string, runners: string[] = []): Promise<Protected> {
   const candidates = [
     ...(await watchedFiles(cwd)),
     ...(await repoFiles(cwd)).filter((path) => repoProtected(path)),
+    ...runners,
   ];
   const result: Protected = {};
   for (const path of [...new Set(candidates)].sort()) {
@@ -229,6 +230,48 @@ function kindOf(path: string, taskPath: string): ContractKind {
   if (name === ".gitignore") return "gitignore";
   if (name === "package.json") return "scripts";
   return "runner";
+}
+
+export async function referencedFiles(cwd: string, commands: string[]): Promise<string[]> {
+  const scripts = asRecord(
+    parseObject((await readTextIfExists(absolute(cwd, "package.json"))) ?? "")?.scripts,
+  );
+  const seen = new Set<string>();
+  const pending = [...commands];
+  const found = new Set<string>();
+  while (pending.length > 0) {
+    const command = pending.shift() ?? "";
+    if (seen.has(command)) continue;
+    seen.add(command);
+    for (const segment of command.split(/&&|\|\||[;|]/)) {
+      const words = segment
+        .trim()
+        .split(/\s+/)
+        .map((word) => word.replace(/^["']|["']$/g, ""));
+      const script = npmScript(words);
+      if (script && typeof scripts[script] === "string") pending.push(scripts[script] as string);
+      if (words[0] === "make") found.add("Makefile");
+      for (const word of words.filter(looksLikePath)) found.add(word.replace(/^\.\//, ""));
+    }
+  }
+  const present = await Promise.all(
+    [...found].map(async (path) =>
+      (await readTextIfExists(absolute(cwd, path))) === undefined ? [] : [path],
+    ),
+  );
+  return present.flat();
+}
+
+function npmScript(words: string[]): string | undefined {
+  if (!["npm", "pnpm", "yarn", "bun"].includes(words[0] ?? "")) return undefined;
+  const rest = words.slice(1).filter((word) => !word.startsWith("-"));
+  if (rest[0] === "run" || rest[0] === "run-script") return rest[1];
+  return rest[0] === "test" || rest[0] === "t" ? "test" : undefined;
+}
+
+function looksLikePath(word: string): boolean {
+  if (word.includes("..") || word.startsWith("/") || /^[a-z]+:/i.test(word)) return false;
+  return /^(\.\/)?[\w@.-]+(\/[\w@.-]+)*\.(c?js|mjs|ts|mts|cts|py|sh|bash|rb|php|pl)$/.test(word);
 }
 
 function repoProtected(path: string): boolean {

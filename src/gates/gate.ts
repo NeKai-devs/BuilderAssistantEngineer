@@ -3,6 +3,8 @@ import type { CommandContext } from "../commands/context.js";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
 import { t } from "../i18n/index.js";
+import { countIntegrity, testsGrew } from "../review/integrity.js";
+import type { MechanicalFacts } from "../review/mechanical.js";
 import type { ReviewFinding } from "../review/parse.js";
 import { capturedTask, formatFindings, type ReviewResult, reviewTask } from "../review/run.js";
 import type { GateStage } from "../tasks/attempts.js";
@@ -86,7 +88,17 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
       regressions: regression.regressions.map((check) => check.command),
     };
   }
-  const known = new Map((regression?.checks ?? []).map((check) => [check.command, check]));
+  const checksRun = regression?.checks ?? [];
+  const integrity = countIntegrity(checksRun, acceptance);
+  if (integrity.length > 0) {
+    const list = formatFindings(integrity);
+    ctx.prompter.note(list, t("integrity.title"));
+    sections.push(`## ${t("integrity.title")}\n\n${list}`);
+  }
+  if (integrity.some((finding) => finding.severity === "blocker")) {
+    return fail("integrity", joinSections(sections), t("integrity.failed"));
+  }
+  const known = new Map(checksRun.map((check) => [check.command, check]));
   const excused = new Set([
     ...(fix ? [] : (regression?.preexisting ?? []).map((check) => check.command)),
     ...excluded,
@@ -106,7 +118,9 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     return fail("handoff", joinSections([...sections, `## Handoff note\n\n${handoff}`]), handoff);
   }
   ctx.prompter.success(t("handoff.passed"));
-  const review = await safeReview(ctx, capture, stillFailing(verification), acceptance);
+  const review = await safeReview(ctx, capture, stillFailing(verification), acceptance, {
+    testsGrew: testsGrew(checksRun),
+  });
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);
   if (findings) ctx.prompter.note(findings, t("review.findings"));
@@ -148,9 +162,10 @@ async function safeReview(
   capture: Capture,
   notes: ReviewFinding[],
   acceptance: Acceptance,
+  facts: MechanicalFacts,
 ): Promise<ReviewResult | { status: "error"; findings: ReviewFinding[]; reason: string }> {
   try {
-    return await reviewTask(ctx, capture, notes, acceptance);
+    return await reviewTask(ctx, capture, notes, acceptance, facts);
   } catch (error) {
     if (!(error instanceof UserError)) throw error;
     return { status: "error", findings: [], reason: t("review.error", { details: error.message }) };

@@ -8,12 +8,14 @@ import { BAE_DIR } from "../core/paths.js";
 import { loadPrompt, type Prompt } from "../core/prompt-loader.js";
 import { repoState } from "../core/state.js";
 import { findReviewer } from "../review/reviewer.js";
+import { inScope, scopePaths } from "../review/scope.js";
 import { hashPaths, takeSnapshot } from "../review/snapshot.js";
 import { runDir } from "../tasks/runs.js";
 import type { Task } from "../tasks/schema.js";
-import { collectProtected, TASKS_DIR } from "./contract.js";
+import { verificationCommands } from "../tasks/schema.js";
+import { collectProtected, referencedFiles, TASKS_DIR } from "./contract.js";
 import { captureIgnore } from "./ignore-rules.js";
-import { suiteBaselineSchema } from "./regression.js";
+import { suiteBaselineSchema, suiteCommands } from "./regression.js";
 
 export const CAPTURED_PROMPTS = ["review", "retry", "lesson", "fix-format"] as const;
 export type CapturedPrompt = (typeof CAPTURED_PROMPTS)[number];
@@ -145,6 +147,16 @@ async function captureContract(cwd: string, config: Config, task: Task) {
     ) as Capture["prompts"],
     reviewer: await findReviewer(cwd, config.backend),
     ...(agentsMd === undefined ? {} : { agentsMd }),
-    protected: await collectProtected(cwd),
+    protected: await collectProtected(cwd, await runnerFiles(cwd, config, task)),
   };
+}
+
+async function runnerFiles(cwd: string, config: Config, task: Task): Promise<string[]> {
+  const scope = scopePaths(task);
+  const suite = await referencedFiles(
+    cwd,
+    suiteCommands(config).map((item) => item.command),
+  );
+  const own = await referencedFiles(cwd, verificationCommands(task.body));
+  return [...suite, ...own.filter((path) => !inScope(path, scope))];
 }

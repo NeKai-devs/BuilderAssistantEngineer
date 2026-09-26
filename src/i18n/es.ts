@@ -202,7 +202,7 @@ export const es: Messages = {
     "Parece un archivo de secretos (.env, clave privada o credenciales); déjalo fuera del cambio.",
   "mechanical.secretValue": "Añade lo que parece una credencial ({{kind}}); léela del entorno.",
   "mechanical.noTests":
-    "La tarea exige tests (tests: required), pero el cambio no toca ningún archivo de test.",
+    "La tarea exige tests (tests: required), pero no ejecuta más tests que antes ni añade aserciones a un archivo de test.",
   "mechanical.outOfScope": "Cambios fuera del Scope de la tarea: {{files}}",
   "mechanical.failed": "Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
   "plan.openQuestions":
@@ -292,4 +292,14 @@ export const es: Messages = {
     "No es un repositorio git, así que la revisión no puede ver los cambios de la tarea.",
   "option.allowSkip":
     "continúa cuando un chequeo no puede correr (sin git, sin línea base, sin veredicto del revisor); cada omisión queda registrada",
+  "integrity.title": "Integridad de los tests",
+  "integrity.failed": "La tarea quitó o desactivó tests.",
+  "integrity.deleted": "Borra un archivo de test.",
+  "integrity.skipMarker": "Añade un marcador que omite o aísla tests ({{marker}}).",
+  "integrity.exclusion":
+    "Añade una configuración del runner de tests que deja tests fuera ({{keys}}).",
+  "integrity.fewerTests":
+    "`{{command}}` ejecuta menos tests que antes de la tarea ({{now}}; antes: {{before}}).",
+  "integrity.moreSkipped":
+    "`{{command}}` omite más tests que antes de la tarea ({{now}}; antes: {{before}}).",
 };

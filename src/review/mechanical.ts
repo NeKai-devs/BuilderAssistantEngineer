@@ -5,21 +5,27 @@ import { type Acceptance, accept, findingId, newAcceptance } from "../gates/find
 import { t } from "../i18n/index.js";
 import type { Task } from "../tasks/schema.js";
 import type { TaskChanges } from "./changes.js";
+import { staticIntegrity } from "./integrity.js";
 import type { ReviewFinding } from "./parse.js";
 import { inScope, scopePaths } from "./scope.js";
+import { addsAssertions } from "./tests.js";
 
 export type MechanicalReview = { passed: boolean; findings: ReviewFinding[] };
 
 const ALWAYS_IN_SCOPE = new Set([".gitignore"]);
 
+export type MechanicalFacts = { testsGrew: boolean };
+
 export function mechanicalReview(
   task: Task,
   changes: TaskChanges,
   acceptance: Acceptance = newAcceptance(),
+  facts: MechanicalFacts = { testsGrew: false },
 ): MechanicalReview {
   const findings = [
     ...secretFindings(changes).map((finding) => accept(acceptance, finding, true)),
-    ...testFindings(task, changes),
+    ...staticIntegrity(task, changes, acceptance),
+    ...testFindings(task, changes, facts),
     ...scopeFindings(task, changes),
   ];
   return { passed: !findings.some((finding) => finding.severity === "blocker"), findings };
@@ -50,8 +56,10 @@ function secretFindings(changes: TaskChanges): ReviewFinding[] {
   return [...files, ...values];
 }
 
-function testFindings(task: Task, changes: TaskChanges): ReviewFinding[] {
-  if (task.meta.tests !== "required" || changes.files.some(isTestFile)) return [];
+function testFindings(task: Task, changes: TaskChanges, facts: MechanicalFacts): ReviewFinding[] {
+  if (task.meta.tests !== "required" || facts.testsGrew || changes.added.some(addsAssertions)) {
+    return [];
+  }
   return [{ severity: "blocker", message: t("mechanical.noTests") }];
 }
 

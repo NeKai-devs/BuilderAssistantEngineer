@@ -81,20 +81,66 @@ describe("mechanicalReview on the with-secrets fixture", () => {
     ]);
   });
 
-  it("fails a task with tests: required until the change touches a test file", async () => {
+  it("fails a task with tests: required until a test file adds assertions", async () => {
     const untested = await changedRepo({ "src/config.js": "export const a = 1;\n" });
     expect(mechanicalReview(task({ tests: "required" }), untested).findings).toEqual([
       {
         severity: "blocker",
         message:
-          "The task requires tests (tests: required), but the change does not touch any test file.",
+          "The task requires tests (tests: required), but it neither runs more tests than before nor adds assertions to a test file.",
       },
     ]);
-    const tested = await changedRepo({
+    const comment = await changedRepo({
       "src/config.js": "export const a = 1;\n",
       "test/config.test.js": "// more tests\n",
     });
+    expect(mechanicalReview(task({ tests: "required" }), comment).passed).toBe(false);
+    const tested = await changedRepo({
+      "src/config.js": "export const a = 1;\n",
+      "test/config.test.js": "it('reads a', () => expect(a).toBe(1));\n",
+    });
     expect(mechanicalReview(task({ tests: "required" }), tested).passed).toBe(true);
+    const counted = await changedRepo({ "src/config.js": "export const a = 1;\n" });
+    expect(
+      mechanicalReview(task({ tests: "required" }), counted, undefined, { testsGrew: true }).passed,
+    ).toBe(true);
+  });
+
+  it("recognizes Rust inline tests, Cypress specs and e2e folders as tests", async () => {
+    const rust = await changedRepo({
+      "src/config.js": "export const a = 1;\n",
+      "src/lib.rs":
+        "#[cfg(test)]\nmod tests {\n    #[test]\n    fn adds() { assert_eq!(1 + 1, 2); }\n}\n",
+    });
+    expect(mechanicalReview(task({ tests: "required" }), rust).passed).toBe(true);
+    const cypress = await changedRepo({
+      "src/config.js": "export const a = 1;\n",
+      "cypress/e2e/login.cy.ts": "it('logs in', () => { cy.get('#u').should('exist'); });\n",
+    });
+    expect(mechanicalReview(task({ tests: "required" }), cypress).passed).toBe(true);
+  });
+
+  it("blocks deleted tests, new skip or only markers and new runner exclusions", async () => {
+    const changes = await changedRepo({
+      "src/config.js": "export const a = 1;\n",
+      "test/skip.test.js": "it.skip('slow', () => expect(1).toBe(1));\n",
+      "pytest.ini": "[pytest]\naddopts = --deselect tests/test_slow.py\n",
+    });
+    const messages = mechanicalReview(task(), changes).findings.map((finding) => [
+      finding.severity,
+      finding.file,
+      finding.message,
+    ]);
+    expect(messages).toContainEqual([
+      "blocker",
+      "test/skip.test.js",
+      "Adds a marker that skips or isolates tests (.skip).",
+    ]);
+    expect(messages).toContainEqual([
+      "blocker",
+      "pytest.ini",
+      "Adds a test runner configuration that leaves tests out (--deselect).",
+    ]);
   });
 
   it("reports files outside the Scope as a finding that does not block", async () => {

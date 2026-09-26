@@ -198,7 +198,7 @@ export const en = {
   "mechanical.secretValue":
     "Adds what looks like a credential ({{kind}}); read it from the environment instead.",
   "mechanical.noTests":
-    "The task requires tests (tests: required), but the change does not touch any test file.",
+    "The task requires tests (tests: required), but it neither runs more tests than before nor adds assertions to a test file.",
   "mechanical.outOfScope": "Changed outside the task's Scope: {{files}}",
   "mechanical.failed": "The automatic checks failed, so the reviewer was not run.",
   "plan.openQuestions":
@@ -283,6 +283,15 @@ export const en = {
   "capture.noGit": "This is not a git repository, so the review cannot see the task's changes.",
   "option.allowSkip":
     "go on when a check cannot run (no git, no baseline, no reviewer verdict); every skip is recorded",
+  "integrity.title": "Test integrity",
+  "integrity.failed": "The task removed or disabled tests.",
+  "integrity.deleted": "Deletes a test file.",
+  "integrity.skipMarker": "Adds a marker that skips or isolates tests ({{marker}}).",
+  "integrity.exclusion": "Adds a test runner configuration that leaves tests out ({{keys}}).",
+  "integrity.fewerTests":
+    "`{{command}}` runs fewer tests than before the task ({{now}}; before: {{before}}).",
+  "integrity.moreSkipped":
+    "`{{command}}` skips more tests than before the task ({{now}}; before: {{before}}).",
 } as const;
 
 export type MessageKey = keyof typeof en;

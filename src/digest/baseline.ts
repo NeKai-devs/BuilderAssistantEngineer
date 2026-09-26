@@ -135,11 +135,11 @@ const CI_PATHS = [
 ];
 
 const TEST_PATHS = [
-  /(^|\/)(__tests__|tests?|spec)\//,
-  /\.(test|spec)\.[a-z0-9]+$/i,
+  /(^|\/)(__tests__|tests?|spec|e2e|cypress)\//,
+  /\.(test|spec|cy|e2e)\.[a-z0-9]+$/i,
   /(^|\/)test_[^/]+\.py$/,
-  /_test\.(go|py|exs)$/,
-  /Tests?\.(cs|java|kt|swift)$/,
+  /_(test|spec)\.(go|py|exs|rb)$/,
+  /Tests?\.(cs|java|kt|swift|php|scala)$/,
 ];
 
 export function isTestFile(path: string): boolean {
