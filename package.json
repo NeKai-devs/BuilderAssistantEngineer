@@ -1,0 +1,49 @@
+{
+  "name": "builder-assistant-engineer",
+  "version": "0.0.0",
+  "description": "Turn an idea or an existing repo into an execution plan that console AI agents can run.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "builder-assistant-engineer": "dist/bin.js",
+    "bae": "dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.12"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "agents",
+    "claude-code",
+    "opencode",
+    "codex",
+    "gemini",
+    "planning"
+  ],
+  "scripts": {
+    "dev": "tsx src/bin.ts",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && node scripts/copy-prompts.mjs",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "picocolors": "^1.1.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
