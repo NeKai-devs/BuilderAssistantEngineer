@@ -209,6 +209,10 @@ export const en = {
   "md.blocking": "Blocking: the plan assumed an answer",
   "md.answer": "Answer",
   "md.open": "open, not answered yet",
+  "handoff.missing":
+    "{{path}} has no handoff note: write at most {{max}} lines under ## Log (what changed, decisions, traps).",
+  "handoff.tooLong": "The handoff note in {{path}} has {{count}} lines; keep it to {{max}}.",
+  "handoff.passed": "Handoff note present.",
 } as const;
 
 export type MessageKey = keyof typeof en;

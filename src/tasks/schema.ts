@@ -37,6 +37,7 @@ export const SECTIONS = {
   acceptance: ["acceptance criteria", "criterios de aceptación", "criterios de aceptacion"],
   verification: ["verification", "verificación", "verificacion"],
   risks: ["risks and notes", "riesgos y notas", "risks", "riesgos"],
+  log: ["log", "registro", "bitácora", "bitacora"],
 } as const;
 
 export type SectionKey = keyof typeof SECTIONS;

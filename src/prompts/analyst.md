@@ -90,6 +90,9 @@ Checklist; every item objectively verifiable.
 ## Verification
 Exact commands (tests, lint, build, curl, scripts) in a fenced ```sh block, one command per line, run from the repo root; exit code 0 means pass. Expected results in prose below the block. Never use sudo, destructive commands (rm -rf, git reset --hard) or piped installers (curl | sh); the CLI refuses to run them.
 ## Risks and notes
+## Log
+
+End every task with an empty `## Log` heading: the agent that executes the task writes its handoff note there, and the CLI requires it before marking the task done.
 
 `tests: required` when the task adds or changes behavior: the CLI fails the task if its diff touches no test file. `tests: optional` for docs, configuration or refactors already covered by existing tests.
 

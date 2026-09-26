@@ -40,6 +40,16 @@ describe("parsePlan", () => {
     expect(plan.files[0]?.content).toContain("ends with <<<END FILE>>> on its own line.");
   });
 
+  it("adds an empty Log section to task files that lack one", () => {
+    const files = {
+      "AGENTS.md": "x",
+      "docs/plan/tasks/T-001-a.md": taskFile("T-001").replace("## Log\n", ""),
+    };
+    const plan = parsePlan(planOutput({ files }));
+    expect(plan.files[1]?.content.endsWith("None.\n\n## Log\n")).toBe(true);
+    expect(plan.tasks[0]?.body).toContain("## Log");
+  });
+
   it("reads the project commands from the CONFIG block and drops nulls", () => {
     const config =
       '{"commands": {"test": "npm test", "lint": " npm run lint ", "typecheck": null}}';

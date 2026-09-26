@@ -1,4 +1,4 @@
-import { readdir, readFile, rm } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
@@ -14,10 +14,16 @@ const NEEDS_FILE = `node -e "process.exit(require('fs').existsSync('done.txt') ?
 const BREAKS_WITH = (file: string) =>
   `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
 const REVIEW_PASS = () => '{"verdict": "pass", "findings": []}';
+async function addLog(cwd: string, note = "Added the feature file; no traps.") {
+  const path = join(cwd, "docs/plan/tasks/T-001-first.md");
+  await writeFile(path, `${(await readFile(path, "utf8")).trimEnd()}\n${note}\n`);
+}
+
 const writesFile =
   (cwd: string, name: string): Step =>
   async () => {
     await writeFiles(cwd, { [name]: "work\n" });
+    await addLog(cwd);
     return "";
   };
 
@@ -165,7 +171,7 @@ describe("next", () => {
 
   it("uses the manual flow for api and manual backends and skips review outside git", async () => {
     const cwd = await repo(PASS, { git: false, backend: "manual" });
-    const { code, names, ui } = await runNext(cwd, ["--yes"], [() => ""]);
+    const { code, names, ui } = await runNext(cwd, ["--yes"], [() => addLog(cwd).then(() => "")]);
     expect(code).toBe(0);
     expect(names).toEqual(["manual"]);
     expect(ui.log.join("\n")).toContain("Review skipped: this is not a git repository");
@@ -300,5 +306,66 @@ describe("next mechanical review", () => {
     expect(calls).toHaveLength(3);
     expect(calls[1]?.prompt).toContain("- [blocker] .env: Looks like a secrets file");
     expect(calls[2]?.options).toMatchObject({ access: "read" });
+  });
+});
+
+describe("next handoff note", () => {
+  it("opens the prompt with the plan state, the commands and the last three notes", async () => {
+    const cwd = await repo(PASS, { commands: { test: PASS } });
+    const done = (id: string, deps: string[]) =>
+      taskFile(id, { status: "done", dependsOn: deps, log: `Note from ${id}.` });
+    await writeFiles(cwd, {
+      "docs/plan/tasks/T-001-first.md": done("T-001", []),
+      "docs/plan/tasks/T-002-second.md": done("T-002", ["T-001"]),
+      "docs/plan/tasks/T-003-third.md": done("T-003", ["T-002"]),
+      "docs/plan/tasks/T-004-fourth.md": done("T-004", ["T-003"]),
+      "docs/plan/tasks/T-005-fifth.md": taskFile("T-005", { dependsOn: ["T-004"] }),
+      "docs/plan/tasks/T-006-sixth.md": taskFile("T-006", { dependsOn: ["T-005"] }),
+      "docs/plan/tasks/T-007-seventh.md": taskFile("T-007", { status: "blocked" }),
+    });
+    const { calls } = await runNext(cwd, ["--yes"], [() => ""]);
+    const prompt = calls[0]?.prompt ?? "";
+    expect(prompt).toContain(
+      "## Where the plan stands\n\n- Done: 4 of 7 tasks. You are on T-005 (phase 1).\n- Blocked, do not work on them: T-007 Do T-007\n- Up next after this task: T-006 Do T-006",
+    );
+    expect(prompt).toContain(`## Project commands\n\n- test: \`${PASS}\``);
+    expect(prompt).toContain("### T-004 Do T-004\n\nNote from T-004.");
+    expect(prompt).toContain("### T-002 Do T-002\n\nNote from T-002.");
+    expect(prompt).not.toContain("Note from T-001.");
+    expect(prompt).toContain("under `## Log` in docs/plan/tasks/T-005-fifth.md");
+  });
+
+  it("adds a Log heading to task files from older plans when the task starts", async () => {
+    const cwd = await repo(PASS);
+    const path = "docs/plan/tasks/T-001-first.md";
+    await writeFiles(cwd, { [path]: taskFile("T-001", { command: PASS }).replace("## Log\n", "") });
+    await runNext(cwd, ["--yes"], [() => ""]);
+    expect(await readFile(join(cwd, path), "utf8")).toMatch(/None\.\n\n## Log\n$/);
+  });
+
+  it("keeps the task out of done until the agent writes a short handoff note", async () => {
+    const cwd = await repo(PASS);
+    const silent: Step = async () => {
+      await writeFiles(cwd, { "feature.txt": "work\n" });
+      return "";
+    };
+    const verbose: Step = () =>
+      addLog(cwd, Array.from({ length: 9 }, (_, index) => `line ${index + 1}`).join("\n")).then(
+        () => "",
+      );
+    const { code, calls, ui } = await runNext(
+      cwd,
+      ["--headless", "--yes"],
+      [silent, verbose, () => ""],
+    );
+    expect(code).toBe(1);
+    expect(calls).toHaveLength(3);
+    expect(calls[1]?.prompt).toContain(
+      "docs/plan/tasks/T-001-first.md has no handoff note: write at most 8 lines under ## Log",
+    );
+    expect(calls[2]?.prompt).toContain(
+      "The handoff note in docs/plan/tasks/T-001-first.md has 9 lines; keep it to 8.",
+    );
+    expect(ui.log.join("\n")).not.toContain("Review passed.");
   });
 });

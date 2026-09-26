@@ -1,5 +1,7 @@
+import { join } from "node:path";
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
+import { readTextIfExists } from "../core/fs.js";
 import { headCommit } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
 import type { ShellResult } from "../core/process.js";
@@ -15,9 +17,9 @@ import {
 } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
 import { formatFindings, reviewTask } from "../review/run.js";
+import { logLines, MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
 import { readBase, saveBase, writeRunLog } from "../tasks/runs.js";
-import type { Task } from "../tasks/schema.js";
-import { verificationCommands } from "../tasks/schema.js";
+import { parseTask, type Task, verificationCommands } from "../tasks/schema.js";
 import { pickNext, waitingOn } from "../tasks/select.js";
 import { setTaskStatus } from "../tasks/status.js";
 import { findUnsafe, runVerification, type VerificationRun } from "../tasks/verify.js";
@@ -53,11 +55,12 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     return;
   }
   const started = await start(ctx, config, task, checks.suite);
+  const prompt = await taskPrompt(ctx, config, started, tasks);
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   if (options.headless && !headless) ctx.prompter.warn(t("next.headlessNeedsAgent"));
   const done = headless
-    ? await headlessLoop(ctx, config, started, checks)
-    : await attemptOnce(ctx, config, started, checks);
+    ? await headlessLoop(ctx, config, started, checks, prompt)
+    : await attemptOnce(ctx, config, started, checks, prompt);
   if (!done) throw new ExitCode(1);
 }
 
@@ -103,10 +106,11 @@ async function attemptOnce(
   config: Config,
   task: Task,
   checks: Checks,
+  prompt: string,
 ): Promise<boolean> {
   const backend = ctx.createBackend(isAgentBackend(config.backend) ? config.backend : "manual");
   ctx.prompter.info(t("next.launching", { backend: backend.name }));
-  await backend.run(await taskPrompt(ctx, task), { cwd: ctx.cwd, interactive: true });
+  await backend.run(prompt, { cwd: ctx.cwd, interactive: true });
   await setTaskStatus(ctx.cwd, task, "in_progress");
   const gate = await runGate(ctx, config, task, checks, { granted: false });
   await writeRunLog(ctx.cwd, task.meta.id, gate.report);
@@ -120,10 +124,11 @@ async function headlessLoop(
   config: Config,
   task: Task,
   checks: Checks,
+  first: string,
 ): Promise<boolean> {
   const backend = ctx.createBackend(config.backend);
   const approval: Approval = { granted: false };
-  let prompt = await taskPrompt(ctx, task);
+  let prompt = first;
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     ctx.prompter.info(t("next.attempt", { attempt, max: MAX_RETRIES + 1, backend: backend.name }));
     await backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print });
@@ -182,7 +187,18 @@ async function runGate(
   if (regression && !regression.passed) {
     return { passed: false, retryable: true, report: checked };
   }
-  const review = await reviewTask(ctx, config, task);
+  const current = await reloadTask(ctx, task);
+  const handoff = handoffProblem(current);
+  if (handoff) {
+    ctx.prompter.warn(handoff);
+    return {
+      passed: false,
+      retryable: true,
+      report: `${checked}\n\n## Handoff note\n\n${handoff}`,
+    };
+  }
+  ctx.prompter.success(t("handoff.passed"));
+  const review = await reviewTask(ctx, config, current);
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);
   if (findings) ctx.prompter.note(findings, t("review.findings"));
@@ -258,8 +274,40 @@ function verificationReport(verification: VerificationRun): string {
   return ["## Verification", ...runs].join("\n\n");
 }
 
-async function taskPrompt(ctx: CommandContext, task: Task): Promise<string> {
-  return renderPrompt(await loadPrompt("task", ctx.cwd), { task: task.text.trim() });
+async function taskPrompt(
+  ctx: CommandContext,
+  config: Config,
+  task: Task,
+  tasks: Task[],
+): Promise<string> {
+  const others = tasks.map((item) => (item.meta.id === task.meta.id ? task : item));
+  return renderPrompt(await loadPrompt("task", ctx.cwd), {
+    context: planContext(config, others, task),
+    task: task.text.trim(),
+    task_path: task.path,
+    max_log_lines: String(MAX_LOG_LINES),
+    suite:
+      suiteCommands(config).length > 0
+        ? ", then the project's lint and test commands, which must not turn red"
+        : "",
+  });
+}
+
+async function reloadTask(ctx: CommandContext, task: Task): Promise<Task> {
+  const text = await readTextIfExists(join(ctx.cwd, ...task.path.split("/")));
+  if (text === undefined) return task;
+  try {
+    return parseTask(task.path, text);
+  } catch {
+    return task;
+  }
+}
+
+function handoffProblem(task: Task): string | undefined {
+  const count = logLines(task).length;
+  const vars = { path: task.path, max: MAX_LOG_LINES, count };
+  if (count === 0) return t("handoff.missing", vars);
+  return count > MAX_LOG_LINES ? t("handoff.tooLong", vars) : undefined;
 }
 
 function describeTask(task: Task, checks: Checks): string {

@@ -215,4 +215,9 @@ export const es: Messages = {
   "md.blocking": "Bloqueante: el plan asumió una respuesta",
   "md.answer": "Respuesta",
   "md.open": "abierta, sin responder",
+  "handoff.missing":
+    "{{path}} no tiene nota de traspaso: escribe como máximo {{max}} líneas bajo ## Log (qué cambió, decisiones, trampas).",
+  "handoff.tooLong":
+    "La nota de traspaso de {{path}} tiene {{count}} líneas; déjala en {{max}} como máximo.",
+  "handoff.passed": "Nota de traspaso presente.",
 };

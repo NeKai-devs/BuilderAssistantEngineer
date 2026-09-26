@@ -5,6 +5,7 @@ export type TaskOptions = {
   command?: string;
   tests?: "required" | "optional";
   scope?: string;
+  log?: string;
 };
 
 export function taskFile(id: string, options: TaskOptions = {}): string {
@@ -36,6 +37,8 @@ export function taskFile(id: string, options: TaskOptions = {}): string {
     "Tests pass.",
     "## Risks and notes",
     "None.",
+    "## Log",
+    ...(options.log === undefined ? [] : [options.log]),
     "",
   ].join("\n");
 }

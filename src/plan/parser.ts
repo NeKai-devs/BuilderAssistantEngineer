@@ -4,6 +4,7 @@ import type { Commands } from "../config/schema.js";
 import { FormatError } from "../core/errors.js";
 import { splitFrontmatter } from "../tasks/frontmatter.js";
 import { findCycle } from "../tasks/graph.js";
+import { withLogSection } from "../tasks/handoff.js";
 import { parseTask, TASK_PATH, type Task, taskProblems } from "../tasks/schema.js";
 
 export type PlanFile = { path: string; content: string };
@@ -74,7 +75,7 @@ export const PLAN_FORMAT = [
   ".claude/agents/*.md, .claude/commands/*.md, .opencode/agent/*.md, .opencode/command/*.md.",
   "Task files start with YAML frontmatter (id, title, status, phase, depends_on, size S|M|L,",
   "risk low|medium|high, tests required|optional) and contain the sections Goal, Context, Scope, Steps, Acceptance criteria,",
-  "Verification (commands in a ```sh block, one per line) and Risks and notes.",
+  "Verification (commands in a ```sh block, one per line), Risks and notes, and an empty Log.",
   "Subagent files start with YAML frontmatter that includes a description.",
 ].join("\n");
 
@@ -86,7 +87,9 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
   if (summary === "" && problems.length === 0) problems.push("SUMMARY is empty");
   const questions = parseQuestions(single(blocks, "QUESTIONS", problems)?.body, problems);
   const commands = parseConfig(blocks, warnings);
-  const files = collectFiles(blocks, problems);
+  const files = collectFiles(blocks, problems).map((file) =>
+    TASK_PATH.test(file.path) ? { ...file, content: withLogSection(file.content) } : file,
+  );
   const tasks = validateTasks(files, options.knownTaskIds ?? [], problems);
   warnings.push(...missingTestPolicies(files));
   validateAgents(files, options.requireReviewer ?? false, problems);
