@@ -28,6 +28,7 @@ export async function runCommand(
     input: options.input,
     timeout: options.timeoutMs,
     reject: false,
+    env: { PWD: options.cwd },
   });
   const { onStdout } = options;
   if (onStdout) subprocess.stdout?.on("data", (chunk: Buffer) => onStdout(chunk.toString()));
@@ -47,7 +48,12 @@ export async function runInteractive(
   options: { cwd: string },
 ): Promise<CommandResult> {
   if (!(await findExecutable(file))) return missing(file);
-  const result = await execa(file, args, { cwd: options.cwd, stdio: "inherit", reject: false });
+  const result = await execa(file, args, {
+    cwd: options.cwd,
+    stdio: "inherit",
+    reject: false,
+    env: { PWD: options.cwd },
+  });
   const notFound = "code" in result && result.code === "ENOENT";
   return { exitCode: result.exitCode ?? -1, stdout: "", stderr: result.message ?? "", notFound };
 }
@@ -68,6 +74,7 @@ export async function runShell(
     all: true,
     reject: false,
     timeout: options.timeoutMs ?? SHELL_TIMEOUT_MS,
+    env: { PWD: options.cwd },
   });
   const { onOutput } = options;
   if (onOutput) subprocess.all?.on("data", (chunk: Buffer) => onOutput(chunk.toString()));

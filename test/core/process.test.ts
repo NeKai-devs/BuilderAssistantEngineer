@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runCommand } from "../../src/core/process.js";
+import { tempDir } from "../helpers.js";
 
 describe("runCommand", () => {
   it("pipes stdin, streams stdout and reports the exit code", async () => {
@@ -13,6 +14,18 @@ describe("runCommand", () => {
     });
     expect(result).toMatchObject({ exitCode: 3, stdout: "hello", notFound: false });
     expect(chunks.join("")).toBe("hello");
+  });
+
+  it("sets PWD to the working directory of the child", async () => {
+    const cwd = await tempDir();
+    const result = await runCommand(
+      process.execPath,
+      ["-e", "process.stdout.write(process.env.PWD ?? '')"],
+      {
+        cwd,
+      },
+    );
+    expect(result.stdout).toBe(cwd);
   });
 
   it("flags a missing executable", async () => {

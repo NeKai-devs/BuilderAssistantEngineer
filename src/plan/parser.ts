@@ -28,7 +28,8 @@ export type ParseOptions = { knownTaskIds?: string[]; requireReviewer?: boolean 
 
 type Block = { kind: "SUMMARY" | "QUESTIONS" | "FILE"; path: string; body: string };
 
-const MARKER = /<<<(SUMMARY|QUESTIONS|END SUMMARY|END QUESTIONS|END FILE|FILE:[^>\n]*)>>>/g;
+export const MARKER =
+  /^[ \t]*<<<(SUMMARY|QUESTIONS|END SUMMARY|END QUESTIONS|END FILE|FILE:[^>\n]*)>>>/gm;
 const MAX_PROBLEMS = 20;
 
 const ALLOWED_PATHS = [

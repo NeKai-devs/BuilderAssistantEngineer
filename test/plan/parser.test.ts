@@ -30,6 +30,16 @@ describe("parsePlan", () => {
     expect(plan.warnings).toEqual([]);
   });
 
+  it("only treats markers at the start of a line as markers", () => {
+    const files = {
+      "AGENTS.md":
+        "Output uses `<<<FILE: path>>>` blocks.\nEach ends with <<<END FILE>>> on its own line.",
+    };
+    const plan = parsePlan(planOutput({ files }));
+    expect(plan.files[0]?.content).toContain("`<<<FILE: path>>>` blocks.");
+    expect(plan.files[0]?.content).toContain("ends with <<<END FILE>>> on its own line.");
+  });
+
   it("tolerates chatter outside the blocks with a warning and fenced JSON questions", () => {
     const text = `Sure, here is the plan:\n${planOutput({ questions: "```json\n[]\n```" })}\nDone!`;
     const plan = parsePlan(text);
