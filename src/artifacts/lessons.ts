@@ -27,7 +27,7 @@ function removeLessons(body: string): string {
   const start = body.indexOf(LESSONS_BEGIN);
   const end = body.indexOf(LESSONS_END);
   if (start === -1 || end < start) return body;
-  const heading = body.lastIndexOf("\n## ", start);
-  const from = heading === -1 ? start : heading;
+  const heading = /(?:^|\n)## [^\n]*\n\s*$/.exec(body.slice(0, start));
+  const from = heading ? heading.index : start;
   return `${body.slice(0, from)}${body.slice(end + LESSONS_END.length)}`;
 }

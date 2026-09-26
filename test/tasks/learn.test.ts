@@ -29,4 +29,14 @@ describe("addLesson", () => {
       "# Mine\n\n<!-- bae:begin -->\n# Project\n\n## Lessons learned\n\n<!-- bae:lessons -->\n- Rule one.\n- Rule two.\n<!-- bae:lessons:end -->\n<!-- bae:end -->\n\nFooter.\n",
     );
   });
+
+  it("keeps a single heading when AGENTS.md has no generated memory yet", async () => {
+    const cwd = await tempDir();
+    await addLesson(cwd, "Rule A.");
+    await addLesson(cwd, "Rule B.");
+    await addLesson(cwd, "Rule C.");
+    const text = await readFile(join(cwd, "AGENTS.md"), "utf8");
+    expect(text.match(/## Lessons learned/g)).toHaveLength(1);
+    expect(text).toContain("- Rule A.\n- Rule B.\n- Rule C.");
+  });
 });
