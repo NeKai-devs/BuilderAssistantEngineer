@@ -130,9 +130,10 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   const handoff = handoffProblem(await currentTask(ctx, capture));
   if (handoff) {
     ctx.prompter.warn(handoff);
-    return fail("handoff", joinSections([...sections, `## Handoff note\n\n${handoff}`]), handoff);
+    sections.push(`## Handoff note\n\n${handoff}`);
+  } else {
+    ctx.prompter.success(t("handoff.passed"));
   }
-  ctx.prompter.success(t("handoff.passed"));
   const review = await safeReview(ctx, capture, stillFailing(verification, known), acceptance, {
     testsGrew: testsGrew(checksRun),
     secrets: capture.config.secrets,

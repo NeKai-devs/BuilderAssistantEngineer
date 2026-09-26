@@ -517,31 +517,28 @@ describe("next handoff note", () => {
     expect(await readFile(join(cwd, path), "utf8")).toMatch(/None\.\n\n## Log\n$/);
   });
 
-  it("keeps the task out of done until the agent writes a short handoff note", async () => {
+  it("warns about a missing or long handoff note without failing the task", async () => {
     const cwd = await repo(PASS);
     const silent: Step = async () => {
       await writeFiles(cwd, { "feature.txt": "work\n" });
       return "";
     };
-    const verbose: Step = () =>
-      addLog(cwd, Array.from({ length: 9 }, (_, index) => `line ${index + 1}`).join("\n")).then(
-        () => "",
+    const { code, calls, ui } = await runNext(cwd, ["--headless", "--yes"], [silent, REVIEW_PASS]);
+    expect(code).toBe(0);
+    expect(ui.log).toContain(
+      "warn: docs/plan/tasks/T-001-first.md has no handoff note: write at most 8 lines under ## Log (what changed, decisions, traps).",
+    );
+    expect(calls[1]?.prompt).toContain("new file: feature.txt");
+    const verbose = await repo(PASS);
+    const long: Step = () =>
+      addLog(verbose, Array.from({ length: 9 }, (_, index) => `line ${index + 1}`).join("\n")).then(
+        () => writeFiles(verbose, { "feature.txt": "work\n" }).then(() => ""),
       );
-    const lesson = () => '{"root_cause": "No note.", "rule": "Write the Log before exiting."}';
-    const { code, calls, ui } = await runNext(
-      cwd,
-      ["--headless", "--yes"],
-      [silent, verbose, () => "", lesson],
+    const second = await runNext(verbose, ["--yes"], [long, REVIEW_PASS]);
+    expect(second.code).toBe(0);
+    expect(second.ui.log).toContain(
+      "warn: The handoff note in docs/plan/tasks/T-001-first.md has 9 lines; keep it to 8.",
     );
-    expect(code).toBe(1);
-    expect(calls).toHaveLength(4);
-    expect(calls[1]?.prompt).toContain(
-      "docs/plan/tasks/T-001-first.md has no handoff note: write at most 8 lines under ## Log",
-    );
-    expect(calls[2]?.prompt).toContain(
-      "The handoff note in docs/plan/tasks/T-001-first.md has 9 lines; keep it to 8.",
-    );
-    expect(ui.log.join("\n")).not.toContain("Review passed.");
   });
 });
 

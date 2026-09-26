@@ -138,7 +138,8 @@ export const es: Messages = {
   "review.passed": "Revisión superada.",
   "review.failed": "La revisión de {{id}} no pasó.",
   "review.noGit": "Revisión omitida: no es un repositorio git, así que no hay diff que revisar.",
-  "review.emptyDiff": "No se encontraron cambios para esta tarea.",
+  "review.noChanges":
+    "La tarea no cambió archivos y sus chequeos pasan, así que no se llamó al revisor.",
   "review.dryRun": "Dry run: el prompt de revisión de arriba no se envió.",
   "review.noTask": "No hay ninguna tarea en curso. Indica un id, p. ej. review T-003.",
   "review.unknownTask": "No se encontró la tarea {{id}} en docs/plan/tasks.",

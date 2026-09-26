@@ -41,10 +41,10 @@ export async function reviewTask(
       ? { status: "skipped", findings: [], reason }
       : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
   }
-  if (view.changes.files.length === 0) {
-    return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
-  }
   const mechanical = mechanicalReview(task, view.changes, acceptance, facts);
+  if (mechanical.passed && view.changes.files.length === 0) {
+    return { status: "pass", findings: mechanical.findings, reason: t("review.noChanges") };
+  }
   if (!mechanical.passed) {
     return {
       status: "fail",

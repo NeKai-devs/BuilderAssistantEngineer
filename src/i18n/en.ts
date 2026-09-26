@@ -133,7 +133,8 @@ export const en = {
   "review.passed": "Review passed.",
   "review.failed": "Review failed for {{id}}.",
   "review.noGit": "Review skipped: this is not a git repository, so there is no diff to review.",
-  "review.emptyDiff": "No changes were found for this task.",
+  "review.noChanges":
+    "The task changed no files and its checks pass, so the reviewer was not called.",
   "review.dryRun": "Dry run: the review prompt above was not sent.",
   "review.noTask": "No task is in progress. Pass a task id, e.g. review T-003.",
   "review.unknownTask": "Task {{id}} was not found in docs/plan/tasks.",
