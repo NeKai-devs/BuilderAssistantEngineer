@@ -149,14 +149,36 @@ describe("next", () => {
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("done");
   });
 
-  it("blocks the task after two failed retries and keeps the logs", async () => {
+  it("blocks the task after two failed retries, keeps the logs and records a lesson", async () => {
     const cwd = await repo(FAIL);
     const noop: Step = () => "";
-    const { code, calls } = await runNext(cwd, ["--headless", "--yes"], [noop, noop, noop]);
+    const lesson = () =>
+      '{"root_cause": "The command was never implemented.", "rule": "Run the Verification commands before finishing."}';
+    const { code, calls, ui } = await runNext(
+      cwd,
+      ["--headless", "--yes"],
+      [noop, noop, noop, lesson],
+    );
     expect(code).toBe(1);
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
+    expect(calls[3]?.options).toMatchObject({ access: "read" });
+    expect(calls[3]?.prompt).toContain("was blocked after every automatic retry failed");
+    expect(calls[3]?.prompt).toContain("# Attempt 3");
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("blocked");
-    expect(await logs(cwd, "T-001")).toHaveLength(3);
+    expect(await logs(cwd, "T-001")).toHaveLength(4);
+    expect(ui.log).toContain("success: Rule added to AGENTS.md.");
+    expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toBe(
+      "# Rules\n\n<!-- bae:begin -->\n## Lessons learned\n\n<!-- bae:lessons -->\n- Run the Verification commands before finishing.\n<!-- bae:lessons:end -->\n<!-- bae:end -->\n",
+    );
+    const attempts = (await readFile(join(cwd, ".bae/runs/T-001/attempts.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(attempts.map((attempt) => [attempt.outcome, attempt.stage, attempt.headless])).toEqual([
+      ["failed", "verification", true],
+      ["failed", "verification", true],
+      ["blocked", "verification", true],
+    ]);
   });
 
   it("refuses unsafe verification commands even with --yes and does not retry", async () => {
@@ -353,13 +375,14 @@ describe("next handoff note", () => {
       addLog(cwd, Array.from({ length: 9 }, (_, index) => `line ${index + 1}`).join("\n")).then(
         () => "",
       );
+    const lesson = () => '{"root_cause": "No note.", "rule": "Write the Log before exiting."}';
     const { code, calls, ui } = await runNext(
       cwd,
       ["--headless", "--yes"],
-      [silent, verbose, () => ""],
+      [silent, verbose, () => "", lesson],
     );
     expect(code).toBe(1);
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(calls[1]?.prompt).toContain(
       "docs/plan/tasks/T-001-first.md has no handoff note: write at most 8 lines under ## Log",
     );
@@ -367,5 +390,58 @@ describe("next handoff note", () => {
       "The handoff note in docs/plan/tasks/T-001-first.md has 9 lines; keep it to 8.",
     );
     expect(ui.log.join("\n")).not.toContain("Review passed.");
+  });
+});
+
+describe("next lessons", () => {
+  const REVIEW_FAIL = () =>
+    '{"verdict": "fail", "findings": [{"severity": "blocker", "message": "no tests"}]}';
+  const LESSON = () =>
+    '{"root_cause": "Tests were skipped.", "rule": "- Add a test for every new route.\\nExtra line."}';
+
+  it("asks for a lesson once, after the second failed review, and respects a refusal", async () => {
+    const cwd = await repo(PASS);
+    const first = await runNext(cwd, [], [writesFile(cwd, "a.txt"), REVIEW_FAIL], [true]);
+    expect(first.calls).toHaveLength(2);
+    const second = await runNext(
+      cwd,
+      [],
+      [writesFile(cwd, "b.txt"), REVIEW_FAIL, LESSON],
+      [true, false],
+    );
+    expect(second.calls).toHaveLength(3);
+    expect(second.calls[2]?.prompt).toContain("failed its review twice");
+    expect(second.ui.log).toContain(
+      "note: Lesson from T-001 Root cause: Tests were skipped.\nRule: Add a test for every new route.",
+    );
+    expect(second.ui.log).toContain("info: Rule not added; it stays in .bae/runs/T-001/lesson.md.");
+    expect(await readFile(join(cwd, ".bae/runs/T-001/lesson.md"), "utf8")).toContain(
+      "- Added to AGENTS.md: no",
+    );
+    expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toBe("# Rules\n");
+    const third = await runNext(cwd, [], [writesFile(cwd, "c.txt"), REVIEW_FAIL], [true]);
+    expect(third.calls).toHaveLength(2);
+  });
+
+  it("adds the rule before the next headless attempt so the agent reads it", async () => {
+    const cwd = await repo(PASS);
+    const { code, calls } = await runNext(
+      cwd,
+      ["--headless", "--yes"],
+      [
+        writesFile(cwd, "a.txt"),
+        REVIEW_FAIL,
+        writesFile(cwd, "b.txt"),
+        REVIEW_FAIL,
+        LESSON,
+        writesFile(cwd, "c.txt"),
+        REVIEW_PASS,
+      ],
+    );
+    expect(code).toBe(0);
+    expect(calls).toHaveLength(7);
+    expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toContain(
+      "- Add a test for every new route.",
+    );
   });
 });

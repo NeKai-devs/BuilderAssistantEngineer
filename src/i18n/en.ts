@@ -213,6 +213,14 @@ export const en = {
     "{{path}} has no handoff note: write at most {{max}} lines under ## Log (what changed, decisions, traps).",
   "handoff.tooLong": "The handoff note in {{path}} has {{count}} lines; keep it to {{max}}.",
   "handoff.passed": "Handoff note present.",
+  "md.lessons": "Lessons learned",
+  "lesson.asking": "{{id}} failed repeatedly; asking the agent for the root cause and a rule…",
+  "lesson.title": "Lesson from {{id}}",
+  "lesson.body": "Root cause: {{cause}}\nRule: {{rule}}",
+  "lesson.confirm": "Add this rule to AGENTS.md?",
+  "lesson.added": "Rule added to AGENTS.md.",
+  "lesson.skipped": "Rule not added; it stays in {{path}}.",
+  "lesson.failed": "Could not get a lesson from the agent: {{details}}",
 } as const;
 
 export type MessageKey = keyof typeof en;

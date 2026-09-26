@@ -220,4 +220,12 @@ export const es: Messages = {
   "handoff.tooLong":
     "La nota de traspaso de {{path}} tiene {{count}} líneas; déjala en {{max}} como máximo.",
   "handoff.passed": "Nota de traspaso presente.",
+  "md.lessons": "Lecciones aprendidas",
+  "lesson.asking": "{{id}} falló varias veces; pidiendo al agente la causa raíz y una regla…",
+  "lesson.title": "Lección de {{id}}",
+  "lesson.body": "Causa raíz: {{cause}}\nRegla: {{rule}}",
+  "lesson.confirm": "¿Añadir esta regla a AGENTS.md?",
+  "lesson.added": "Regla añadida a AGENTS.md.",
+  "lesson.skipped": "Regla no añadida; queda en {{path}}.",
+  "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
 };
