@@ -11,13 +11,16 @@ import { truncateText } from "../digest/format.js";
 import { t } from "../i18n/index.js";
 import { readBase } from "../tasks/runs.js";
 import type { Task } from "../tasks/schema.js";
+import { taskChanges } from "./changes.js";
 import { taskDiff } from "./diff.js";
+import { mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
 
 export type ReviewResult = {
   status: "pass" | "fail" | "skipped";
   findings: ReviewFinding[];
   reason?: string;
+  stage?: "mechanical" | "reviewer";
 };
 
 const AGENT_DIRS = [".claude/agents", ".opencode/agent"];
@@ -31,10 +34,21 @@ export async function reviewTask(
   task: Task,
 ): Promise<ReviewResult> {
   const base = await readBase(ctx.cwd, task.meta.id);
-  const diff = await taskDiff(ctx.cwd, base, [BAE_DIR, task.path]);
+  const exclude = [BAE_DIR, task.path];
+  const diff = await taskDiff(ctx.cwd, base, exclude);
   if (diff === undefined) return { status: "skipped", findings: [], reason: t("review.noGit") };
   if (diff.trim() === "") {
     return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
+  }
+  const changes = await taskChanges(ctx.cwd, base, exclude);
+  const mechanical = changes ? mechanicalReview(task, changes) : { passed: true, findings: [] };
+  if (!mechanical.passed) {
+    return {
+      status: "fail",
+      findings: mechanical.findings,
+      reason: t("mechanical.failed"),
+      stage: "mechanical",
+    };
   }
   const prompt = renderPrompt(await loadPrompt("review", ctx.cwd), {
     reviewer: await findReviewer(ctx.cwd, config.backend),
@@ -44,6 +58,7 @@ export async function reviewTask(
     ),
     task: task.text,
     diff,
+    checks: formatFindings(mechanical.findings) || "(none)",
     output_language: LANGUAGE_NAMES[config.lang],
   });
   if (ctx.flags.dryRun) {
@@ -64,7 +79,8 @@ export async function reviewTask(
   const blocked = reply.findings.some((finding) => finding.severity === "blocker");
   return {
     status: reply.verdict === "pass" && !blocked ? "pass" : "fail",
-    findings: reply.findings,
+    findings: [...mechanical.findings, ...reply.findings],
+    stage: "reviewer",
   };
 }
 

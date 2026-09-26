@@ -18,6 +18,12 @@ Review the changes made for one task. Check every acceptance criterion of the ta
 {{diff}}
 </diff>
 
+The CLI already checked secrets, required tests and the files changed against the task's Scope. Its findings, which you may confirm or explain:
+
+<checks>
+{{checks}}
+</checks>
+
 Write the findings in {{output_language}}. Respond with JSON only:
 {"verdict": "pass" | "fail", "findings": [{"severity": "blocker" | "major" | "minor", "file": "optional path", "message": "what is wrong and how to fix it"}]}
 

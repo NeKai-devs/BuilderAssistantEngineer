@@ -75,13 +75,14 @@ phase: 1
 depends_on: [T-001]
 size: S | M | L
 risk: low | medium | high
+tests: required | optional
 ---
 ## Goal
 What exists when this is done and why it matters.
 ## Context
 What to read first (paths), relevant conventions, related ADRs, gotchas.
 ## Scope
-In and out. Files expected to change, with files to create marked (new).
+In: the files expected to change, one backticked path per line, with files to create marked (new); tests may go anywhere. Out: what must not change. The CLI flags changes outside In.
 ## Steps
 Suggested sequence, not a straitjacket.
 ## Acceptance criteria
@@ -89,6 +90,8 @@ Checklist; every item objectively verifiable.
 ## Verification
 Exact commands (tests, lint, build, curl, scripts) in a fenced ```sh block, one command per line, run from the repo root; exit code 0 means pass. Expected results in prose below the block. Never use sudo, destructive commands (rm -rf, git reset --hard) or piped installers (curl | sh); the CLI refuses to run them.
 ## Risks and notes
+
+`tests: required` when the task adds or changes behavior: the CLI fails the task if its diff touches no test file. `tests: optional` for docs, configuration or refactors already covered by existing tests.
 
 Every task must be executable by an agent that has read AGENTS.md and nothing else.
 

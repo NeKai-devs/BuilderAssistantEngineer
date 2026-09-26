@@ -197,4 +197,11 @@ export const es: Messages = {
   "evidence.fixed": "Todas las rutas citadas existen o están marcadas (new).",
   "evidence.unverified": "{{count}} ruta(s) citadas siguen sin verificar; aparecen en el resumen.",
   "evidence.summary": "Rutas sin verificar (no están en el repositorio ni marcadas como nuevas):",
+  "mechanical.secretFile":
+    "Parece un archivo de secretos (.env, clave privada o credenciales); déjalo fuera del cambio.",
+  "mechanical.secretValue": "Añade lo que parece una credencial ({{kind}}); léela del entorno.",
+  "mechanical.noTests":
+    "La tarea exige tests (tests: required), pero el cambio no toca ningún archivo de test.",
+  "mechanical.outOfScope": "Cambios fuera del Scope de la tarea: {{files}}",
+  "mechanical.failed": "Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
 };

@@ -3,6 +3,8 @@ export type TaskOptions = {
   dependsOn?: string[];
   status?: string;
   command?: string;
+  tests?: "required" | "optional";
+  scope?: string;
 };
 
 export function taskFile(id: string, options: TaskOptions = {}): string {
@@ -15,13 +17,14 @@ export function taskFile(id: string, options: TaskOptions = {}): string {
     `depends_on: [${(options.dependsOn ?? []).join(", ")}]`,
     "size: S",
     "risk: low",
+    `tests: ${options.tests ?? "optional"}`,
     "---",
     "## Goal",
     `Goal of ${id}.`,
     "## Context",
     "Read AGENTS.md.",
     "## Scope",
-    "src/ only.",
+    options.scope ?? "src/ only.",
     "## Steps",
     "1. Do it.",
     "## Acceptance criteria",

@@ -24,6 +24,7 @@ describe("task files", () => {
       depends_on: ["T-001"],
       size: "S",
       risk: "low",
+      tests: "optional",
     });
     expect(taskProblems(task)).toEqual([]);
   });

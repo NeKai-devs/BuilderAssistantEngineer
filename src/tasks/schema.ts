@@ -4,6 +4,7 @@ import { splitFrontmatter } from "./frontmatter.js";
 
 export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
+export const TEST_POLICIES = ["required", "optional"] as const;
 
 export const TASK_ID = /^T-\d{3,}$/;
 export const TASK_PATH = /^docs\/plan\/tasks\/(T-\d{3,})-[A-Za-z0-9._-]+\.md$/;
@@ -22,6 +23,7 @@ export const taskMetaSchema = z.object({
     .transform((value) => value ?? []),
   size: z.enum(["S", "M", "L"]),
   risk: z.enum(["low", "medium", "high"]),
+  tests: z.enum(TEST_POLICIES).default("optional"),
 });
 
 export type TaskMeta = z.output<typeof taskMetaSchema>;

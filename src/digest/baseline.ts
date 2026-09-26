@@ -142,6 +142,10 @@ const TEST_PATHS = [
   /Tests?\.(cs|java|kt|swift)$/,
 ];
 
+export function isTestFile(path: string): boolean {
+  return languageOf(path) !== undefined && TEST_PATHS.some((pattern) => pattern.test(path));
+}
+
 export function isCiPath(path: string): boolean {
   return CI_PATHS.some((pattern) => pattern.test(path));
 }
@@ -197,9 +201,7 @@ function toolchainEvidence(manifests: Manifest[], markers: Marker[]): string[] {
 }
 
 function testFileEvidence(paths: string[]): string[] {
-  const tests = paths.filter(
-    (path) => languageOf(path) !== undefined && TEST_PATHS.some((pattern) => pattern.test(path)),
-  );
+  const tests = paths.filter(isTestFile);
   if (tests.length === 0) return [];
   const noun = tests.length === 1 ? "test file" : "test files";
   return [`${tests.length} ${noun}, e.g. ${tests.slice(0, EVIDENCE_SAMPLE).join(", ")}`];

@@ -282,3 +282,23 @@ describe("next regression gate", () => {
     );
   });
 });
+
+describe("next mechanical review", () => {
+  it("skips the reviewer when the change adds a secrets file and retries with the finding", async () => {
+    const cwd = await repo(PASS);
+    const cleans: Step = async () => {
+      await rm(join(cwd, ".env"));
+      await writeFiles(cwd, { "feature.txt": "work\n" });
+      return "";
+    };
+    const { code, calls } = await runNext(
+      cwd,
+      ["--headless", "--yes"],
+      [writesFile(cwd, ".env"), cleans, REVIEW_PASS],
+    );
+    expect(code).toBe(0);
+    expect(calls).toHaveLength(3);
+    expect(calls[1]?.prompt).toContain("- [blocker] .env: Looks like a secrets file");
+    expect(calls[2]?.options).toMatchObject({ access: "read" });
+  });
+});

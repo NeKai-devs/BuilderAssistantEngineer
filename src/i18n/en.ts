@@ -191,6 +191,14 @@ export const en = {
   "evidence.unverified":
     "{{count}} cited path(s) are still unverified; they are listed in the summary.",
   "evidence.summary": "Unverified paths (not in the repository and not marked new):",
+  "mechanical.secretFile":
+    "Looks like a secrets file (.env, private key or credentials); keep it out of the change.",
+  "mechanical.secretValue":
+    "Adds what looks like a credential ({{kind}}); read it from the environment instead.",
+  "mechanical.noTests":
+    "The task requires tests (tests: required), but the change does not touch any test file.",
+  "mechanical.outOfScope": "Changed outside the task's Scope: {{files}}",
+  "mechanical.failed": "The automatic checks failed, so the reviewer was not run.",
 } as const;
 
 export type MessageKey = keyof typeof en;

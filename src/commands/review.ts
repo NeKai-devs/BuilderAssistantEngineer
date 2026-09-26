@@ -16,6 +16,7 @@ export async function runReview(ctx: CommandContext, taskId: string | undefined)
     throw new UserError(wanted ? t("review.unknownTask", { id: wanted }) : t("review.noTask"));
   }
   const result = await reviewTask(ctx, config, task);
+  if (result.reason && result.status === "fail") ctx.prompter.warn(result.reason);
   if (result.findings.length > 0)
     ctx.prompter.note(formatFindings(result.findings), t("review.findings"));
   if (result.status === "skipped") {

@@ -73,7 +73,7 @@ export const PLAN_FORMAT = [
   "Allowed FILE paths: AGENTS.md, CLAUDE.md, GEMINI.md, docs/plan/**/*.md, docs/plan/tasks/T-NNN-slug.md,",
   ".claude/agents/*.md, .claude/commands/*.md, .opencode/agent/*.md, .opencode/command/*.md.",
   "Task files start with YAML frontmatter (id, title, status, phase, depends_on, size S|M|L,",
-  "risk low|medium|high) and contain the sections Goal, Context, Scope, Steps, Acceptance criteria,",
+  "risk low|medium|high, tests required|optional) and contain the sections Goal, Context, Scope, Steps, Acceptance criteria,",
   "Verification (commands in a ```sh block, one per line) and Risks and notes.",
   "Subagent files start with YAML frontmatter that includes a description.",
 ].join("\n");
@@ -88,6 +88,7 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
   const commands = parseConfig(blocks, warnings);
   const files = collectFiles(blocks, problems);
   const tasks = validateTasks(files, options.knownTaskIds ?? [], problems);
+  warnings.push(...missingTestPolicies(files));
   validateAgents(files, options.requireReviewer ?? false, problems);
   if (problems.length > 0) throw new FormatError(problems.slice(0, MAX_PROBLEMS).join("\n"));
   return { summary, questions, commands, files, tasks, warnings };
@@ -258,6 +259,13 @@ function validateTasks(files: PlanFile[], knownIds: string[], problems: string[]
   }
   validateGraph(tasks, knownIds, problems);
   return tasks;
+}
+
+function missingTestPolicies(files: PlanFile[]): string[] {
+  return files
+    .filter((file) => TASK_PATH.test(file.path))
+    .filter((file) => safeFrontmatter(file.content)?.data.tests === undefined)
+    .map((file) => `${file.path}: no tests field in the frontmatter; assuming optional`);
 }
 
 function validateGraph(tasks: Task[], knownIds: string[], problems: string[]): void {
