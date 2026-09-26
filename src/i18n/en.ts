@@ -318,6 +318,11 @@ export const en = {
   "contract.shadow": "Added a file that would run instead of the project's own tool.",
   "contract.indexFlags":
     "Marked files as unchanged in the git index (assume-unchanged or skip-worktree), which hides them from the review: {{files}}. The flags were cleared.",
+  "integrity.noCounts":
+    "`{{command}}` no longer reports how many tests ran, although it did before the task.",
+  "integrity.removedTests": "Removes tests that are not added back: {{tests}}.",
+  "integrity.lostAssertions":
+    "Removes {{count}} assertion line(s) from a test file without adding them back.",
 } as const;
 
 export type MessageKey = keyof typeof en;

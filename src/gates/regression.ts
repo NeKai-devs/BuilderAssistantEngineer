@@ -1,8 +1,12 @@
+import { join } from "node:path";
 import { z } from "zod";
 import type { Config } from "../config/schema.js";
 import { bashPath, runScript } from "../core/bash.js";
+import { readTextIfExists } from "../core/fs.js";
+import { asRecord, parseObject } from "../core/json.js";
 import type { ShellResult } from "../core/process.js";
-import { type Counts, countsSchema, parseCounts } from "./results.js";
+import { expandScripts } from "./protected-files.js";
+import { type Counts, countsSchema, parseCounts, runnerHint } from "./results.js";
 
 export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
@@ -72,12 +76,15 @@ export async function runSuite(
 ): Promise<SuiteResult[]> {
   const results: SuiteResult[] = [];
   const bash = await bashPath();
+  const scripts = asRecord(
+    parseObject((await readTextIfExists(join(cwd, "package.json"))) ?? "")?.scripts,
+  );
   for (const item of suite) {
     onOutput?.(`$ ${item.command}\n`);
     const result = bash
       ? await runScript(bash, `set -o pipefail\n${item.command}\n`, { cwd, onOutput })
       : { exitCode: -1, output: "bash was not found" };
-    const counts = parseCounts(result.output);
+    const counts = parseCounts(result.output, runnerHint(expandScripts(item.command, scripts)));
     results.push({ ...item, ...result, ...(counts ? { counts } : {}) });
   }
   return results;

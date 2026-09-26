@@ -3,7 +3,16 @@ import type { AddedText } from "./changes.js";
 
 const RUST_TEST = /#\[(?:tokio::)?test\]|#\[cfg\(test\)\]/;
 const ASSERTION =
-  /\bexpect\s*[({]|\bassert(?:_eq|_ne)?!\s*\(|\bassert\w*\s*[(]|\bassert\s|\.should\b|\bshould\s*[.(]|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail)\b|\brequire\.\w+\(|\bXCTAssert\w*\(|\bAssert\.\w+\(|\bassertThat\(|\bself\.assert\w*\(|\$this->assert\w*\(/;
+  /\bexpect\s*[({]|\bassert(?:_eq|_ne)?!\s*\(|\bassert\w*\s*[(]|^\s*assert\s|\.should\b|\bshould\s*[.(]|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail)\b|\brequire\.\w+\(|\bXCTAssert\w*\(|\bAssert\.\w+\(|\bassertThat\(|\bself\.assert\w*\(|\$this->assert\w*\(|\bthrow\b/;
+const COMMENT = /^\s*(\/\/|#(?!\[)|\*|\/\*)/;
+const DECLARATIONS = [
+  /\b(?:it|test|specify)(?:\.\w+)*\s*\(\s*(['"`])(.+?)\1/g,
+  /^\s*it\s+(['"])(.+?)\1/gm,
+  /^\s*(?:async\s+)?def\s+()(test\w*)\s*\(/gm,
+  /^\s*func\s+()(Test\w+)\s*\(/gm,
+  /\bfunction\s+()(test\w+)\s*\(/g,
+];
+const ANNOTATED = /#\[(?:tokio::)?test\]|@Test\b|\[(?:Fact|Test|TestMethod)\]/g;
 const SKIP_MARKERS: [string, RegExp][] = [
   [".skip", /\b(?:it|test|describe|context|suite)\.skip\b/],
   [".only", /\b(?:it|test|describe|context|suite)\.only\b/],
@@ -36,7 +45,26 @@ export function isTestChange(item: AddedText): boolean {
 }
 
 export function addsAssertions(item: AddedText): boolean {
-  return isTestChange(item) && ASSERTION.test(item.text);
+  return isTestChange(item) && assertionCount(item.text) > 0;
+}
+
+export function assertionCount(text: string): number {
+  return code(text).filter((line) => ASSERTION.test(line)).length;
+}
+
+export function testNames(text: string): string[] {
+  const body = code(text).join("\n");
+  return DECLARATIONS.flatMap((pattern) =>
+    [...body.matchAll(pattern)].map((match) => match[2] ?? ""),
+  ).filter(Boolean);
+}
+
+export function annotatedCount(text: string): number {
+  return [...code(text).join("\n").matchAll(ANNOTATED)].length;
+}
+
+function code(text: string): string[] {
+  return text.split("\n").filter((line) => !COMMENT.test(line));
 }
 
 export function skipMarkers(item: AddedText): string[] {

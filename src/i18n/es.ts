@@ -329,4 +329,9 @@ export const es: Messages = {
   "contract.shadow": "Añadió un archivo que se ejecutaría en lugar de la herramienta del proyecto.",
   "contract.indexFlags":
     "Marcó archivos como sin cambios en el índice de git (assume-unchanged o skip-worktree), lo que los oculta de la revisión: {{files}}. Se quitaron las marcas.",
+  "integrity.noCounts":
+    "`{{command}}` ya no informa cuántos tests corrieron, aunque antes de la tarea sí lo hacía.",
+  "integrity.removedTests": "Quita tests que no vuelven a añadirse: {{tests}}.",
+  "integrity.lostAssertions":
+    "Quita {{count}} línea(s) de aserción de un archivo de test sin volver a añadirlas.",
 };

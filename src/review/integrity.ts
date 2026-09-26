@@ -7,7 +7,15 @@ import type { Task } from "../tasks/schema.js";
 import type { TaskChanges } from "./changes.js";
 import type { ReviewFinding } from "./parse.js";
 import { inScope, scopePaths } from "./scope.js";
-import { exclusionKeys, isRunnerConfig, skipMarkers } from "./tests.js";
+import {
+  annotatedCount,
+  assertionCount,
+  exclusionKeys,
+  isRunnerConfig,
+  isTestChange,
+  skipMarkers,
+  testNames,
+} from "./tests.js";
 
 export function staticIntegrity(
   task: Task,
@@ -25,6 +33,8 @@ export function staticIntegrity(
         blocker(item.path, t("integrity.skipMarker", { marker }), marker),
       ),
     ),
+    ...removedTests(changes),
+    ...lostAssertions(changes),
     ...changes.untracked.filter(isRunnerConfig).flatMap((path) => {
       const keys = exclusionKeys(texts.get(path) ?? "");
       if (keys.length === 0) return [];
@@ -35,6 +45,11 @@ export function staticIntegrity(
 }
 
 export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): ReviewFinding[] {
+  const vanished = checks
+    .filter((check) => check.key === "test" && check.before?.counts && !check.counts)
+    .map((check) =>
+      counted(check, "vanished", t("integrity.noCounts", { command: check.command })),
+    );
   const findings = comparable(checks).flatMap(({ check, now, before }) => {
     const vars = { command: check.command, now: describe(now), before: describe(before) };
     return [
@@ -46,7 +61,7 @@ export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): Re
         : []),
     ];
   });
-  return findings.map((finding) => accept(acceptance, finding, true));
+  return [...vanished, ...findings].map((finding) => accept(acceptance, finding, true));
 }
 
 export function testsGrew(checks: SuiteCheck[]): boolean {
@@ -59,6 +74,33 @@ function comparable(checks: SuiteCheck[]) {
       ? [{ check, now: check.counts, before: check.before.counts }]
       : [],
   );
+}
+
+function removedTests(changes: TaskChanges): ReviewFinding[] {
+  const kept = new Set(changes.added.flatMap((item) => testNames(item.text)));
+  const added = new Map(changes.added.map((item) => [item.path, annotatedCount(item.text)]));
+  return changes.removed
+    .filter((item) => isTestChange(item) || isTestFile(item.path))
+    .flatMap((item) => {
+      const names = [...new Set(testNames(item.text))].filter((name) => !kept.has(name));
+      const annotated = annotatedCount(item.text) - (added.get(item.path) ?? 0);
+      if (names.length === 0 && annotated <= 0) return [];
+      const what = names.length > 0 ? names.join(", ") : String(annotated);
+      return [blocker(item.path, t("integrity.removedTests", { tests: what }), `removed:${what}`)];
+    });
+}
+
+function lostAssertions(changes: TaskChanges): ReviewFinding[] {
+  const added = new Map(changes.added.map((item) => [item.path, assertionCount(item.text)]));
+  return changes.removed
+    .filter((item) => isTestFile(item.path) && !changes.deleted.includes(item.path))
+    .flatMap((item) => {
+      const lost = assertionCount(item.text) - (added.get(item.path) ?? 0);
+      if (lost <= 0) return [];
+      return [
+        blocker(item.path, t("integrity.lostAssertions", { count: lost }), `assertions:${lost}`),
+      ];
+    });
 }
 
 function blocker(file: string, message: string, detail: string): ReviewFinding {

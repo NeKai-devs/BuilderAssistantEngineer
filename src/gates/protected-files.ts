@@ -189,6 +189,24 @@ export function executedBy(commands: string[], scripts: Record<string, unknown>)
   return { files: [...files], modules: [...modules], make };
 }
 
+export function expandScripts(command: string, scripts: Record<string, unknown>): string {
+  const seen = new Set<string>();
+  const pending = [command];
+  const texts: string[] = [];
+  while (pending.length > 0) {
+    const current = pending.shift() ?? "";
+    if (seen.has(current)) continue;
+    seen.add(current);
+    texts.push(current);
+    for (const simple of parseLine(current).commands) {
+      const { name, args } = program(simple);
+      const script = npmScript(name, args);
+      if (script && typeof scripts[script] === "string") pending.push(scripts[script] as string);
+    }
+  }
+  return texts.join("\n");
+}
+
 export function shadowCandidates(executed: Executed): string[] {
   return [
     ...(executed.make ? MAKEFILES : []),

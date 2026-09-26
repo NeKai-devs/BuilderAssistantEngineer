@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCounts } from "../../src/gates/results.js";
+import { parseCounts, runnerHint } from "../../src/gates/results.js";
 
 describe("parseCounts", () => {
   it.each([
@@ -20,7 +20,6 @@ describe("parseCounts", () => {
       "--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.00s)\n--- SKIP: TestC (0.00s)",
       [1, 1, 1],
     ],
-    ["go", "ok  \texample.com/a\t0.012s\nFAIL\texample.com/b\t0.020s", [1, 1, 0]],
     ["mocha", "  12 passing (30ms)\n  1 pending\n  2 failing", [12, 2, 1]],
     ["node:test", "# tests 5\n# pass 4\n# fail 1\n# skipped 0\n# todo 0", [4, 1, 0]],
     ["bun", " 9 pass\n 1 skip\n 0 fail\n", [9, 0, 1]],
@@ -36,6 +35,23 @@ describe("parseCounts", () => {
     ["tsc", "Found 4 errors in 2 files.", [0, 4, 0]],
   ])("reads %s output", (_, output, [passed, failed, skipped]) => {
     expect(parseCounts(output)).toEqual({ passed, failed, skipped });
+  });
+
+  it("takes the last summary, and only the runner the command uses", () => {
+    const forged =
+      "      Tests  3 passed (3)\nreal output\nTests:       1 failed, 2 passed, 3 total";
+    expect(parseCounts(forged)).toEqual({ passed: 2, failed: 1, skipped: 0 });
+    const early = "Tests:       1 failed, 2 passed, 3 total\n      Tests  3 passed (3)";
+    expect(parseCounts(early, runnerHint("npx jest --ci"))).toEqual({
+      passed: 2,
+      failed: 1,
+      skipped: 0,
+    });
+    expect(parseCounts("      Tests  3 passed (3)", runnerHint("npx jest"))).toBeUndefined();
+  });
+
+  it("does not count Go packages as tests", () => {
+    expect(parseCounts("ok  \texample.com/a\t0.012s\nFAIL\texample.com/b\t0.020s")).toBeUndefined();
   });
 
   it("ignores color codes and returns nothing for output without a summary", () => {

@@ -24,6 +24,7 @@ export type AddedText = { path: string; text: string };
 export type TaskChanges = {
   files: string[];
   added: AddedText[];
+  removed: AddedText[];
   deleted: string[];
   untracked: string[];
 };
@@ -36,7 +37,6 @@ const MAX_SUSPICIOUS_LINES = 5_000;
 const MAX_LINE_CHARS = 2_000;
 const SUSPICIOUS =
   /AKIA|gh[pousr]_|github_pat_|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@/i;
-const TARGET_FILE = /^\+\+\+ (.+)$/;
 export const GATE_EXCLUDED = [BAE_DIR, TASKS_DIR];
 
 export async function taskChanges(cwd: string, capture: Capture): Promise<ChangeView> {
@@ -54,13 +54,15 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
     return { ok: false, reason: "gitError" };
   }
   const created = untracked.filter((path) => !isExcluded(path));
+  const lines = diffLines(patch);
   const contents = await Promise.all(created.map((path) => newFileText(cwd, path)));
   const all: TaskChanges = {
     files: [...new Set([...names, ...created])].sort(),
     added: [
-      ...addedLines(patch),
+      ...lines.added,
       ...created.map((path, index) => ({ path, text: contents[index] ?? "" })),
     ],
+    removed: lines.removed,
     deleted,
     untracked: created,
   };
@@ -68,31 +70,41 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
   return { ok: true, ref, changes: withoutPaths(all, before), before };
 }
 
-export function addedLines(patch: string): AddedText[] {
-  const byFile = new Map<string, string[]>();
+export function diffLines(patch: string): { added: AddedText[]; removed: AddedText[] } {
+  const added = new Map<string, string[]>();
+  const removed = new Map<string, string[]>();
   let current: string | undefined;
+  let source: string | undefined;
   let inHeader = false;
   for (const line of patch.split(/\r?\n/)) {
     if (line.startsWith("diff --git ")) {
       current = undefined;
+      source = undefined;
       inHeader = true;
       continue;
     }
-    const target = inHeader ? TARGET_FILE.exec(line) : null;
-    if (target) {
-      current = stripPrefix(unquotePath((target[1] ?? "").replace(/\t$/, "")));
+    if (inHeader && line.startsWith("--- ")) {
+      source = headerPath(line.slice(4));
+      continue;
+    }
+    if (inHeader && line.startsWith("+++ ")) {
+      const target = headerPath(line.slice(4));
+      current = target === "/dev/null" ? source : target;
       inHeader = false;
       continue;
     }
-    if (!inHeader && current && line.startsWith("+")) {
-      byFile.set(current, [...(byFile.get(current) ?? []), line.slice(1)]);
-    }
+    if (inHeader || !current) continue;
+    const into = line.startsWith("+") ? added : line.startsWith("-") ? removed : undefined;
+    into?.set(current, [...(into.get(current) ?? []), line.slice(1)]);
   }
-  return [...byFile].map(([path, added]) => ({ path, text: added.join("\n") }));
+  const texts = (map: Map<string, string[]>) =>
+    [...map].map(([path, lines]) => ({ path, text: lines.join("\n") }));
+  return { added: texts(added), removed: texts(removed) };
 }
 
-function stripPrefix(path: string): string {
-  return path.startsWith("b/") ? path.slice(2) : path;
+function headerPath(raw: string): string {
+  const path = unquotePath(raw.replace(/\t$/, ""));
+  return path === "/dev/null" ? path : path.replace(/^[ab]\//, "");
 }
 
 function withoutPaths(changes: TaskChanges, skip: Set<string>): TaskChanges {
@@ -100,6 +112,7 @@ function withoutPaths(changes: TaskChanges, skip: Set<string>): TaskChanges {
   return {
     files: changes.files.filter(keep),
     added: changes.added.filter((item) => keep(item.path)),
+    removed: changes.removed.filter((item) => keep(item.path)),
     deleted: changes.deleted.filter(keep),
     untracked: changes.untracked.filter(keep),
   };

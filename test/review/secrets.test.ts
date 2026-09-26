@@ -59,6 +59,7 @@ describe("secretFindings", () => {
     const changes: TaskChanges = {
       files: ["test/fixtures/keys/id_rsa"],
       added: [{ path: "test/fixtures/aws.txt", text: join("AKIA", "ABCDEFGHIJKLMNOP") }],
+      removed: [],
       deleted: [],
       untracked: [],
     };

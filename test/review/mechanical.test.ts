@@ -97,7 +97,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
     expect(mechanicalReview(task({ tests: "required" }), comment).passed).toBe(false);
     const tested = await changedRepo({
       "src/config.js": "export const a = 1;\n",
-      "test/config.test.js": "it('reads a', () => expect(a).toBe(1));\n",
+      "test/extra.test.js": "it('reads a', () => expect(a).toBe(1));\n",
     });
     expect(mechanicalReview(task({ tests: "required" }), tested).passed).toBe(true);
     const counted = await changedRepo({ "src/config.js": "export const a = 1;\n" });
