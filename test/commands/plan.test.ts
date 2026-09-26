@@ -86,6 +86,26 @@ describe("plan", () => {
     expect(await exists(cwd, ".claude/agents/reviewer.md")).toBe(false);
   });
 
+  it("asks the analyst to continue an answer cut off by the output limit", async () => {
+    const cwd = await setup();
+    const full = planOutput();
+    const cut = full.indexOf("<<<FILE: docs/plan/tasks/T-002-add-feature.md>>>") + 60;
+    const rest = full.slice(full.indexOf("<<<FILE: docs/plan/tasks/T-002-add-feature.md>>>"));
+    const { code, ai, ui } = await runPlan(
+      cwd,
+      ["--yes"],
+      [full.slice(0, cut), `Continuing.\n${rest}`],
+    );
+    expect(code).toBe(0);
+    expect(ui.log).toContain(
+      "warn: The answer was cut off at <<<FILE: docs/plan/tasks/T-002-add-feature.md>>>; asking the analyst to continue from there.",
+    );
+    expect(ai.prompts[1]).toContain("- MODE: PLAN");
+    expect(ai.prompts[1]).toContain("start with <<<FILE: docs/plan/tasks/T-002-add-feature.md>>>");
+    expect(await exists(cwd, "docs/plan/tasks/T-002-add-feature.md")).toBe(true);
+    expect(await exists(cwd, ".claude/commands/next.md")).toBe(true);
+  });
+
   it("retries once when the answer is malformed", async () => {
     const cwd = await setup();
     const { code, ai } = await runPlan(cwd, ["--yes"], ["no blocks here", planOutput()]);

@@ -13,11 +13,13 @@ export type FormatRequest<T> = {
   parse: (text: string) => T;
   format: string;
   onRetry?: (error: FormatError) => void;
+  complete?: (text: string) => Promise<string>;
 };
 
 export async function runWithFormatRetry<T>(request: FormatRequest<T>): Promise<T> {
   const { backend, options, parse } = request;
-  const first = await backend.run(request.prompt, options);
+  const complete = request.complete ?? (async (text: string) => text);
+  const first = await complete(await backend.run(request.prompt, options));
   try {
     return parse(first);
   } catch (error) {
@@ -28,7 +30,7 @@ export async function runWithFormatRetry<T>(request: FormatRequest<T>): Promise<
       format: request.format,
       previous_response: first,
     });
-    return parseOrReport(await backend.run(fix, options), parse, options.cwd);
+    return parseOrReport(await complete(await backend.run(fix, options)), parse, options.cwd);
   }
 }
 

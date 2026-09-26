@@ -86,6 +86,8 @@ export const en = {
   "plan.useReplan": "Nothing changed. Use replan to update the plan and keep finished work.",
   "plan.dryRunDone":
     "Dry run: the prompt above is exactly what would be sent. Nothing was written.",
+  "plan.continuing":
+    "The answer was cut off at {{marker}}; asking the analyst to continue from there.",
   "plan.summary": "Summary",
   "plan.questions": "Open questions — answer them in .bae/interview.md and run replan",
   "plan.blocking": "blocking",

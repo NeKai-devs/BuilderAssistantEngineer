@@ -147,8 +147,9 @@ The prompts live in [`src/prompts`](src/prompts). To change one for a project, c
 | `review.md` | `reviewer`, `agents_md`, `task`, `diff`, `output_language` |
 | `retry.md` | `task`, `failure`, `attempt` |
 | `fix-format.md` | `error`, `format`, `previous_response` |
+| `continue.md` | `prompt`, `partial`, `next_marker` |
 
-The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>` and `<<<FILE: path>>>` blocks). If the answer is malformed, the CLI asks once to fix only the format; if it is still wrong, the raw answer is saved to `.bae/tmp/last-response.md`.
+The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>` and `<<<FILE: path>>>` blocks). If the answer is cut off by the model's output limit, the CLI asks it to continue from the unfinished block (up to three times). If the answer is malformed, the CLI asks once to fix only the format; if it is still wrong, the raw answer is saved to `.bae/tmp/last-response.md`.
 
 ## Files and safety
 

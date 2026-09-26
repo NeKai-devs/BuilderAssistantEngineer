@@ -90,6 +90,8 @@ export const es: Messages = {
   "plan.useReplan": "Sin cambios. Usa replan para actualizar el plan conservando lo hecho.",
   "plan.dryRunDone":
     "Dry run: el prompt de arriba es exactamente lo que se enviaría. No se escribió nada.",
+  "plan.continuing":
+    "La respuesta se cortó en {{marker}}; se pide al analista que continúe desde ahí.",
   "plan.summary": "Resumen",
   "plan.questions": "Preguntas abiertas — respóndelas en .bae/interview.md y ejecuta replan",
   "plan.blocking": "bloqueante",
