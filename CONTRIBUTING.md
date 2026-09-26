@@ -45,7 +45,7 @@ The resulting lockfile installs fine with `npm ci` on npm 10.
 
 ## Evaluating prompt changes
 
-`npm run eval` runs `init` and `plan` for real on every repository in `test/fixtures/repos`, using the brief in `scripts/eval/briefs/<fixture>.md`, and saves the results under `eval/<label>/` (or `eval/<date>/` without a label):
+`npm run eval` runs `init` and `plan` for real on every repository in `test/fixtures/repos` that has a brief in `scripts/eval/briefs/<fixture>.md`, and saves the results under `eval/<label>/` (or `eval/<date>/` without a label):
 
 ```sh
 npm run eval -- --backend claude --lang en --label my-change
@@ -60,8 +60,13 @@ Each fixture gets `prompt.md` (the exact prompt), `cli-output.txt`, `output/` (e
 | Tasks with verification | tasks whose Verification has at least one command in a `sh` block |
 | file:line refs valid | backticked `path:line` citations whose file exists and has that line |
 | Cited paths that exist | backticked path citations that exist after the plan (future files count as missing) |
+| Existence claims verified | citations the evidence check validates (architecture, ADRs, task Context; `(new)` paths excluded) that exist |
 | Questions (blocking) | questions returned by the analyst |
 | Continuations, format retries | how often the answer was cut off or malformed |
+| Local repairs | format slips fixed without asking the model again |
+| Evidence retries, unverified after retry | how often cited paths had to be fixed, and how many stayed unverified |
+| Commands | project commands saved to `.bae/config.json` (out of test, lint, typecheck, build) |
+| tests: required, Empty Log | tasks that require tests, and tasks that end with an empty `## Log` |
 | Minutes, cost | wall time, and cost when the backend reports it (claude) |
 
 The header records the backend, the models the backend reported, the `analyst.md` hash and the tool commit. Options: `--backend`, `--lang`, `--targets`, `--only`, `--label` and `--out`.
@@ -73,15 +78,16 @@ Only `eval/baseline/` is committed; other runs stay local (see `.gitignore`). To
 ```text
 src/cli.ts            commander wiring, global flags, exit codes
 src/commands/         init, plan, next, status, replan, review
+src/gates/            the next gate: verification, regression, handoff note, review
 src/digest/           repository digest: walk, manifests, baseline, redaction, budget
 src/backends/         claude, opencode, codex, gemini, api, manual
 src/interview/        base questions and the adaptive round
 src/analyst/          analyst prompt variables and the one-time format retry
-src/plan/             plan parser, filters, prior plan for replan
-src/artifacts/        managed merge, diffs, confirmation and writes
-src/tasks/            task files, selection, status, verification, run logs
-src/review/           task diff and reviewer
-src/prompts/          analyst, task, review, retry and fix-format prompts
+src/plan/             plan parser, local repair, evidence check, questions, prior plan
+src/artifacts/        managed merge, lessons block, diffs, confirmation and writes
+src/tasks/            task files, selection, status, verification, handoff, attempts, metrics, lessons
+src/review/           task diff, mechanical checks and reviewer
+src/prompts/          analyst, task, review, retry, fix-format, fix-paths, continue and lesson prompts
 scripts/eval/         eval runner, metrics and fixture briefs
 test/                 unit and end-to-end tests
 ```
