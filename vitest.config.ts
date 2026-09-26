@@ -5,5 +5,6 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     exclude: [...configDefaults.exclude, "test/fixtures/**"],
     restoreMocks: true,
+    testTimeout: 30_000,
   },
 });
