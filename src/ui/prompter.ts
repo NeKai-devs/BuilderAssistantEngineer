@@ -11,5 +11,5 @@ export type Prompter = {
   multiselect<T extends string>(message: string, choices: Choice<T>[], initial: T[]): Promise<T[]>;
   text(message: string, placeholder?: string): Promise<string>;
   confirm(message: string, initial?: boolean): Promise<boolean>;
-  spinner<R>(message: string, task: () => Promise<R>): Promise<R>;
+  spinner<R>(message: string, task: (update: (message: string) => void) => Promise<R>): Promise<R>;
 };

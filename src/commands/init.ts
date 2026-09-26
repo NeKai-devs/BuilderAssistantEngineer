@@ -159,7 +159,7 @@ async function interviewFor(
     ctx.prompter.info(t("interview.adaptiveManual"));
   }
   if (!adaptive) return ctx.flags.dryRun ? finishDryRun(ctx) : renderInterview(data);
-  const digest = await ctx.prompter.spinner(t("init.readingRepo"), async () => {
+  const digest = await ctx.prompter.spinner(t("digest.reading"), async () => {
     return (await buildDigest(ctx.cwd, { maxChars: config.digest.maxChars })).text;
   });
   const base = {

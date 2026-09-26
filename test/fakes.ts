@@ -28,7 +28,7 @@ export function fakePrompter(answers: unknown[]) {
     multiselect: async (message) => next(message) as never,
     text: async (message) => String(next(message) ?? ""),
     confirm: async (message) => Boolean(next(message)),
-    spinner: async (_message, task) => task(),
+    spinner: async (_message, task) => task(() => {}),
   };
   return { prompter, log, asked, remaining: () => queue.length };
 }

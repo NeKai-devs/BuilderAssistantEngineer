@@ -26,10 +26,11 @@ export function createClackPrompter(): Prompter {
     confirm: async (message, initial) =>
       unwrap(await clack.confirm({ message, initialValue: initial })),
     spinner: async (message, task) => {
-      const spin = clack.spinner();
+      if (!process.stdout.isTTY) return staticSpinner(message, task);
+      const spin = clack.spinner({ indicator: "timer" });
       spin.start(message);
       try {
-        const result = await task();
+        const result = await task((update) => spin.message(update));
         spin.stop(message);
         return result;
       } catch (error) {
@@ -43,4 +44,12 @@ export function createClackPrompter(): Prompter {
 function unwrap<T>(value: T): Exclude<T, symbol> {
   if (clack.isCancel(value)) throw new UserError(t("ui.cancelled"));
   return value as Exclude<T, symbol>;
+}
+
+async function staticSpinner<R>(
+  message: string,
+  task: (update: (message: string) => void) => Promise<R>,
+): Promise<R> {
+  clack.log.step(message);
+  return task(() => {});
 }

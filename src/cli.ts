@@ -3,13 +3,13 @@ import { Command, CommanderError, Option } from "commander";
 import pc from "picocolors";
 import { type CommandContext, type CommandDeps, defaultDeps } from "./commands/context.js";
 import { type InitOptions, runInit } from "./commands/init.js";
+import { type PlanOptions, runPlan } from "./commands/plan.js";
 import { BACKENDS } from "./config/schema.js";
 import { type GlobalFlags, resolveSettings } from "./config/settings.js";
 import { readConfig } from "./config/store.js";
 import { UserError } from "./core/errors.js";
 import { isLang, LANGS, type Lang, setLang, t } from "./i18n/index.js";
-
-const ONLY_GROUPS = ["plan", "agents", "memory"] as const;
+import { ONLY_GROUPS } from "./plan/filter.js";
 
 export async function main(
   argv: string[],
@@ -52,7 +52,7 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("plan")
     .description(t("command.plan"))
     .addOption(new Option("--only <group>", t("option.only")).choices(ONLY_GROUPS))
-    .action(notImplemented("plan"));
+    .action((options: PlanOptions, command: Command) => runPlan(context(command), options));
   program
     .command("next")
     .description(t("command.next"))
