@@ -114,7 +114,7 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
-  "next.blocked": "{{id}} is blocked after every retry failed. Logs: {{path}}",
+  "next.blocked": "{{id}} is blocked: {{reason}} Logs: {{path}}",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",
@@ -156,6 +156,8 @@ export const en = {
   "error.unexpected": "Unexpected error. Please report it with the output below.",
   "backend.notInstalled":
     "`{{command}}` is not installed or not in PATH. Install it or pick another backend with --backend.",
+  "backend.timedOut":
+    "`{{command}}` did not finish within {{minutes}} minutes and was stopped (agent.timeoutMinutes in .bae/config.json).",
   "backend.failed": "`{{command}}` exited with code {{code}}:\n{{details}}",
   "backend.apiNotConfigured":
     "The api backend needs ANTHROPIC_API_KEY, or OPENAI_BASE_URL/OPENAI_API_KEY for an OpenAI-compatible endpoint.",
@@ -176,7 +178,6 @@ export const en = {
   "regression.title": "Regression check",
   "regression.baselineTitle": "Regression baseline, before the task",
   "regression.confirm": "Run the project's lint and test commands now to record the baseline?",
-  "regression.skipped": "Baseline skipped; the regression check is off for this task.",
   "regression.preexisting":
     "`{{command}}` already fails before the task (exit {{code}}); recorded as preexisting, it will not block.",
   "regression.found": "Regression: `{{command}}` exits with {{code}} after the task.",
@@ -223,6 +224,7 @@ export const en = {
   "lesson.added": "Rule added to AGENTS.md.",
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
+  "status.blockedReason": "{{id}} is blocked: {{reason}}",
   "status.metrics": "Local metrics",
   "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
   "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",
@@ -232,8 +234,6 @@ export const en = {
   "format.repaired": "Repaired the answer locally: {{repairs}}.",
   "evidence.retryFailed":
     "The request to fix the cited paths failed, so the plan keeps them as they are: {{details}}",
-  "regression.lateBaseline":
-    "{{id}} was already in progress without a regression baseline; recording it now, so failures its earlier changes caused count as preexisting.",
   "regression.noCommands":
     "No lint or test command in .bae/config.json or the manifests; the regression check is off until you add them under commands.",
   "option.acceptFinding":
@@ -241,8 +241,6 @@ export const en = {
   "review.noBase":
     "Review failed: the commit recorded when the task started no longer exists, so the task's changes cannot be isolated.",
   "review.noCapture": "{{id}} has no capture from next; reviewing it against the current HEAD.",
-  "capture.late":
-    "{{id}} was already in progress without a capture; capturing it now, so changes made before this run count as preexisting.",
   "contract.title": "Contract",
   "contract.failed":
     "The task changed files that define its own checks; they were restored from the state captured before the task.",
@@ -259,6 +257,32 @@ export const en = {
   "contract.removed": "Removed.",
   "findings.accepted": "Accepted with --accept-finding.",
   "findings.acceptedTitle": "Accepted findings",
+  "regression.failed": "The regression check failed.",
+  "regression.mustPass":
+    "`{{command}}` still fails (exit {{code}}), and the task is tests: fix, so the test suite must end green.",
+  "regression.uncomparable":
+    "`{{command}}` already failed before the task and still fails (exit {{code}}); its output has no counts to compare, so only green passes.",
+  "regression.worse":
+    "Regression: `{{command}}` fails more checks than before the task ({{now}}; before: {{before}}).",
+  "regression.lateStop": "{{id}} has no regression baseline from before its agent ran.",
+  "regression.declinedStop":
+    "Without running lint and tests first there is no baseline, so the task could not be done.",
+  "regression.unusable":
+    "`{{command}}` gives no usable baseline (exit {{code}}): it did not finish, or it fails with no counts to compare. The task could not be done while it stays red.",
+  "review.noVerdict": "The reviewer gave no verdict.",
+  "review.error": "The reviewer could not give a verdict: {{details}}",
+  "skip.used": "Going on without this check because of --allow-skip: {{what}}",
+  "skip.title": "Skipped with --allow-skip",
+  "skip.stopped":
+    "Nothing was launched. Fix the cause, or run next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
+  "next.budgetUsed": "The task already used its {{max}} automatic attempts.",
+  "next.refusedBlocked":
+    "{{id}} is blocked before launching the agent, because its checks cannot run. Fix the task's Verification or the commands in .bae/config.json, then set the task back to pending.",
+  "capture.lateStop":
+    "{{id}} is in progress without a capture from before its agent ran, so its checks have no trustworthy starting point. Set it back to pending, or run with --allow-skip.",
+  "capture.noGit": "This is not a git repository, so the review cannot see the task's changes.",
+  "option.allowSkip":
+    "go on when a check cannot run (no git, no baseline, no reviewer verdict); every skip is recorded",
 } as const;
 
 export type MessageKey = keyof typeof en;

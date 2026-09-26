@@ -75,7 +75,7 @@ phase: 1
 depends_on: [T-001]
 size: S | M | L
 risk: low | medium | high
-tests: required | optional
+tests: required | optional | fix
 ---
 ## Goal
 What exists when this is done and why it matters.
@@ -94,7 +94,7 @@ Exact commands (tests, lint, build, curl, scripts) in a fenced ```sh block, one 
 
 End every task with an empty `## Log` heading: the agent that executes the task writes its handoff note there, and the CLI requires it before marking the task done.
 
-`tests: required` when the task adds or changes behavior: the CLI fails the task if its diff touches no test file. `tests: optional` for docs, configuration or refactors already covered by existing tests.
+`tests: required` when the task adds or changes behavior: the CLI fails the task unless it runs more tests than before or adds assertions to a test file. `tests: optional` for docs, configuration or refactors already covered by existing tests. `tests: fix` when the goal of the task is to repair tests that already fail: the CLI accepts it only when the project's test command ends green.
 
 Every task must be executable by an agent that has read AGENTS.md and nothing else.
 

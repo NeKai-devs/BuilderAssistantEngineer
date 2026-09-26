@@ -5,6 +5,7 @@ import { asRecord } from "../core/json.js";
 import { runDir } from "./runs.js";
 
 export const GATE_STAGES = [
+  "agent",
   "contract",
   "refused",
   "declined",
@@ -23,7 +24,12 @@ export type Attempt = {
   outcome: AttemptOutcome;
   stage?: GateStage;
   regressions: string[];
+  reason?: string;
+  skips?: string[];
+  accepted?: string[];
 };
+
+export const MAX_ATTEMPTS = 3;
 
 const ATTEMPTS_FILE = "attempts.jsonl";
 const OUTCOMES = new Set<string>(["done", "failed", "blocked"]);
@@ -60,6 +66,27 @@ function toAttempt(line: string): Attempt | undefined {
     headless: data.headless === true,
     outcome: data.outcome as AttemptOutcome,
     ...(stage ? { stage } : {}),
-    regressions: Array.isArray(data.regressions) ? data.regressions.map(String) : [],
+    regressions: strings(data.regressions),
+    ...(typeof data.reason === "string" ? { reason: data.reason } : {}),
+    ...(Array.isArray(data.skips) ? { skips: strings(data.skips) } : {}),
+    ...(Array.isArray(data.accepted) ? { accepted: strings(data.accepted) } : {}),
   };
+}
+
+export function sinceBlocked(attempts: Attempt[]): Attempt[] {
+  const last = attempts.map((attempt) => attempt.outcome).lastIndexOf("blocked");
+  return attempts.slice(last + 1);
+}
+
+export async function attemptsLeft(cwd: string, id: string): Promise<number> {
+  return Math.max(0, MAX_ATTEMPTS - sinceBlocked(await readAttempts(cwd, id)).length);
+}
+
+export async function blockedReason(cwd: string, id: string): Promise<string | undefined> {
+  return (await readAttempts(cwd, id)).filter((attempt) => attempt.outcome === "blocked").at(-1)
+    ?.reason;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String) : [];
 }

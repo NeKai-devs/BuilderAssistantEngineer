@@ -62,6 +62,7 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .description(t("command.next"))
     .option("--headless", t("option.headless"))
     .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
+    .option("--allow-skip", t("option.allowSkip"))
     .action((options: NextOptions, command: Command) => runNext(context(command), options));
   program
     .command("status")

@@ -33,6 +33,7 @@ describe("planContext", () => {
       digest: { maxChars: 1 },
       commands: {},
       gates: { regression: "full" as const },
+      agent: { timeoutMinutes: 45 },
     };
     const text = planContext(config, tasks, current, finished);
     expect(text.indexOf("Note T-001.")).toBeLessThan(text.indexOf("Note T-002."));

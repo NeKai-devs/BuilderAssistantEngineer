@@ -41,6 +41,7 @@ const captureSchema = z.object({
   agentsMd: z.string().optional(),
   protected: z.record(z.string(), z.string()),
   baseline: suiteBaselineSchema.optional(),
+  skips: z.array(z.string()).default([]),
   late: z.boolean().optional(),
   finished: z.boolean().optional(),
 });
@@ -62,6 +63,7 @@ export async function prepareCapture(cwd: string, config: Config, task: Task): P
         snapshot: reuse.snapshot,
         ignore: reuse.ignore,
         baseline: reuse.baseline,
+        skips: reuse.skips,
         late: reuse.late,
       }
     : await captureFixed(cwd);
@@ -128,6 +130,7 @@ async function captureFixed(cwd: string) {
     ...(base ? { base } : {}),
     snapshot: await takeSnapshot(cwd, [BAE_DIR, TASKS_DIR]),
     ignore: git ? await captureIgnore(cwd) : [],
+    skips: [] as string[],
   };
 }
 

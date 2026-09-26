@@ -118,7 +118,7 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
-  "next.blocked": "{{id}} queda bloqueada tras fallar todos los reintentos. Logs: {{path}}",
+  "next.blocked": "{{id}} queda bloqueada: {{reason}} Logs: {{path}}",
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
   "next.allDone": "Todas las tareas están hechas.",
   "next.nothingReady": "No hay ninguna tarea lista",
@@ -161,6 +161,8 @@ export const es: Messages = {
   "error.unexpected": "Error inesperado. Repórtalo adjuntando la salida siguiente.",
   "backend.notInstalled":
     "`{{command}}` no está instalado o no está en el PATH. Instálalo o elige otro backend con --backend.",
+  "backend.timedOut":
+    "`{{command}}` no terminó en {{minutes}} minutos y se detuvo (agent.timeoutMinutes en .bae/config.json).",
   "backend.failed": "`{{command}}` terminó con código {{code}}:\n{{details}}",
   "backend.apiNotConfigured":
     "El backend api necesita ANTHROPIC_API_KEY, u OPENAI_BASE_URL/OPENAI_API_KEY para un endpoint compatible con OpenAI.",
@@ -182,8 +184,6 @@ export const es: Messages = {
   "regression.baselineTitle": "Línea base de regresión, antes de la tarea",
   "regression.confirm":
     "¿Ejecutar ahora los comandos de lint y test del proyecto para registrar la línea base?",
-  "regression.skipped":
-    "Línea base omitida; el chequeo de regresión queda desactivado para esta tarea.",
   "regression.preexisting":
     "`{{command}}` ya falla antes de la tarea (salida {{code}}); queda registrado como preexistente y no bloquea.",
   "regression.found": "Regresión: `{{command}}` termina con {{code}} después de la tarea.",
@@ -230,6 +230,7 @@ export const es: Messages = {
   "lesson.added": "Regla añadida a AGENTS.md.",
   "lesson.skipped": "Regla no añadida; queda en {{path}}.",
   "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
+  "status.blockedReason": "{{id}} está bloqueada: {{reason}}",
   "status.metrics": "Métricas locales",
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
@@ -239,8 +240,6 @@ export const es: Messages = {
   "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
   "evidence.retryFailed":
     "Falló la petición para corregir las rutas citadas, así que el plan las conserva tal cual: {{details}}",
-  "regression.lateBaseline":
-    "{{id}} ya estaba en curso sin línea base de regresión; se registra ahora, así que los fallos que causaron sus cambios anteriores cuentan como preexistentes.",
   "regression.noCommands":
     "No hay comando de lint ni de test en .bae/config.json ni en los manifiestos; el chequeo de regresión queda desactivado hasta que los añadas en commands.",
   "option.acceptFinding":
@@ -248,8 +247,6 @@ export const es: Messages = {
   "review.noBase":
     "Revisión fallida: el commit registrado al empezar la tarea ya no existe, así que no se pueden aislar sus cambios.",
   "review.noCapture": "{{id}} no tiene captura de next; se revisa contra el HEAD actual.",
-  "capture.late":
-    "{{id}} ya estaba en curso sin captura; se captura ahora, así que los cambios anteriores a esta ejecución cuentan como preexistentes.",
   "contract.title": "Contrato",
   "contract.failed":
     "La tarea cambió archivos que definen sus propios chequeos; se restauraron desde el estado capturado antes de la tarea.",
@@ -267,4 +264,32 @@ export const es: Messages = {
   "contract.removed": "Eliminado.",
   "findings.accepted": "Aceptado con --accept-finding.",
   "findings.acceptedTitle": "Hallazgos aceptados",
+  "regression.failed": "El chequeo de regresión falló.",
+  "regression.mustPass":
+    "`{{command}}` sigue fallando (exit {{code}}) y la tarea es tests: fix, así que la suite de tests debe terminar en verde.",
+  "regression.uncomparable":
+    "`{{command}}` ya fallaba antes de la tarea y sigue fallando (exit {{code}}); su salida no tiene conteos para comparar, así que solo pasa en verde.",
+  "regression.worse":
+    "Regresión: `{{command}}` falla más chequeos que antes de la tarea ({{now}}; antes: {{before}}).",
+  "regression.lateStop":
+    "{{id}} no tiene línea base de regresión de antes de que corriera su agente.",
+  "regression.declinedStop":
+    "Sin correr antes lint y tests no hay línea base, así que la tarea no podría completarse.",
+  "regression.unusable":
+    "`{{command}}` no da una línea base usable (exit {{code}}): no terminó, o falla sin conteos que comparar. La tarea no podría completarse mientras siga en rojo.",
+  "review.noVerdict": "El revisor no dio veredicto.",
+  "review.error": "El revisor no pudo dar un veredicto: {{details}}",
+  "skip.used": "Se continúa sin este chequeo por --allow-skip: {{what}}",
+  "skip.title": "Omitido con --allow-skip",
+  "skip.stopped":
+    "No se lanzó nada. Corrige la causa, o vuelve a correr next con --allow-skip para seguir sin ese chequeo; la omisión queda en el log de la ejecución.",
+  "next.budgetUsed": "La tarea ya usó sus {{max}} intentos automáticos.",
+  "next.refusedBlocked":
+    "{{id}} queda bloqueada antes de lanzar el agente, porque sus chequeos no pueden correr. Corrige la Verificación de la tarea o los comandos de .bae/config.json y vuelve a ponerla en pending.",
+  "capture.lateStop":
+    "{{id}} está en curso sin una captura de antes de que corriera su agente, así que sus chequeos no tienen un punto de partida fiable. Vuelve a ponerla en pending, o corre con --allow-skip.",
+  "capture.noGit":
+    "No es un repositorio git, así que la revisión no puede ver los cambios de la tarea.",
+  "option.allowSkip":
+    "continúa cuando un chequeo no puede correr (sin git, sin línea base, sin veredicto del revisor); cada omisión queda registrada",
 };

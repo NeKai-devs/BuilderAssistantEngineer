@@ -8,6 +8,7 @@ export type CommandResult = {
   stdout: string;
   stderr: string;
   notFound: boolean;
+  timedOut?: boolean;
 };
 
 export type CommandOptions = {
@@ -39,6 +40,7 @@ export async function runCommand(
     stdout: result.stdout ?? "",
     stderr: result.exitCode === undefined ? (result.message ?? "") : (result.stderr ?? ""),
     notFound,
+    ...(result.timedOut ? { timedOut: true } : {}),
   };
 }
 

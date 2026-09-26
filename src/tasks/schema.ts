@@ -4,7 +4,7 @@ import { splitFrontmatter } from "./frontmatter.js";
 
 export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
-export const TEST_POLICIES = ["required", "optional"] as const;
+export const TEST_POLICIES = ["required", "optional", "fix"] as const;
 
 export const TASK_ID = /^T-\d{3,}$/;
 export const TASK_PATH = /^docs\/plan\/tasks\/(T-\d{3,})-[A-Za-z0-9._-]+\.md$/;

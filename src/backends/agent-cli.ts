@@ -121,9 +121,10 @@ async function runHeadless(
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,
     input: prompt,
+    timeoutMs: options.timeoutMs,
     onStdout: spec.jsonOutput ? undefined : options.stream,
   });
-  assertSucceeded(spec, result);
+  assertSucceeded(spec, result, options.timeoutMs);
   const parsed = spec.parse?.(result) ?? { text: result.stdout, info: {} };
   options.onInfo?.(parsed.info);
   if (spec.jsonOutput) options.stream?.(parsed.text);
@@ -165,8 +166,12 @@ async function runSession(
   return "";
 }
 
-function assertSucceeded(spec: AgentSpec, result: CommandResult): void {
+function assertSucceeded(spec: AgentSpec, result: CommandResult, timeoutMs?: number): void {
   if (result.notFound) throw new UserError(t("backend.notInstalled", { command: spec.command }));
+  if (result.timedOut) {
+    const minutes = Math.round((timeoutMs ?? 0) / 60_000);
+    throw new UserError(t("backend.timedOut", { command: spec.command, minutes }));
+  }
   if (result.exitCode === 0) return;
   const details = (result.stderr.trim() || result.stdout.trim()).slice(-ERROR_TAIL);
   throw new UserError(

@@ -7,6 +7,7 @@ export const TARGETS = ["claude-code", "opencode", "codex", "gemini"] as const;
 export const COMMAND_KEYS = ["test", "lint", "typecheck", "build"] as const;
 export const REGRESSION_MODES = ["full", "task", "off"] as const;
 export const DEFAULT_DIGEST_MAX_CHARS = 100_000;
+export const DEFAULT_AGENT_TIMEOUT_MINUTES = 45;
 
 const command = z.string().trim().min(1).optional();
 
@@ -30,6 +31,11 @@ export const configSchema = z.object({
   gates: z
     .object({ regression: z.enum(REGRESSION_MODES).default("full") })
     .default({ regression: "full" }),
+  agent: z
+    .object({
+      timeoutMinutes: z.number().int().positive().default(DEFAULT_AGENT_TIMEOUT_MINUTES),
+    })
+    .default({ timeoutMinutes: DEFAULT_AGENT_TIMEOUT_MINUTES }),
 });
 
 export type Config = z.infer<typeof configSchema>;

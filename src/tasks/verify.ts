@@ -47,18 +47,20 @@ export async function runVerification(
   cwd: string,
   commands: string[],
   onOutput?: (chunk: string) => void,
-  preexisting: ReadonlySet<string> = new Set(),
+  known: ReadonlyMap<string, ShellResult> = new Map(),
+  excused: ReadonlySet<string> = new Set(),
 ): Promise<VerificationRun> {
   const runs: CommandRun[] = [];
   for (const command of commands) {
-    onOutput?.(`$ ${command}\n`);
-    const result = await runShell(command, { cwd, onOutput });
+    const reused = known.get(command);
+    if (!reused) onOutput?.(`$ ${command}\n`);
+    const result = reused ?? (await runShell(command, { cwd, onOutput }));
     runs.push({ command, ...result });
-    if (result.exitCode !== 0 && !preexisting.has(command)) return { passed: false, runs };
+    if (result.exitCode !== 0 && !excused.has(command)) return { passed: false, runs };
   }
-  const excused = runs.some((run) => run.exitCode !== 0);
-  const checked = runs.some((run) => !preexisting.has(run.command));
-  return { passed: !excused || checked, runs };
+  const failed = runs.some((run) => run.exitCode !== 0);
+  const checked = runs.some((run) => !excused.has(run.command));
+  return { passed: !failed || checked, runs };
 }
 
 function hasRecursiveForceRm(command: string): boolean {

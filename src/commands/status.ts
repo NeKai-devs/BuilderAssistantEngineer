@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import { t } from "../i18n/index.js";
+import { blockedReason } from "../tasks/attempts.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import { formatDuration, type RunMetrics, readMetrics } from "../tasks/metrics.js";
 import type { Task, TaskStatus } from "../tasks/schema.js";
@@ -27,10 +28,22 @@ export async function runStatus(ctx: CommandContext): Promise<void> {
     ctx.cwd,
     loaded.map((item) => item.id),
   );
-  ctx.print(`${renderStatus(loaded, metrics)}\n`);
+  const blocked = loaded.filter((item) => item.task?.meta.status === "blocked");
+  const reasons = new Map(
+    await Promise.all(
+      blocked.map(
+        async (item) => [item.id, (await blockedReason(ctx.cwd, item.id)) ?? ""] as const,
+      ),
+    ),
+  );
+  ctx.print(`${renderStatus(loaded, metrics, reasons)}\n`);
 }
 
-export function renderStatus(loaded: LoadedTask[], metrics?: RunMetrics): string {
+export function renderStatus(
+  loaded: LoadedTask[],
+  metrics?: RunMetrics,
+  reasons: Map<string, string> = new Map(),
+): string {
   const tasks = loaded.flatMap((item) => (item.task ? [item.task] : []));
   const phases = [...new Set(orderTasks(tasks).map((task) => task.meta.phase))];
   const blocks = phases.map((phase) =>
@@ -42,8 +55,12 @@ export function renderStatus(loaded: LoadedTask[], metrics?: RunMetrics): string
     ),
   );
   const invalid = loaded.filter((item) => item.error).map((item) => `${pc.red("!")} ${item.error}`);
+  const why = [...reasons]
+    .filter(([, reason]) => reason !== "")
+    .map(([id, reason]) => `${SYMBOLS.blocked} ${t("status.blockedReason", { id, reason })}`);
   return [
     ...blocks,
+    ...(why.length > 0 ? [why.join("\n")] : []),
     ...(invalid.length > 0 ? [invalid.join("\n")] : []),
     summary(tasks),
     ...(metrics && metrics.attempts > 0 ? [renderMetrics(metrics)] : []),

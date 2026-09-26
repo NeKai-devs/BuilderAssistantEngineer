@@ -9,6 +9,7 @@ export type RunOptions = {
   stream?: (chunk: string) => void;
   interactive?: boolean;
   access?: Access;
+  timeoutMs?: number;
   onInfo?: (info: RunInfo) => void;
 };
 

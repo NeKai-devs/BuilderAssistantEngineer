@@ -3,6 +3,7 @@ import { hasApiCredentials } from "../backends/api.js";
 import {
   type Backend as BackendName,
   type Config,
+  DEFAULT_AGENT_TIMEOUT_MINUTES,
   DEFAULT_DIGEST_MAX_CHARS,
   MODES,
   type Mode,
@@ -64,6 +65,7 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
     digest: existing?.digest ?? { maxChars: DEFAULT_DIGEST_MAX_CHARS },
     commands: existing?.commands ?? {},
     gates: existing?.gates ?? { regression: "full" },
+    agent: existing?.agent ?? { timeoutMinutes: DEFAULT_AGENT_TIMEOUT_MINUTES },
   };
   const interview = await interviewFor(ctx, config, options);
   if (interview === undefined) return;

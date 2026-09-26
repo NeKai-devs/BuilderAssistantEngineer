@@ -3,7 +3,7 @@ export type TaskOptions = {
   dependsOn?: string[];
   status?: string;
   command?: string;
-  tests?: "required" | "optional";
+  tests?: "required" | "optional" | "fix";
   scope?: string;
   log?: string;
 };

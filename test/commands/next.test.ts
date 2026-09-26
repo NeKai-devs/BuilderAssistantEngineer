@@ -10,6 +10,7 @@ import { taskFile } from "../plan-sample.js";
 
 const PASS = 'node -e "process.exit(0)"';
 const FAIL = 'node -e "process.exit(1)"';
+const RED = `node -e "console.log('Tests  1 failed | 2 passed (3)'); process.exit(1)"`;
 const NEEDS_FILE = `node -e "process.exit(require('fs').existsSync('done.txt') ? 0 : 1)"`;
 const BREAKS_WITH = (file: string) =>
   `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
@@ -187,19 +188,30 @@ describe("next", () => {
     ]);
   });
 
-  it("refuses unsafe verification commands even with --yes and does not retry", async () => {
+  it("blocks a task with unsafe verification commands before launching the agent", async () => {
     const cwd = await repo("rm -rf build");
     const { code, calls, ui } = await runNext(cwd, ["--headless", "--yes"], [() => ""]);
     expect(code).toBe(1);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(0);
     expect(ui.log).toContain(
       "warn: Refusing to run `rm -rf build` (rm -rf). Fix the task's Verification section.",
     );
+    expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("blocked");
   });
 
-  it("uses the manual flow for api and manual backends and skips review outside git", async () => {
+  it("uses the manual flow for api and manual backends and skips review outside git only with --allow-skip", async () => {
     const cwd = await repo(PASS, { git: false, backend: "manual" });
-    const { code, names, ui } = await runNext(cwd, ["--yes"], [() => addLog(cwd).then(() => "")]);
+    const stopped = await runNext(cwd, ["--yes"], []);
+    expect(stopped.code).toBe(1);
+    expect(stopped.ui.log).toContain(
+      "warn: This is not a git repository, so the review cannot see the task's changes.",
+    );
+    expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("pending");
+    const { code, names, ui } = await runNext(
+      cwd,
+      ["--yes", "--allow-skip"],
+      [() => addLog(cwd).then(() => "")],
+    );
     expect(code).toBe(0);
     expect(names).toEqual(["manual"]);
     expect(ui.log.join("\n")).toContain("Review skipped: this is not a git repository");
@@ -230,39 +242,45 @@ describe("next", () => {
 describe("next regression gate", () => {
   const TASK = "docs/plan/tasks/T-001-first.md";
 
-  it("records a failing baseline as preexisting and does not block the task", async () => {
-    const cwd = await repo(PASS, { commands: { test: FAIL, lint: PASS } });
+  it("records a failing baseline with counts as preexisting and does not block the task", async () => {
+    const cwd = await repo(PASS, { commands: { test: RED, lint: PASS } });
     const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt"), REVIEW_PASS]);
     expect(code).toBe(0);
     expect(ui.log).toContain(
-      `warn: \`${FAIL}\` already fails before the task (exit 1); recorded as preexisting, it will not block.`,
+      `warn: \`${RED}\` already fails before the task (exit 1); recorded as preexisting, it will not block.`,
     );
-    expect(ui.log).toContain(`info: \`${FAIL}\` still fails (exit 1), as it did before the task.`);
+    expect(ui.log).toContain(`info: \`${RED}\` still fails (exit 1), as it did before the task.`);
     expect((await capture(cwd)).baseline).toEqual({
       skipped: false,
-      exitCodes: { lint: 0, test: 1 },
+      excluded: [],
+      commands: {
+        [PASS]: { exitCode: 0 },
+        [RED]: { exitCode: 1, counts: { passed: 2, failed: 1, skipped: 0 } },
+      },
     });
     expect(await statusOf(cwd, TASK)).toBe("done");
   });
 
   it("does not block on a preexisting failure that the task's Verification repeats", async () => {
-    const cwd = await repo(`${PASS}\n${FAIL}`, { commands: { test: FAIL } });
+    const cwd = await repo(`${PASS}\n${RED}`, { commands: { test: RED } });
     const { code, calls } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt"), REVIEW_PASS]);
     expect(code).toBe(0);
     expect(calls[1]?.prompt).toContain(
-      `- [minor] \`${FAIL}\` failed before the task and still fails (exit 1), so it did not block.`,
+      `- [minor] \`${RED}\` failed before the task and still fails (exit 1), so it did not block.`,
     );
     const [log] = await logs(cwd, "T-001");
     const report = await readFile(runFile(cwd, "T-001", log ?? ""), "utf8");
-    expect(report).toContain(`$ ${FAIL} (exit 1, preexisting: it already failed before the task)`);
+    expect(report).toContain(
+      `$ ${RED} (exit 1, preexisting: it already failed before the task and did not get worse)`,
+    );
     expect(await statusOf(cwd, TASK)).toBe("done");
   });
 
   it("still fails verification when a preexisting failure is the task's only check", async () => {
-    const cwd = await repo(FAIL, { commands: { test: FAIL } });
+    const cwd = await repo(RED, { commands: { test: RED } });
     const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(code).toBe(1);
-    expect(ui.log).toContain(`warn: Verification failed: \`${FAIL}\` exited with 1.`);
+    expect(ui.log).toContain(`warn: Verification failed: \`${RED}\` exited with 1.`);
     expect(await statusOf(cwd, TASK)).toBe("in_progress");
   });
 
@@ -324,14 +342,24 @@ describe("next regression gate", () => {
     const again = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(again.code).toBe(1);
     expect(again.ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
-    const late = await repo(PASS, { commands: { test: FAIL } });
+    const late = await repo(PASS, { commands: { test: PASS } });
     await writeFiles(late, {
       "docs/plan/tasks/T-001-first.md": taskFile("T-001", { status: "in_progress", command: PASS }),
     });
-    const resumed = await runNext(late, ["--yes"], [writesFile(late, "a.txt"), REVIEW_PASS]);
+    const stopped = await runNext(late, ["--yes"], []);
+    expect(stopped.code).toBe(1);
+    expect(stopped.ui.log).toContain(
+      "warn: T-001 is in progress without a capture from before its agent ran, so its checks have no trustworthy starting point. Set it back to pending, or run with --allow-skip.",
+    );
+    const resumed = await runNext(
+      late,
+      ["--yes", "--allow-skip"],
+      [writesFile(late, "a.txt"), REVIEW_PASS],
+    );
     expect(resumed.code).toBe(0);
-    expect(resumed.ui.log).toContain(
-      "warn: T-001 was already in progress without a capture; capturing it now, so changes made before this run count as preexisting.",
+    const [log] = await logs(late, "T-001");
+    expect(await readFile(runFile(late, "T-001", log ?? ""), "utf8")).toContain(
+      "## Skipped with --allow-skip\n\n- T-001 is in progress without a capture",
     );
   });
 
@@ -351,16 +379,22 @@ describe("next regression gate", () => {
     );
   });
 
-  it("lets the user skip the baseline, which turns the check off for that task", async () => {
+  it("stops when the user declines the baseline, unless --allow-skip turns the check off", async () => {
     const cwd = await repo(PASS, { commands: { test: FAIL } });
+    const stopped = await runNext(cwd, [], [], [false]);
+    expect(stopped.code).toBe(1);
+    expect(stopped.calls).toHaveLength(0);
+    expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("pending");
     const { code, ui } = await runNext(
       cwd,
-      [],
+      ["--allow-skip"],
       [writesFile(cwd, "a.txt"), REVIEW_PASS],
       [false, true],
     );
     expect(code).toBe(0);
-    expect(ui.log).toContain("warn: Baseline skipped; the regression check is off for this task.");
+    expect(ui.log).toContain(
+      "warn: Going on without this check because of --allow-skip: Without running lint and tests first there is no baseline, so the task could not be done.",
+    );
   });
 
   it("refuses unsafe project commands", async () => {

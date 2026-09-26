@@ -42,6 +42,7 @@ describe("init", () => {
       digest: { maxChars: 100_000 },
       commands: {},
       gates: { regression: "full" },
+      agent: { timeoutMinutes: 45 },
     });
     const interview = await read(cwd, ".bae/interview.md");
     expect(interview).toContain("# Entrevista");

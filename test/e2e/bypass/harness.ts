@@ -14,6 +14,11 @@ export const REVIEW_PASS: Step = () => '{"verdict": "pass", "findings": []}';
 export const BREAKS_WITH = (file: string) =>
   `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
 export const fake = (...parts: string[]) => parts.join("");
+export const FAIL = 'node -e "process.exit(1)"';
+export const LESSON: Step = () =>
+  '{"root_cause": "It kept failing.", "rule": "Run the checks before finishing."}';
+export const COUNTED = (file: string, total = 10) =>
+  `node -e "const f=require('fs').existsSync('${file}')?5:1; console.log('Tests  '+f+' failed | '+(${total}-f)+' passed (${total})'); process.exit(1)"`;
 
 export type RepoOptions = {
   task?: TaskOptions;
