@@ -2,7 +2,7 @@
 
 Turn an idea, or an existing repository, into an execution plan that console AI agents can run on their own: Claude Code, opencode, Codex CLI, Gemini CLI or any other.
 
-It acts as your tech lead and architect. It interviews you, analyzes the repository and writes files your agent reads as soon as it opens the repo: project memory (`AGENTS.md`), a phased plan, tasks that are ready-to-run prompts, and specialized subagents. Then it hands tasks to the agent one by one and only marks a task done after a series of [gates](#gates) the agent cannot skip: the task's own checks, no regressions in the project's lint and tests, a handoff note, mechanical checks on the diff and a review.
+It acts as your tech lead and architect. It interviews you, analyzes the repository and writes files your agent reads as soon as it opens the repo: project memory (`AGENTS.md`), a phased plan, tasks that are ready-to-run prompts, and specialized subagents. Then it hands tasks to the agent one by one and only marks a task done after a series of [gates](#gates) pass: the task's own checks, no regressions in the project's lint, typecheck, build and tests, no tests removed or skipped, mechanical checks on the diff and a review. The gates read a capture taken before the agent starts, stored outside the repository, so an agent that edits the repository cannot rewrite what checks it. [What the gates protect against](#what-the-gates-protect-against) says exactly where that stops.
 
 - Zero friction: `npx builder-assistant-engineer` inside your project. No API key required if you already use an agent CLI.
 - Native output for each agent: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.claude/agents`, `.opencode/agent`, slash commands.
@@ -19,7 +19,7 @@ npx builder-assistant-engineer next    # run the next task, verify it, review it
 npx builder-assistant-engineer status  # see progress
 ```
 
-Requires Node.js 20.12 or newer. For `init`, `plan` and `next` you also need one of the [backends](#backends): an agent CLI you already use, an API key, or any AI you can copy and paste into.
+Requires Node.js 20.12 or newer, and bash for `next` (on Windows, the Git Bash that comes with Git for Windows). For `init`, `plan` and `next` you also need one of the [backends](#backends): an agent CLI you already use, an API key, or any AI you can copy and paste into.
 
 ## What you get
 
@@ -71,7 +71,7 @@ Both commands exit 0.
 ## Log
 ````
 
-The task's state lives in its frontmatter (`pending`, `in_progress`, `done`, `blocked`), so progress is versioned with your code. `tests: required` means the task's diff must touch a test file. `## Log` starts empty; the agent that finishes the task writes its handoff note there.
+The task's state lives in its frontmatter (`pending`, `in_progress`, `done`, `blocked`), so progress is versioned with your code. `tests: required` means the task must run more tests than before or add assertions to a test file. `tests: fix` marks a task whose goal is to repair failing tests: the project's test command must end green. `## Log` starts empty; the agent that finishes the task writes its handoff note there.
 
 ## Example
 
@@ -90,7 +90,7 @@ Phase 2  ░░░░░░░░░░░░░░░░░░░░ 0/2
 
 1/4 done (25%) · next: T-002 Expose GET /health on a testable Gin router
 
-Metrics from .bae/runs
+Local metrics
   attempts: 3 over 2 task(s), 1.5 per task
   done on the first attempt: 1/2 (50%)
   regressions caught: 1
@@ -105,10 +105,10 @@ Metrics from .bae/runs
 | --- | --- |
 | `init` | Detects greenfield or brownfield, lets you choose the backend, target agents (multi-select) and language, runs the interview and saves `.bae/config.json` and `.bae/interview.md`. `--brief <files>` loads a written brief. |
 | `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. |
-| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes. `--headless` runs the agent without a session. |
+| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
 | `status` | Phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
 | `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. |
-| `review [task]` | Runs the mechanical checks and then the generated reviewer, read-only, on a task's diff against its acceptance criteria and `AGENTS.md`. Exits with 1 when the review fails. Defaults to the task in progress. |
+| `review [task]` | Runs the mechanical checks and then the generated reviewer, read-only, on a task's diff against its acceptance criteria and `AGENTS.md`. Exits with 1 when the review fails. Defaults to the task in progress. Takes `--accept-finding <id>` too. |
 
 Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly what would be sent to the AI and changes nothing) and `-y, --yes` (accepts every confirmation).
 
@@ -137,27 +137,40 @@ Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly wh
 
 ## How `next` works
 
-1. Picks the task in progress, or the first pending task whose `depends_on` are all done, ordered by phase and id.
-2. Marks it `in_progress`, records the current commit so the review sees only this task's changes and, when the regression gate is `full`, runs the project's lint and test commands to record a baseline.
-3. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted.
-4. Runs the gates below. Commands are shown before they run (`--yes` skips the question), always in the repository root. Commands such as `sudo`, `rm -rf`, `curl | sh`, `git push`, `git reset --hard` or `npm publish` are refused, even with `--yes`.
-5. If every gate passes, the task is marked `done`. Otherwise it stays `in_progress` and you see why.
-6. With `--headless`, a failed attempt is retried with the task plus the failure output, up to two retries. After that the task is marked `blocked` and the logs stay in `.bae/runs/T-NNN/`.
+1. Picks the task in progress that still has attempts left, then the first pending task whose `depends_on` are all done, ordered by phase and id. A task in progress that used its attempts goes after the ready ones.
+2. Checks that the task can be verified at all. If its Verification is missing, trivial or refused, the task is marked `blocked` with the reason, and no agent is launched.
+3. When the regression gate is `full`, runs the project's lint, typecheck, build and test commands to record a baseline. Then it marks the task `in_progress` and takes the capture: the current commit, the files that were already uncommitted, the ignore rules, the config, the task, the prompts, the reviewer and every file that defines the checks.
+4. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted, and stops after `agent.timeoutMinutes`.
+5. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run (see `verify.allow`).
+6. If every gate passes, the task is marked `done`. Otherwise it stays `in_progress` and you see why.
+7. With `--headless`, a failed attempt is retried with the task plus the failure output. A task gets three attempts in total, counted across runs of `next`, including attempts that ended because the agent failed or timed out. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
+
+When something a gate needs cannot be had (no git repository, a declined or unusable baseline, a task that was already in progress without a capture, a reviewer with no verdict), `next` stops and says why instead of skipping it. `--allow-skip` goes on without that check and records the skip in the run log and the attempt.
 
 ## Gates
 
-Each one is a check, not a document: the agent cannot skip it, and a task that fails one is not `done`.
+A task that fails a gate is not `done`. The `next` gates run in this order and read only the capture, never `.bae/` or the task file as the agent left them.
 
 | Gate | When | What it does |
 | --- | --- | --- |
-| Evidence | `plan`, `replan` | Every path cited in the architecture, the ADRs and each task's Context must exist, and every `path:line` range must fit in the file. Files the plan will create are marked `(new)`. Missing paths trigger one retry that asks the analyst to fix only those; paths that stay unverified are listed under the summary and in `.bae/tmp/plan-report.json`. |
+| Evidence | `plan`, `replan` | Every path cited in the architecture, the ADRs and each task's Context must exist, and every `path:line` range must fit in the file. Files the plan will create are marked `(new)`. Wrong citations trigger one request that asks the analyst to fix only those. In a brownfield plan, a `path:line` citation that is still wrong stops the plan, and nothing is written. Paths without a line that stay unverified are listed under the summary and in `.bae/tmp/plan-report.json`. |
 | Questions | `plan`, `replan` | Blocking questions are asked on the spot; the others are listed. All of them are saved to `.bae/interview.md`, and you can plan again right away with your answers. |
-| Verification | `next` | The commands in the task's `## Verification` block must exit 0. When one of them is the project's lint or test command and it already failed in the regression baseline, it does not block as long as another Verification command passed; the reviewer is told it still fails. |
-| Regression | `next` | Runs the project's `lint` and `test` commands after the task. A command that passed before the task and fails after it blocks the task; one that already failed is recorded as preexisting and does not. |
-| Handoff note | `next` | The task's `## Log` must hold a note of at most 8 lines: what changed, decisions, traps. |
-| Mechanical review | `next`, `review` | On the task's diff: a `.env` or key file, or an added credential, fails; `tests: required` fails if no test file changed; files outside the task's Scope are reported. The AI reviewer only runs when nothing here blocks. |
-| Review | `next`, `review` | The generated reviewer checks the diff against the acceptance criteria and `AGENTS.md`. |
+| Contract | `next` | The task file outside `## Log`, the other task files, `.bae/`, the agent definitions and settings, an existing `.gitignore`, the `package.json` scripts, the test runner config and the files the checks run must not change. Anything that changed is restored and the attempt fails. An existing `.gitignore`, script or runner config may change when the task's Scope lists it and you accept the finding. |
+| Regression | `next` | Runs the project's `lint`, `typecheck`, `build` and `test` commands and compares each one with its own baseline. A command that passed must still pass. For one that already failed, the counts parsed from its output (tests passed and failed, or errors) must not get worse. One that already failed and has no counts only passes green. |
+| Test integrity | `next` | Fewer tests run or more tests skipped than in the baseline blocks the task. So do a deleted test file, a new `.skip`, `.only`, `xit`, `@pytest.mark.skip`, `t.Skip`, `#[ignore]` or similar, and a new runner config that leaves tests out. |
+| Verification | `next` | The task's `## Verification` block runs as one bash script with `set -Eeuo pipefail`, so a failure anywhere, including inside a pipe, fails it. A block that runs no runner and no check, or that hides failures with `\|\| true`, is refused. A line that repeats a project command reuses its result, and a command that already failed and did not get worse does not block, unless the task is `tests: fix`. |
+| Handoff note | `next` | A missing note, or one longer than 8 lines, under `## Log` is reported as a warning. |
+| Mechanical review | `next`, `review` | On the task's diff: a `.env` or key file, an added token or key, a hard-coded password, credentials in a connection string or a long random string fails (known example keys are fine); `tests: required` fails unless the task runs more tests or adds assertions; files outside the task's Scope are reported. The AI reviewer only runs when nothing here blocks, and its pass never overrides a blocker. |
+| Review | `next`, `review` | The generated reviewer checks the diff against the acceptance criteria and `AGENTS.md`. The diff puts the Scope files first and lockfiles last, and sits between markers the reviewer is told to treat as data. A reviewer with no valid verdict fails the attempt. A task that changed no files and passes its checks skips the reviewer. |
 | Lessons | `next` | When a task ends `blocked` or fails its review twice, the agent proposes the root cause and a one-line rule. Once you approve it (`--yes` approves), the rule goes to a Lessons learned list in the managed block of `AGENTS.md`, which replans keep. |
+
+Every finding a gate can accept has an id, printed next to it, such as `(secret-1a2b3c4d)`. `--accept-finding <id>` accepts it for that run, and the acceptance is recorded in the run log and the attempt. Secrets can always be accepted this way. Contract and test integrity findings on a file can be accepted only when the task's Scope lists that file.
+
+### What the gates protect against
+
+The gates are built for an agent that makes mistakes or takes shortcuts by editing the repository: rewriting a test script, deleting or skipping a failing test, changing its own task, hiding files with `.gitignore`, overriding the review prompt, or crashing before the checks. Each of the 17 evasions found in an adversarial review of 0.2.0 has an end-to-end test in [`test/e2e/bypass`](test/e2e/bypass) that tries it and checks that the gates stop it. Those tests run in CI on Linux, macOS and Windows.
+
+The gates do not protect against an agent with full access to your machine. Such an agent can replace `npm`, `bash` or this CLI, edit dependencies inside ignored folders such as `node_modules`, or write to the state directory in your home. Run agents with the permissions their CLI gives them (`--headless` never bypasses them), and review what they change.
 
 ### Configuration
 
@@ -171,15 +184,21 @@ Each one is a check, not a document: the agent cannot skip it, and a task that f
     "typecheck": "npm run typecheck",
     "build": "npm run build"
   },
-  "gates": { "regression": "full" }
+  "gates": { "regression": "full" },
+  "verify": { "allow": ["./scripts/check.sh"] },
+  "secrets": { "allow": ["test/fixtures/**"] },
+  "agent": { "timeoutMinutes": 45 }
 }
 ```
 
-`gates.regression` is `full` (default: baseline before the task, lint and test after it), `task` (lint and test only after the task, so any failure blocks; cheaper when the suite is already green) or `off` (only the task's own Verification).
+- `gates.regression` is `full` (default: a baseline of lint, typecheck, build and test before the agent starts, compared after it), `task` (the same commands only after the task, so any failure blocks; cheaper when the suite is already green) or `off` (only the task's own Verification).
+- `verify.allow` lists command prefixes that may run when nobody confirms them, besides the known runners and checks.
+- `secrets.allow` lists path globs that the secret checks skip, such as test fixtures.
+- `agent.timeoutMinutes` stops a headless agent that runs longer. The attempt is recorded.
 
 ## Customizing prompts
 
-The prompts live in [`src/prompts`](src/prompts). To change one for a project, copy it to `.bae/prompts/<name>.md` and edit it; the CLI uses your copy instead. Every `{{variable}}` must stay defined, or the CLI stops with an error.
+The prompts live in [`src/prompts`](src/prompts). To change one for a project, copy it to `.bae/prompts/<name>.md` and edit it; the CLI uses your copy instead. Every `{{variable}}` must stay defined, or the CLI stops with an error. `next` captures the prompts when it starts a task, so an override written while the agent works is removed and fails the attempt.
 
 | Prompt | Variables |
 | --- | --- |
@@ -196,7 +215,8 @@ The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>`, `<<<
 
 ## Files and safety
 
-- `.bae/config.json` holds configuration only; `.bae/interview.md` holds your answers and the analyst's questions, and can be edited by hand. `.bae/runs/T-NNN/` keeps each task's base commit, regression baseline, run logs, attempt records (`attempts.jsonl`, the source of the `status` metrics) and lesson. `.bae/runs/` and `.bae/tmp/` are added to `.gitignore`.
+- `.bae/config.json` holds configuration only; `.bae/interview.md` holds your answers and the analyst's questions, and can be edited by hand. `.bae/tmp/` holds scratch files and is added to `.gitignore`.
+- What the gates trust lives outside the repository, in `~/.bae/<repo-key>/runs/T-NNN/` (`BAE_HOME` moves `~/.bae`): each task's capture with its base commit, baseline and protected files, the run logs, the attempt records (`attempts.jsonl`, the source of the `status` metrics) and the lesson.
 - The digest respects `.gitignore` and `.baeignore`, skips binaries, lockfiles and `node_modules`, never reads `.env` files or keys, redacts tokens and secrets it finds, and stays within a character budget (100,000 by default, `digest.maxChars` in the config) with priority manifests > entry points > docs > the rest.
 - Existing files are merged, not overwritten. Generated memory goes between `<!-- bae:begin -->` and `<!-- bae:end -->` in `AGENTS.md`, `CLAUDE.md` and `GEMINI.md`; your text outside the markers is kept. Plan files are shown as a diff before writing, and done tasks are never touched.
 - Nothing is sent anywhere except to the backend you choose. There is no telemetry.
