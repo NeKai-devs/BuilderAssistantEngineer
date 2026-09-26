@@ -89,7 +89,6 @@ export const en = {
   "plan.continuing":
     "The answer was cut off at {{marker}}; asking the analyst to continue from there.",
   "plan.summary": "Summary",
-  "plan.questions": "Open questions — answer them in .bae/interview.md and run replan",
   "plan.blocking": "blocking",
   "plan.done": "{{count}} file(s) written. Next: {{next}}",
   "plan.nothingWritten": "No files were written.",
@@ -199,6 +198,17 @@ export const en = {
     "The task requires tests (tests: required), but the change does not touch any test file.",
   "mechanical.outOfScope": "Changed outside the task's Scope: {{files}}",
   "mechanical.failed": "The automatic checks failed, so the reviewer was not run.",
+  "plan.openQuestions":
+    "Open questions, saved to .bae/interview.md; answer them there and run replan when you can",
+  "plan.questionsSaved": "{{count}} question(s) saved to .bae/interview.md.",
+  "plan.rerun": "You answered blocking questions. Run the plan again now with your answers?",
+  "plan.rerunning": "Running the plan again with your answers.",
+  "md.planQuestions": "Questions from the plan ({{date}})",
+  "md.why": "Why",
+  "md.options": "Options",
+  "md.blocking": "Blocking: the plan assumed an answer",
+  "md.answer": "Answer",
+  "md.open": "open, not answered yet",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -136,6 +136,73 @@ describe("plan", () => {
     expect(await read(cwd, "docs/plan/02-architecture.md")).toBe(`${architecture}\n`);
   });
 
+  it("asks only blocking questions and saves every question to the interview", async () => {
+    const cwd = await setup();
+    const questions = JSON.stringify([
+      { question: "Which DB?", why: "schema", options: ["sqlite", "postgres"], blocking: true },
+      { question: "Product name?", why: "branding" },
+    ]);
+    const { code, ui, ai } = await runPlan(
+      cwd,
+      [],
+      [planOutput({ questions })],
+      ["all", "option-1", false],
+    );
+    expect(code).toBe(0);
+    expect(ai.prompts).toHaveLength(1);
+    expect(ui.asked).toEqual([
+      "Write 7 file(s)?",
+      "Which DB?",
+      "You answered blocking questions. Run the plan again now with your answers?",
+    ]);
+    expect(ui.log.join("\n")).toContain("1. Product name? — branding");
+    const interview = await read(cwd, ".bae/interview.md");
+    expect(interview).toMatch(
+      /^# Interview\n\nAdd team accounts\.\n\n## Questions from the plan \(\d{4}-\d{2}-\d{2}\)/,
+    );
+    expect(interview).toContain(
+      "### Which DB?\n\n- Why: schema\n- Options: sqlite / postgres\n- Blocking: the plan assumed an answer\n- Answer: postgres",
+    );
+    expect(interview).toContain(
+      "### Product name?\n\n- Why: branding\n- Answer: _open, not answered yet_",
+    );
+    expect(ui.log.at(-1)).toBe(
+      "outro: 7 file(s) written. Next: npx builder-assistant-engineer next",
+    );
+  });
+
+  it("plans again right away with the answers and drops tasks the new plan no longer has", async () => {
+    const cwd = await setup();
+    const questions = '[{"question": "Which DB?", "why": "schema", "blocking": true}]';
+    const smaller = {
+      "AGENTS.md": "# Project",
+      "docs/plan/tasks/T-001-setup-baseline.md": taskFile("T-001"),
+      ".claude/agents/reviewer.md": "---\nname: reviewer\ndescription: Reviews tasks\n---\nReview.",
+    };
+    const { code, ai, ui } = await runPlan(
+      cwd,
+      [],
+      [planOutput({ questions }), planOutput({ files: smaller })],
+      ["all", "postgres", true, "all"],
+    );
+    expect(code).toBe(0);
+    expect(ai.prompts).toHaveLength(2);
+    expect(ai.prompts[1]).toContain("### Which DB?");
+    expect(ai.prompts[1]).toContain("- Answer: postgres");
+    expect(ui.log).toContain("outro: Running the plan again with your answers.");
+    expect(await exists(cwd, "docs/plan/tasks/T-002-add-feature.md")).toBe(false);
+    expect(await exists(cwd, "docs/plan/tasks/T-001-setup-baseline.md")).toBe(true);
+  });
+
+  it("does not ask with --yes and keeps blocking questions open", async () => {
+    const cwd = await setup();
+    const questions = '[{"question": "Which DB?", "why": "schema", "blocking": true}]';
+    const { ui } = await runPlan(cwd, ["--yes"], [planOutput({ questions })]);
+    expect(ui.asked).toEqual([]);
+    expect(ui.log).toContain("info: 1 question(s) saved to .bae/interview.md.");
+    expect(await read(cwd, ".bae/interview.md")).toContain("- Answer: _open, not answered yet_");
+  });
+
   it("prints the exact prompt on --dry-run without calling the AI or writing", async () => {
     const cwd = await setup();
     const { code, ai, printed } = await runPlan(cwd, ["--dry-run"], []);

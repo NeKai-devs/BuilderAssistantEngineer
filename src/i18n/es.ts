@@ -93,7 +93,6 @@ export const es: Messages = {
   "plan.continuing":
     "La respuesta se cortó en {{marker}}; se pide al analista que continúe desde ahí.",
   "plan.summary": "Resumen",
-  "plan.questions": "Preguntas abiertas — respóndelas en .bae/interview.md y ejecuta replan",
   "plan.blocking": "bloqueante",
   "plan.done": "{{count}} archivo(s) escritos. Siguiente paso: {{next}}",
   "plan.nothingWritten": "No se escribió ningún archivo.",
@@ -204,4 +203,16 @@ export const es: Messages = {
     "La tarea exige tests (tests: required), pero el cambio no toca ningún archivo de test.",
   "mechanical.outOfScope": "Cambios fuera del Scope de la tarea: {{files}}",
   "mechanical.failed": "Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
+  "plan.openQuestions":
+    "Preguntas abiertas, guardadas en .bae/interview.md; respóndelas allí y ejecuta replan cuando puedas",
+  "plan.questionsSaved": "{{count}} pregunta(s) guardadas en .bae/interview.md.",
+  "plan.rerun":
+    "Respondiste preguntas bloqueantes. ¿Volver a generar el plan ahora con tus respuestas?",
+  "plan.rerunning": "Generando el plan otra vez con tus respuestas.",
+  "md.planQuestions": "Preguntas del plan ({{date}})",
+  "md.why": "Por qué",
+  "md.options": "Opciones",
+  "md.blocking": "Bloqueante: el plan asumió una respuesta",
+  "md.answer": "Respuesta",
+  "md.open": "abierta, sin responder",
 };

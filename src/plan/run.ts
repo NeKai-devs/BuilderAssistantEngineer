@@ -13,14 +13,7 @@ import { scanFiles } from "../digest/walk.js";
 import { t } from "../i18n/index.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
 import { describeUnverified, findUnverified, type Unverified } from "./evidence.js";
-import {
-  type ParsedPlan,
-  PLAN_FORMAT,
-  type PlanQuestion,
-  parseFileBlocks,
-  parsePlan,
-  renderPlan,
-} from "./parser.js";
+import { type ParsedPlan, PLAN_FORMAT, parseFileBlocks, parsePlan, renderPlan } from "./parser.js";
 import { newPlanStats, type PlanStats, recordInfo, writePlanReport } from "./report.js";
 
 export type PlanRequest = { priorPlan: string; knownTaskIds: string[] };
@@ -194,17 +187,6 @@ async function repoFiles(cwd: string): Promise<string> {
   const { files } = await scanFiles(cwd);
   const list = files.map((file) => file.path).join("\n");
   return truncateText(list || "(no files)", MAX_REPO_FILES_CHARS);
-}
-
-export function formatQuestions(questions: PlanQuestion[]): string {
-  return questions
-    .map((question, index) => {
-      const flag = question.blocking ? ` [${t("plan.blocking")}]` : "";
-      const options = question.options?.length ? `\n   ${question.options.join(" / ")}` : "";
-      const why = question.why ? ` — ${question.why}` : "";
-      return `${index + 1}.${flag} ${question.question}${why}${options}`;
-    })
-    .join("\n");
 }
 
 function progress(update: (message: string) => void) {

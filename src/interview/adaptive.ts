@@ -32,7 +32,7 @@ export async function runAdaptiveRound(
       if (reply.done) return { ...data, followUps, summary: reply.summary };
       followUps.push({
         question: reply.question,
-        answer: await askFollowUp(context.prompter, reply),
+        answer: await askQuestion(context.prompter, reply),
       });
     }
   } catch (error) {
@@ -72,10 +72,9 @@ async function nextReply(context: AdaptiveContext, data: InterviewData): Promise
   );
 }
 
-async function askFollowUp(
-  prompter: Prompter,
-  reply: Extract<InterviewReply, { done: false }>,
-): Promise<string> {
+export type Question = { question: string; why?: string; options?: string[] };
+
+export async function askQuestion(prompter: Prompter, reply: Question): Promise<string> {
   if (reply.why) prompter.note(reply.why, reply.question);
   const options = reply.options ?? [];
   if (options.length === 0) return prompter.text(reply.question, t("interview.answer"));
