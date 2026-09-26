@@ -52,7 +52,7 @@ npm run eval -- --backend claude --lang en --label my-change
 npm run eval -- --backend opencode --only go-service,node-app --label shorter-roadmap
 ```
 
-Each fixture gets `prompt.md` (the exact prompt), `plan.log`, `output/` (every generated file) and `meta.json`. The run gets a `summary.md` with one row per fixture and a total row:
+Each fixture gets `prompt.md` (the exact prompt), `cli-output.txt`, `output/` (every generated file) and `meta.json`. The run gets a `summary.md` with one row per fixture and a total row:
 
 | Metric | Meaning |
 | --- | --- |

@@ -56,7 +56,8 @@ console.log(`\nEval saved to ${relative(process.cwd(), runDir) || runDir}`);
 
 async function evaluate(fixture: string): Promise<Result> {
   console.log(`\n== ${fixture}`);
-  const repo = await prepareRepo(fixture);
+  const parent = await mkdtemp(join(tmpdir(), "bae-eval-"));
+  const repo = await prepareRepo(fixture, join(parent, fixture));
   const outDir = join(runDir, fixture);
   await mkdir(outDir, { recursive: true });
   try {
@@ -65,7 +66,7 @@ async function evaluate(fixture: string): Promise<Result> {
     const started = Date.now();
     const plan = await cli(repo, ["plan", "--yes"]);
     const durationMs = Date.now() - started;
-    await writeFile(join(outDir, "plan.log"), plan.output);
+    await writeFile(join(outDir, "cli-output.txt"), plan.output);
     const artifacts = await readArtifacts(repo);
     await copyArtifacts(repo, artifacts, join(outDir, "output"));
     await cp(join(repo, ".bae", "tmp", "last-response.md"), join(outDir, "last-response.md")).catch(
@@ -87,12 +88,11 @@ async function evaluate(fixture: string): Promise<Result> {
     );
     return result;
   } finally {
-    await rm(repo, { recursive: true, force: true });
+    await rm(parent, { recursive: true, force: true });
   }
 }
 
-async function prepareRepo(fixture: string): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), `bae-eval-${fixture}-`));
+async function prepareRepo(fixture: string, repo: string): Promise<string> {
   await cp(join(FIXTURES, fixture), repo, { recursive: true });
   await git(repo, ["init", "-q", "-b", "main"]);
   await git(repo, ["add", "-A"]);
