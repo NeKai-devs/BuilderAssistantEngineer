@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
-import { writeConfig, writeInterview } from "../../src/config/store.js";
+import { readConfig, writeConfig, writeInterview } from "../../src/config/store.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
 import { copyFixture, tempDir, writeFiles } from "../helpers.js";
 import { planOutput, taskFile } from "../plan-sample.js";
@@ -16,6 +16,7 @@ const exists = (cwd: string, path: string) =>
 
 async function setup(
   targets: ("claude-code" | "opencode" | "codex" | "gemini")[] = ["claude-code"],
+  commands: Record<string, string> = {},
 ) {
   const cwd = await copyFixture("node-app");
   await writeConfig(cwd, {
@@ -25,6 +26,7 @@ async function setup(
     targets,
     lang: "en",
     digest: { maxChars: 20_000 },
+    commands,
   });
   await writeInterview(cwd, "# Interview\n\nAdd team accounts.\n");
   return cwd;
@@ -71,6 +73,23 @@ describe("plan", () => {
     });
     expect(ui.log.at(-1)).toBe(
       "outro: 7 file(s) written. Next: npx builder-assistant-engineer next",
+    );
+  });
+
+  it("saves project commands: stored values first, then the analyst's, then the manifests'", async () => {
+    const cwd = await setup(["claude-code"], { test: "npm run test:ci" });
+    const config =
+      '{"commands": {"test": "npm test", "lint": "npm run lint:strict", "typecheck": "npx tsc --noEmit", "build": null}}';
+    const { code, ui } = await runPlan(cwd, ["--yes"], [planOutput({ config })]);
+    expect(code).toBe(0);
+    expect((await readConfig(cwd))?.commands).toEqual({
+      test: "npm run test:ci",
+      lint: "npm run lint:strict",
+      typecheck: "npx tsc --noEmit",
+      build: "npm run build",
+    });
+    expect(ui.log.join("\n")).toContain(
+      "note: Project commands saved to .bae/config.json lint: npm run lint:strict\ntypecheck: npx tsc --noEmit\nbuild: npm run build",
     );
   });
 

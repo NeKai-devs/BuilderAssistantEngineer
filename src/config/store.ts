@@ -4,7 +4,7 @@ import { UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { baePaths } from "../core/paths.js";
 import { t } from "../i18n/index.js";
-import { type Config, configSchema } from "./schema.js";
+import { type Config, type ConfigInput, configSchema } from "./schema.js";
 
 export async function readConfig(cwd: string): Promise<Config | undefined> {
   const path = baePaths(cwd).config;
@@ -21,7 +21,7 @@ export function parseConfig(text: string, displayPath: string): Config {
   );
 }
 
-export async function writeConfig(cwd: string, config: Config): Promise<void> {
+export async function writeConfig(cwd: string, config: ConfigInput): Promise<void> {
   await writeText(baePaths(cwd).config, `${JSON.stringify(config, null, 2)}\n`);
 }
 

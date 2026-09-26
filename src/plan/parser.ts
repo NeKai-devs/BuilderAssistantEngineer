@@ -1,5 +1,6 @@
 import { posix } from "node:path";
 import { z } from "zod";
+import type { Commands } from "../config/schema.js";
 import { FormatError } from "../core/errors.js";
 import { splitFrontmatter } from "../tasks/frontmatter.js";
 import { findCycle } from "../tasks/graph.js";
@@ -16,9 +17,21 @@ const questionSchema = z.object({
 
 export type PlanQuestion = z.output<typeof questionSchema>;
 
+const nullableCommand = z.string().nullish();
+
+const configBlockSchema = z.object({
+  commands: z.object({
+    test: nullableCommand,
+    lint: nullableCommand,
+    typecheck: nullableCommand,
+    build: nullableCommand,
+  }),
+});
+
 export type ParsedPlan = {
   summary: string;
   questions: PlanQuestion[];
+  commands: Commands;
   files: PlanFile[];
   tasks: Task[];
   warnings: string[];
@@ -26,10 +39,10 @@ export type ParsedPlan = {
 
 export type ParseOptions = { knownTaskIds?: string[]; requireReviewer?: boolean };
 
-type Block = { kind: "SUMMARY" | "QUESTIONS" | "FILE"; path: string; body: string };
+type Block = { kind: "SUMMARY" | "QUESTIONS" | "CONFIG" | "FILE"; path: string; body: string };
 
 export const MARKER =
-  /^[ \t]*<<<(SUMMARY|QUESTIONS|END SUMMARY|END QUESTIONS|END FILE|FILE:[^>\n]*)>>>/gm;
+  /^[ \t]*<<<(SUMMARY|QUESTIONS|CONFIG|END SUMMARY|END QUESTIONS|END CONFIG|END FILE|FILE:[^>\n]*)>>>/gm;
 const MAX_PROBLEMS = 20;
 
 const ALLOWED_PATHS = [
@@ -51,6 +64,9 @@ export const PLAN_FORMAT = [
   "<<<QUESTIONS>>>",
   'JSON array of up to 5 objects {"question", "why", "options"?, "blocking"?}; [] if none',
   "<<<END QUESTIONS>>>",
+  "<<<CONFIG>>>",
+  '{"commands": {"test": "...", "lint": "...", "typecheck": "...", "build": "..."}} with null for commands the project will not have',
+  "<<<END CONFIG>>>",
   "<<<FILE: path/to/file.md>>>",
   "full file content",
   "<<<END FILE>>>",
@@ -69,11 +85,12 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
   const summary = single(blocks, "SUMMARY", problems)?.body.trim() ?? "";
   if (summary === "" && problems.length === 0) problems.push("SUMMARY is empty");
   const questions = parseQuestions(single(blocks, "QUESTIONS", problems)?.body, problems);
+  const commands = parseConfig(blocks, warnings);
   const files = collectFiles(blocks, problems);
   const tasks = validateTasks(files, options.knownTaskIds ?? [], problems);
   validateAgents(files, options.requireReviewer ?? false, problems);
   if (problems.length > 0) throw new FormatError(problems.slice(0, MAX_PROBLEMS).join("\n"));
-  return { summary, questions, files, tasks, warnings };
+  return { summary, questions, commands, files, tasks, warnings };
 }
 
 function tokenize(text: string, problems: string[], warnings: string[]): Block[] {
@@ -124,10 +141,7 @@ function single(blocks: Block[], kind: "SUMMARY" | "QUESTIONS", problems: string
 
 function parseQuestions(body: string | undefined, problems: string[]): PlanQuestion[] {
   if (body === undefined) return [];
-  const json = body
-    .trim()
-    .replace(/^```(?:json)?\s*\n?/, "")
-    .replace(/\n?```$/, "");
+  const json = unfence(body);
   let data: unknown;
   try {
     data = JSON.parse(json);
@@ -141,6 +155,37 @@ function parseQuestions(body: string | undefined, problems: string[]): PlanQuest
   if (result.success) return result.data;
   problems.push(`QUESTIONS does not match the schema (${z.prettifyError(result.error)})`);
   return [];
+}
+
+function parseConfig(blocks: Block[], warnings: string[]): Commands {
+  const found = blocks.filter((block) => block.kind === "CONFIG");
+  if (found.length > 1) warnings.push("ignored every CONFIG block after the first");
+  const body = found[0]?.body;
+  if (body === undefined) return {};
+  let data: unknown;
+  try {
+    data = JSON.parse(unfence(body));
+  } catch {
+    warnings.push("ignored the CONFIG block: it is not valid JSON");
+    return {};
+  }
+  const result = configBlockSchema.safeParse(data);
+  if (!result.success) {
+    warnings.push("ignored the CONFIG block: it does not match the schema");
+    return {};
+  }
+  const commands: Commands = {};
+  for (const [key, value] of Object.entries(result.data.commands)) {
+    if (value?.trim()) commands[key as keyof Commands] = value.trim();
+  }
+  return commands;
+}
+
+function unfence(body: string): string {
+  return body
+    .trim()
+    .replace(/^```(?:json)?\s*\n?/, "")
+    .replace(/\n?```$/, "");
 }
 
 function collectFiles(blocks: Block[], problems: string[]): PlanFile[] {

@@ -1,5 +1,8 @@
 import { type Change, planChanges } from "../artifacts/merge.js";
 import { applyChanges, confirmChanges } from "../artifacts/write.js";
+import { fillCommands, proposeCommands } from "../config/commands.js";
+import { COMMAND_KEYS, type Commands } from "../config/schema.js";
+import { readConfig, writeConfig } from "../config/store.js";
 import { ensureGitignore } from "../core/gitignore.js";
 import { t } from "../i18n/index.js";
 import { type OnlyGroup, selectFiles } from "../plan/filter.js";
@@ -27,7 +30,18 @@ export async function runPlan(ctx: CommandContext, options: PlanOptions): Promis
   }
   const files = selectFiles(parsed.files, { only: options.only, targets: config.targets });
   const written = await writePlanFiles(ctx, await planChanges(ctx.cwd, files));
+  if (written.length > 0) await saveCommands(ctx, parsed.commands);
   reportPlan(ctx, parsed, written);
+}
+
+export async function saveCommands(ctx: CommandContext, analyst: Commands): Promise<void> {
+  const stored = await readConfig(ctx.cwd);
+  if (!stored) return;
+  const commands = fillCommands(stored.commands, analyst, await proposeCommands(ctx.cwd));
+  const added = COMMAND_KEYS.filter((key) => commands[key] && !stored.commands[key]);
+  if (added.length === 0) return;
+  await writeConfig(ctx.cwd, { ...stored, commands });
+  ctx.prompter.note(added.map((key) => `${key}: ${commands[key]}`).join("\n"), t("plan.commands"));
 }
 
 export async function writePlanFiles(ctx: CommandContext, changes: Change[]): Promise<Change[]> {

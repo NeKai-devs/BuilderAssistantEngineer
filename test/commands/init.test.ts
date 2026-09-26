@@ -40,6 +40,8 @@ describe("init", () => {
       targets: ["claude-code"],
       lang: "es",
       digest: { maxChars: 100_000 },
+      commands: {},
+      gates: { regression: "full" },
     });
     const interview = await read(cwd, ".bae/interview.md");
     expect(interview).toContain("# Entrevista");

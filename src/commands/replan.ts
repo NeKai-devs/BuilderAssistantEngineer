@@ -7,7 +7,7 @@ import { buildPriorPlan } from "../plan/prior.js";
 import { generatePlan } from "../plan/run.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import type { CommandContext } from "./context.js";
-import { reportPlan, writePlanFiles } from "./plan.js";
+import { reportPlan, saveCommands, writePlanFiles } from "./plan.js";
 import { CLI, requireConfig } from "./shared.js";
 
 const CHANGELOG = "docs/plan/CHANGELOG.md";
@@ -33,7 +33,9 @@ export async function runReplan(ctx: CommandContext): Promise<void> {
     ctx.prompter.warn(t("replan.noChangelog"));
   const files = selectFiles(parsed.files, { targets: config.targets });
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsoleteTasks(tasks, parsed)];
-  reportPlan(ctx, parsed, await writePlanFiles(ctx, changes));
+  const written = await writePlanFiles(ctx, changes);
+  if (written.length > 0) await saveCommands(ctx, parsed.commands);
+  reportPlan(ctx, parsed, written);
 }
 
 function obsoleteTasks(tasks: LoadedTask[], parsed: ParsedPlan): Change[] {

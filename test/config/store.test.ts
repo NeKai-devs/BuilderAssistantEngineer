@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Config } from "../src/config/schema.js";
-import { resolveSettings } from "../src/config/settings.js";
-import { readConfig, readInterview, writeConfig, writeInterview } from "../src/config/store.js";
-import { UserError } from "../src/core/errors.js";
-import { tempDir } from "./helpers.js";
+import type { Config } from "../../src/config/schema.js";
+import { resolveSettings } from "../../src/config/settings.js";
+import { readConfig, readInterview, writeConfig, writeInterview } from "../../src/config/store.js";
+import { UserError } from "../../src/core/errors.js";
+import { tempDir } from "../helpers.js";
 
 const config: Config = {
   version: 1,
@@ -14,6 +14,8 @@ const config: Config = {
   targets: ["claude-code", "opencode"],
   lang: "es",
   digest: { maxChars: 50_000 },
+  commands: { test: "npm test", lint: "npm run lint" },
+  gates: { regression: "task" },
 };
 
 async function writeRawConfig(cwd: string, text: string) {
@@ -32,11 +34,21 @@ describe("config store", () => {
     expect(await readConfig(cwd)).toEqual(config);
   });
 
-  it("fills the digest default", async () => {
+  it("fills the digest, commands and gates defaults", async () => {
     const cwd = await tempDir();
-    const { digest: _, ...rest } = config;
+    const { digest: _, commands: __, gates: ___, ...rest } = config;
     await writeRawConfig(cwd, JSON.stringify(rest));
-    expect((await readConfig(cwd))?.digest).toEqual({ maxChars: 100_000 });
+    expect(await readConfig(cwd)).toMatchObject({
+      digest: { maxChars: 100_000 },
+      commands: {},
+      gates: { regression: "full" },
+    });
+  });
+
+  it("rejects an unknown regression mode", async () => {
+    const cwd = await tempDir();
+    await writeRawConfig(cwd, JSON.stringify({ ...config, gates: { regression: "sometimes" } }));
+    await expect(readConfig(cwd)).rejects.toThrow(/gates/);
   });
 
   it("rejects malformed JSON with a user error", async () => {

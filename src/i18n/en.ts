@@ -171,6 +171,19 @@ export const en = {
     "Paste it into your AI. Then paste the full answer here and finish with Ctrl-D (Ctrl-Z, Enter on Windows), or save it to {{path}} and press Enter.",
   "manual.awaitingDone": "Run it with your agent and press Enter when the task is finished.",
   "manual.emptyResponse": "No answer received. Paste it here or save it to {{path}}.",
+  "plan.commands": "Project commands saved to .bae/config.json",
+  "regression.title": "Regression check",
+  "regression.baselineTitle": "Regression baseline, before the task",
+  "regression.confirm": "Run the project's lint and test commands now to record the baseline?",
+  "regression.skipped": "Baseline skipped; the regression check is off for this task.",
+  "regression.preexisting":
+    "`{{command}}` already fails before the task (exit {{code}}); recorded as preexisting, it will not block.",
+  "regression.found": "Regression: `{{command}}` exits with {{code}} after the task.",
+  "regression.stillFailing":
+    "`{{command}}` still fails (exit {{code}}), as it did before the task.",
+  "regression.passed": "Regression check passed.",
+  "regression.unsafe":
+    "Refusing to run `{{command}}` ({{reason}}). Fix the commands in .bae/config.json.",
 } as const;
 
 export type MessageKey = keyof typeof en;

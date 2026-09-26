@@ -176,4 +176,19 @@ export const es: Messages = {
     "Pégalo en tu IA. Luego pega aquí la respuesta completa y termina con Ctrl-D (Ctrl-Z, Enter en Windows), o guárdala en {{path}} y pulsa Enter.",
   "manual.awaitingDone": "Ejecútalo con tu agente y pulsa Enter cuando la tarea termine.",
   "manual.emptyResponse": "No se recibió respuesta. Pégala aquí o guárdala en {{path}}.",
+  "plan.commands": "Comandos del proyecto guardados en .bae/config.json",
+  "regression.title": "Chequeo de regresión",
+  "regression.baselineTitle": "Línea base de regresión, antes de la tarea",
+  "regression.confirm":
+    "¿Ejecutar ahora los comandos de lint y test del proyecto para registrar la línea base?",
+  "regression.skipped":
+    "Línea base omitida; el chequeo de regresión queda desactivado para esta tarea.",
+  "regression.preexisting":
+    "`{{command}}` ya falla antes de la tarea (salida {{code}}); queda registrado como preexistente y no bloquea.",
+  "regression.found": "Regresión: `{{command}}` termina con {{code}} después de la tarea.",
+  "regression.stillFailing":
+    "`{{command}}` sigue fallando (salida {{code}}), igual que antes de la tarea.",
+  "regression.passed": "Chequeo de regresión superado.",
+  "regression.unsafe":
+    "No se ejecuta `{{command}}` ({{reason}}). Corrige los comandos en .bae/config.json.",
 };

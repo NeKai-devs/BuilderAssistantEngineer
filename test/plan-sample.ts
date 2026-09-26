@@ -51,7 +51,12 @@ export function defaultFiles(): Record<string, string> {
 }
 
 export function planOutput(
-  parts: { summary?: string; questions?: string; files?: Record<string, string> } = {},
+  parts: {
+    summary?: string;
+    questions?: string;
+    config?: string;
+    files?: Record<string, string>;
+  } = {},
 ): string {
   const files = parts.files ?? defaultFiles();
   return [
@@ -61,6 +66,7 @@ export function planOutput(
     "<<<QUESTIONS>>>",
     parts.questions ?? "[]",
     "<<<END QUESTIONS>>>",
+    ...(parts.config === undefined ? [] : ["<<<CONFIG>>>", parts.config, "<<<END CONFIG>>>"]),
     ...Object.entries(files).flatMap(([path, content]) => [
       `<<<FILE: ${path}>>>`,
       content.trimEnd(),

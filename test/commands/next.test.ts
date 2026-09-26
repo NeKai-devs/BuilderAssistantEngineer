@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
@@ -11,6 +11,8 @@ import { taskFile } from "../plan-sample.js";
 const PASS = 'node -e "process.exit(0)"';
 const FAIL = 'node -e "process.exit(1)"';
 const NEEDS_FILE = `node -e "process.exit(require('fs').existsSync('done.txt') ? 0 : 1)"`;
+const BREAKS_WITH = (file: string) =>
+  `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
 const REVIEW_PASS = () => '{"verdict": "pass", "findings": []}';
 const writesFile =
   (cwd: string, name: string): Step =>
@@ -19,10 +21,14 @@ const writesFile =
     return "";
   };
 
-async function repo(
-  command: string,
-  options: { git?: boolean; backend?: "claude" | "manual" } = {},
-) {
+type RepoOptions = {
+  git?: boolean;
+  backend?: "claude" | "manual";
+  commands?: Record<string, string>;
+  regression?: "full" | "task" | "off";
+};
+
+async function repo(command: string, options: RepoOptions = {}) {
   const cwd = await tempDir();
   await writeFiles(cwd, {
     "AGENTS.md": "# Rules\n",
@@ -36,6 +42,8 @@ async function repo(
     targets: ["claude-code"],
     lang: "en",
     digest: { maxChars: 20_000 },
+    commands: options.commands ?? {},
+    gates: { regression: options.regression ?? "full" },
   });
   if (options.git !== false) await gitCommitAll(cwd, "plan");
   return cwd;
@@ -182,5 +190,95 @@ describe("next", () => {
     });
     const done = await runNext(cwd, [], []);
     expect(done.ui.log.at(-1)).toBe("outro: Every task is done.");
+  });
+});
+
+describe("next regression gate", () => {
+  const TASK = "docs/plan/tasks/T-001-first.md";
+
+  it("records a failing baseline as preexisting and does not block the task", async () => {
+    const cwd = await repo(PASS, { commands: { test: FAIL, lint: PASS } });
+    const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt"), REVIEW_PASS]);
+    expect(code).toBe(0);
+    expect(ui.log).toContain(
+      `warn: \`${FAIL}\` already fails before the task (exit 1); recorded as preexisting, it will not block.`,
+    );
+    expect(ui.log).toContain(`info: \`${FAIL}\` still fails (exit 1), as it did before the task.`);
+    expect(JSON.parse(await readFile(join(cwd, ".bae/runs/T-001/baseline.json"), "utf8"))).toEqual({
+      skipped: false,
+      exitCodes: { lint: 0, test: 1 },
+    });
+    expect(await statusOf(cwd, TASK)).toBe("done");
+  });
+
+  it("keeps the task in progress when it turns a passing command red", async () => {
+    const test = BREAKS_WITH("broken.txt");
+    const cwd = await repo(PASS, { commands: { test } });
+    const { code, ui, calls } = await runNext(cwd, ["--yes"], [writesFile(cwd, "broken.txt")]);
+    expect(code).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
+    expect(await statusOf(cwd, TASK)).toBe("in_progress");
+    const [log] = await logs(cwd, "T-001");
+    const report = await readFile(join(cwd, ".bae/runs/T-001", log ?? ""), "utf8");
+    expect(report).toContain("regression: it passed before the task");
+  });
+
+  it("retries headless runs with the regression output until the command is green again", async () => {
+    const test = BREAKS_WITH("broken.txt");
+    const cwd = await repo(PASS, { commands: { test } });
+    const fixes: Step = async () => {
+      await rm(join(cwd, "broken.txt"));
+      await writeFiles(cwd, { "fixed.txt": "ok\n" });
+      return "";
+    };
+    const { code, calls } = await runNext(
+      cwd,
+      ["--headless", "--yes"],
+      [writesFile(cwd, "broken.txt"), fixes, REVIEW_PASS],
+    );
+    expect(code).toBe(0);
+    expect(calls[1]?.prompt).toContain("## Regression check");
+    expect(await statusOf(cwd, TASK)).toBe("done");
+  });
+
+  it("runs the suite only after the task in task mode, so any red command blocks", async () => {
+    const cwd = await repo(PASS, { commands: { test: FAIL }, regression: "task" });
+    const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    expect(code).toBe(1);
+    expect(ui.log).toContain(`warn: Regression: \`${FAIL}\` exits with 1 after the task.`);
+    expect(await readdir(join(cwd, ".bae/runs/T-001"))).not.toContain("baseline.json");
+  });
+
+  it("runs no suite when the gate is off and reuses verification results", async () => {
+    const off = await repo(PASS, { commands: { test: FAIL }, regression: "off" });
+    const first = await runNext(off, ["--yes"], [writesFile(off, "a.txt"), REVIEW_PASS]);
+    expect(first.code).toBe(0);
+    expect(first.printed).not.toContain(`$ ${FAIL}`);
+    const same = await repo(PASS, { commands: { test: PASS } });
+    const second = await runNext(same, ["--yes"], [writesFile(same, "a.txt"), REVIEW_PASS]);
+    expect(second.code).toBe(0);
+    expect(second.printed.split(`$ ${PASS}`)).toHaveLength(3);
+  });
+
+  it("lets the user skip the baseline, which turns the check off for that task", async () => {
+    const cwd = await repo(PASS, { commands: { test: FAIL } });
+    const { code, ui } = await runNext(
+      cwd,
+      [],
+      [writesFile(cwd, "a.txt"), REVIEW_PASS],
+      [false, true],
+    );
+    expect(code).toBe(0);
+    expect(ui.log).toContain("warn: Baseline skipped; the regression check is off for this task.");
+  });
+
+  it("refuses unsafe project commands", async () => {
+    const cwd = await repo(PASS, { commands: { lint: "sudo make lint" } });
+    const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    expect(code).toBe(1);
+    expect(ui.log).toContain(
+      "warn: Refusing to run `sudo make lint` (sudo). Fix the commands in .bae/config.json.",
+    );
   });
 });

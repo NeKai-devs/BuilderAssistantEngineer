@@ -62,6 +62,8 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
     targets: await chooseTargets(ctx, installed, existing),
     lang,
     digest: existing?.digest ?? { maxChars: DEFAULT_DIGEST_MAX_CHARS },
+    commands: existing?.commands ?? {},
+    gates: existing?.gates ?? { regression: "full" },
   };
   const interview = await interviewFor(ctx, config, options);
   if (interview === undefined) return;

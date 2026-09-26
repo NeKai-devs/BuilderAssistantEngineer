@@ -49,6 +49,11 @@ Emit only these blocks, nothing outside them. Paths are relative to the repo roo
 JSON array of up to 5 objects {"question", "why", "options"?, "blocking"?}; [] if none. Even with blocking questions, deliver a provisional plan and state the assumption you planned with.
 <<<END QUESTIONS>>>
 
+<<<CONFIG>>>
+{"commands": {"test": "...", "lint": "...", "typecheck": "...", "build": "..."}}
+<<<END CONFIG>>>
+The project's commands, run from the repo root: the ones the repo has today, or the ones T-001 creates when the baseline marks them absent; null for a command this project will not have. The CLI runs lint and test before and after every task, and a task that turns them red is not done.
+
 <<<FILE: AGENTS.md>>> … <<<END FILE>>>
 <<<FILE: CLAUDE.md>>> … <<<END FILE>>> — only if claude-code is targeted; imports AGENTS.md; only Claude Code-specific rules here
 <<<FILE: GEMINI.md>>> … <<<END FILE>>> — only if gemini is targeted; same rule
