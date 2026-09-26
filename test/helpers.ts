@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { onTestFinished, vi } from "vitest";
+import { runCommand } from "../src/core/process.js";
 
 const FIXTURES = fileURLToPath(new URL("./fixtures/repos/", import.meta.url));
 
@@ -38,4 +39,23 @@ export function captureOutput() {
     return true;
   });
   return { out: () => out.join(""), err: () => err.join("") };
+}
+
+export async function gitCommitAll(cwd: string, message: string): Promise<void> {
+  const identity = [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "-c",
+    "commit.gpgsign=false",
+  ];
+  for (const args of [
+    ["init", "-q", "-b", "main"],
+    ["add", "-A"],
+    [...identity, "commit", "-q", "--allow-empty", "-m", message],
+  ]) {
+    const result = await runCommand("git", args, { cwd });
+    if (result.exitCode !== 0) throw new Error(result.stderr);
+  }
 }

@@ -8,11 +8,13 @@ afterEach(() => setLang("en"));
 describe("i18n", () => {
   it("interpolates variables in the active language", () => {
     setLang("es");
-    expect(t("error.notImplemented", { command: "plan" })).toBe("`plan` aún no está implementado.");
+    expect(t("next.done", { id: "T-001", command: "bae next" })).toBe(
+      "T-001 está hecha. Siguiente paso: bae next",
+    );
   });
 
   it("keeps unknown placeholders visible", () => {
-    expect(t("error.notImplemented")).toBe("`{{command}}` is not implemented yet.");
+    expect(t("next.done")).toBe("{{id}} is done. Next: {{command}}");
   });
 
   it("has the same keys in every catalog", () => {

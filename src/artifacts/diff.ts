@@ -33,6 +33,7 @@ function describe(change: Change): string {
     return `${pc.yellow("~")} ${change.path} (${t("artifacts.updated", { added, removed })})`;
   }
   if (change.kind === "keep") return `${pc.cyan("!")} ${change.path} (${t("artifacts.keptDone")})`;
+  if (change.kind === "delete") return `${pc.red("-")} ${change.path} (${t("artifacts.removed")})`;
   return `${pc.dim("=")} ${change.path} (${t("artifacts.unchanged")})`;
 }
 

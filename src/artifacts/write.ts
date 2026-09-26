@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { CommandContext } from "../commands/context.js";
 import { writeText } from "../core/fs.js";
@@ -7,12 +8,14 @@ import type { Change } from "./merge.js";
 
 type Decision = "all" | "each" | "none";
 
+const WRITABLE = new Set(["create", "update", "delete"]);
+
 export async function confirmChanges(ctx: CommandContext, changes: Change[]): Promise<Change[]> {
   if (changes.length === 0) return [];
   ctx.prompter.note(describeChanges(changes), t("artifacts.changes"));
-  const pending = changes.filter((change) => change.kind === "create" || change.kind === "update");
+  const pending = changes.filter((change) => WRITABLE.has(change.kind));
   if (pending.length === 0) return [];
-  for (const change of pending.filter((candidate) => candidate.kind === "update")) {
+  for (const change of pending.filter((candidate) => candidate.kind !== "create")) {
     ctx.print(`${renderDiff(change)}\n`);
   }
   if (ctx.flags.yes) return pending;
@@ -38,6 +41,8 @@ export async function confirmChanges(ctx: CommandContext, changes: Change[]): Pr
 
 export async function applyChanges(cwd: string, changes: Change[]): Promise<void> {
   for (const change of changes) {
-    await writeText(join(cwd, ...change.path.split("/")), change.after);
+    const path = join(cwd, ...change.path.split("/"));
+    if (change.kind === "delete") await rm(path, { force: true });
+    else await writeText(path, change.after);
   }
 }

@@ -1,6 +1,8 @@
 import { execa } from "execa";
 import { findExecutable } from "./which.js";
 
+const SHELL_TIMEOUT_MS = 15 * 60_000;
+
 export type CommandResult = {
   exitCode: number;
   stdout: string;
@@ -52,4 +54,23 @@ export async function runInteractive(
 
 function missing(file: string): CommandResult {
   return { exitCode: -1, stdout: "", stderr: `${file}: command not found`, notFound: true };
+}
+
+export type ShellResult = { exitCode: number; output: string };
+
+export async function runShell(
+  command: string,
+  options: { cwd: string; timeoutMs?: number; onOutput?: (chunk: string) => void },
+): Promise<ShellResult> {
+  const subprocess = execa(command, {
+    cwd: options.cwd,
+    shell: true,
+    all: true,
+    reject: false,
+    timeout: options.timeoutMs ?? SHELL_TIMEOUT_MS,
+  });
+  const { onOutput } = options;
+  if (onOutput) subprocess.all?.on("data", (chunk: Buffer) => onOutput(chunk.toString()));
+  const result = await subprocess;
+  return { exitCode: result.exitCode ?? -1, output: result.all ?? result.message ?? "" };
 }

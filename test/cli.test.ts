@@ -49,9 +49,12 @@ describe("cli", () => {
   });
 
   it("accepts global flags after the subcommand", async () => {
-    const { code, err } = await run(await tempDir(), "status", "--lang", "es", "--yes");
-    expect(code).toBe(1);
-    expect(err).toContain("`status` aún no está implementado.");
+    const printed: string[] = [];
+    const code = await main(argv("status", "--lang", "es", "--yes"), await tempDir(), {
+      print: (text) => printed.push(text),
+    });
+    expect(code).toBe(0);
+    expect(printed.join("")).toContain("Todavía no hay plan.");
   });
 
   it("rejects an unknown backend", async () => {

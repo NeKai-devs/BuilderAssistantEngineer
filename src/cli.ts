@@ -3,11 +3,15 @@ import { Command, CommanderError, Option } from "commander";
 import pc from "picocolors";
 import { type CommandContext, type CommandDeps, defaultDeps } from "./commands/context.js";
 import { type InitOptions, runInit } from "./commands/init.js";
+import { type NextOptions, runNext } from "./commands/next.js";
 import { type PlanOptions, runPlan } from "./commands/plan.js";
+import { runReplan } from "./commands/replan.js";
+import { runReview } from "./commands/review.js";
+import { runStatus } from "./commands/status.js";
 import { BACKENDS } from "./config/schema.js";
 import { type GlobalFlags, resolveSettings } from "./config/settings.js";
 import { readConfig } from "./config/store.js";
-import { UserError } from "./core/errors.js";
+import { ExitCode, UserError } from "./core/errors.js";
 import { isLang, LANGS, type Lang, setLang, t } from "./i18n/index.js";
 import { ONLY_GROUPS } from "./plan/filter.js";
 
@@ -57,14 +61,22 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("next")
     .description(t("command.next"))
     .option("--headless", t("option.headless"))
-    .action(notImplemented("next"));
-  program.command("status").description(t("command.status")).action(notImplemented("status"));
-  program.command("replan").description(t("command.replan")).action(notImplemented("replan"));
+    .action((options: NextOptions, command: Command) => runNext(context(command), options));
+  program
+    .command("status")
+    .description(t("command.status"))
+    .action((_options: unknown, command: Command) => runStatus(context(command)));
+  program
+    .command("replan")
+    .description(t("command.replan"))
+    .action((_options: unknown, command: Command) => runReplan(context(command)));
   program
     .command("review")
     .description(t("command.review"))
     .argument("[task]", t("argument.task"))
-    .action(notImplemented("review"));
+    .action((task: string | undefined, _options: unknown, command: Command) =>
+      runReview(context(command), task),
+    );
 
   return program;
 }
@@ -77,14 +89,9 @@ export function scanLang(argv: string[]): Lang | undefined {
   return isLang(value) ? value : undefined;
 }
 
-function notImplemented(command: string) {
-  return () => {
-    throw new UserError(t("error.notImplemented", { command }));
-  };
-}
-
 function report(error: unknown): number {
   if (error instanceof CommanderError) return error.exitCode;
+  if (error instanceof ExitCode) return error.code;
   if (error instanceof UserError) {
     process.stderr.write(`${pc.red(error.message)}\n`);
     return 1;

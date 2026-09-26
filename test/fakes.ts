@@ -1,4 +1,4 @@
-import type { Backend } from "../src/backends/types.js";
+import type { Backend, RunOptions } from "../src/backends/types.js";
 import type { Backend as BackendName } from "../src/config/schema.js";
 import type { Prompter } from "../src/ui/prompter.js";
 
@@ -46,4 +46,21 @@ export function fakeBackend(replies: string[], name: BackendName = "claude") {
     },
   };
   return { backend, prompts };
+}
+
+export type Step = (prompt: string, options: RunOptions) => string | Promise<string>;
+
+export function scriptedBackend(steps: Step[], name: BackendName = "claude") {
+  const queue = [...steps];
+  const calls: { prompt: string; options: RunOptions }[] = [];
+  const backend: Backend = {
+    name,
+    run: async (prompt, options) => {
+      calls.push({ prompt, options });
+      const step = queue.shift();
+      if (!step) throw new Error("no scripted step");
+      return step(prompt, options);
+    },
+  };
+  return { backend, calls };
 }

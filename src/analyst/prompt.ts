@@ -13,7 +13,7 @@ export type AnalystInput = {
   priorPlan: string;
 };
 
-const LANGUAGE_NAMES: Record<Lang, string> = { en: "English", es: "Spanish" };
+export const LANGUAGE_NAMES: Record<Lang, string> = { en: "English", es: "Spanish" };
 
 export async function buildAnalystPrompt(cwd: string, input: AnalystInput): Promise<string> {
   const prompt = await loadPrompt("analyst", cwd);

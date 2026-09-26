@@ -8,12 +8,13 @@ import { TASK_PATH } from "../tasks/schema.js";
 export const MANAGED_BEGIN = "<!-- bae:begin -->";
 export const MANAGED_END = "<!-- bae:end -->";
 
-export type ChangeKind = "create" | "update" | "unchanged" | "keep";
+export type ChangeKind = "create" | "update" | "unchanged" | "keep" | "delete";
 export type Change = { path: string; before: string | undefined; after: string; kind: ChangeKind };
 
 const MANAGED_FILES = new Set(["AGENTS.md", "CLAUDE.md", "GEMINI.md"]);
 const IMPORTING_FILES = new Set(["CLAUDE.md", "GEMINI.md"]);
 const IMPORT_LINE = /^@AGENTS\.md[ \t]*$/m;
+const CHANGELOG = "docs/plan/CHANGELOG.md";
 
 export async function planChanges(cwd: string, files: PlanFile[]): Promise<Change[]> {
   const tasks = new Map((await loadTaskFiles(cwd)).map((task) => [task.id, task]));
@@ -53,6 +54,12 @@ async function changeFor(
 
 function contentFor(file: PlanFile, before: string | undefined, existing?: LoadedTask): string {
   if (MANAGED_FILES.has(file.path)) return mergeManaged(before, file.content, file.path);
+  if (file.path === CHANGELOG) return prependChangelog(before, file.content);
   const status = existing?.task?.meta.status;
   return status ? setFrontmatterFields(file.content, { status }) : file.content;
+}
+
+function prependChangelog(before: string | undefined, content: string): string {
+  if (!before || before.includes(content.trim())) return content;
+  return `${content.trimEnd()}\n\n${before}`;
 }
