@@ -1,0 +1,1 @@
+Add team accounts to this Express API: a team has members with roles (owner, member), owners invite users by email, and every existing route keeps working. First deliverable: create a team, invite, accept, list members. Out of scope: billing and SSO. Keep Express and the current test setup.

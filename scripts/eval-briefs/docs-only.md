@@ -1,0 +1,1 @@
+A habit tracker for small teams: each member logs daily habits, the team sees a weekly board, and a Monday email summarizes streaks. Web app, mobile friendly. One developer working with AI agents, launch in six weeks, low budget. First deliverable: sign up, create habits, log them, see the weekly board. Out of scope: native apps and payments.

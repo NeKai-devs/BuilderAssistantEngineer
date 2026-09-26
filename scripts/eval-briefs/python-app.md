@@ -1,0 +1,1 @@
+Turn this FastAPI service into a small notes API for internal use: create, list, update and delete notes with tags, stored in SQLite. First deliverable: CRUD with validation and tests. Out of scope: authentication and a web UI. It must run on Linux servers with Python 3.12.

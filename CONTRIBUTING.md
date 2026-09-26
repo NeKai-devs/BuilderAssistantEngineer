@@ -43,6 +43,19 @@ npx -y npm@11 install <package>
 
 The resulting lockfile installs fine with `npm ci` on npm 10.
 
+## Evaluating prompt changes
+
+`npm run eval` runs `init` and `plan` for real on every repository in `test/fixtures/repos`, using the brief in `scripts/eval-briefs/<fixture>.md`, and saves the results under `eval/<date>[-label]/`:
+
+```sh
+npm run eval -- --backend claude --lang en
+npm run eval -- --backend opencode --only go-service,node-app --label shorter-roadmap
+```
+
+Each fixture gets `prompt.md` (the exact prompt), `plan.log`, `output/` (every generated file) and `meta.json` (exit code, file and task counts, duration, the `analyst.md` hash and the tool commit), plus a `summary.md` for the run. Options: `--backend`, `--lang`, `--targets`, `--only`, `--label` and `--out`.
+
+When you change `src/prompts/analyst.md`, commit an eval run from before and after so the plans can be compared, for example with `git diff --no-index eval/<before> eval/<after>`. The runs call a real AI, so they cost whatever the chosen backend costs.
+
 ## Project layout
 
 ```text
@@ -56,7 +69,8 @@ src/plan/             plan parser, filters, prior plan for replan
 src/artifacts/        managed merge, diffs, confirmation and writes
 src/tasks/            task files, selection, status, verification, run logs
 src/review/           task diff and reviewer
-src/prompts/          analyst, review, retry and fix-format prompts
+src/prompts/          analyst, task, review, retry and fix-format prompts
+scripts/eval.mjs      runs plan on the fixtures and saves the outputs under eval/
 test/                 unit and end-to-end tests
 ```
 

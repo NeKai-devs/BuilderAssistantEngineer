@@ -1,0 +1,1 @@
+Build an internal HTTP service with Gin: GET /health, and GET/POST /users stored in memory, for an internal team that calls it from other services. First deliverable: both endpoints with tests. Out of scope: a database and authentication.
