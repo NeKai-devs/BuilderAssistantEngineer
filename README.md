@@ -152,7 +152,7 @@ Each one is a check, not a document: the agent cannot skip it, and a task that f
 | --- | --- | --- |
 | Evidence | `plan`, `replan` | Every path cited in the architecture, the ADRs and each task's Context must exist, and every `path:line` range must fit in the file. Files the plan will create are marked `(new)`. Missing paths trigger one retry that asks the analyst to fix only those; paths that stay unverified are listed under the summary and in `.bae/tmp/plan-report.json`. |
 | Questions | `plan`, `replan` | Blocking questions are asked on the spot; the others are listed. All of them are saved to `.bae/interview.md`, and you can plan again right away with your answers. |
-| Verification | `next` | The commands in the task's `## Verification` block must exit 0. |
+| Verification | `next` | The commands in the task's `## Verification` block must exit 0. When one of them is the project's lint or test command and it already failed in the regression baseline, it does not block as long as another Verification command passed; the reviewer is told it still fails. |
 | Regression | `next` | Runs the project's `lint` and `test` commands after the task. A command that passed before the task and fails after it blocks the task; one that already failed is recorded as preexisting and does not. |
 | Handoff note | `next` | The task's `## Log` must hold a note of at most 8 lines: what changed, decisions, traps. |
 | Mechanical review | `next`, `review` | On the task's diff: a `.env` or key file, or an added credential, fails; `tests: required` fails if no test file changed; files outside the task's Scope are reported. The AI reviewer only runs when nothing here blocks. |

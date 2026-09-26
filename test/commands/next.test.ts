@@ -242,6 +242,27 @@ describe("next regression gate", () => {
     expect(await statusOf(cwd, TASK)).toBe("done");
   });
 
+  it("does not block on a preexisting failure that the task's Verification repeats", async () => {
+    const cwd = await repo(`${PASS}\n${FAIL}`, { commands: { test: FAIL } });
+    const { code, calls } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt"), REVIEW_PASS]);
+    expect(code).toBe(0);
+    expect(calls[1]?.prompt).toContain(
+      `- [minor] \`${FAIL}\` failed before the task and still fails (exit 1), so it did not block.`,
+    );
+    const [log] = await logs(cwd, "T-001");
+    const report = await readFile(join(cwd, ".bae/runs/T-001", log ?? ""), "utf8");
+    expect(report).toContain(`$ ${FAIL} (exit 1, preexisting: it already failed before the task)`);
+    expect(await statusOf(cwd, TASK)).toBe("done");
+  });
+
+  it("still fails verification when a preexisting failure is the task's only check", async () => {
+    const cwd = await repo(FAIL, { commands: { test: FAIL } });
+    const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    expect(code).toBe(1);
+    expect(ui.log).toContain(`warn: Verification failed: \`${FAIL}\` exited with 1.`);
+    expect(await statusOf(cwd, TASK)).toBe("in_progress");
+  });
+
   it("keeps the task in progress when it turns a passing command red", async () => {
     const test = BREAKS_WITH("broken.txt");
     const cwd = await repo(PASS, { commands: { test } });

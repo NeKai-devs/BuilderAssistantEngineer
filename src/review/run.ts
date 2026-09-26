@@ -33,6 +33,7 @@ export async function reviewTask(
   ctx: CommandContext,
   config: Config,
   task: Task,
+  notes: ReviewFinding[] = [],
 ): Promise<ReviewResult> {
   const base = await readBase(ctx.cwd, task.meta.id);
   const changes = await taskChanges(ctx.cwd, base, [BAE_DIR, task.path]);
@@ -66,7 +67,7 @@ export async function reviewTask(
     ),
     task: task.text,
     diff,
-    checks: formatFindings(mechanical.findings) || "(none)",
+    checks: formatFindings([...mechanical.findings, ...notes]) || "(none)",
     output_language: LANGUAGE_NAMES[config.lang],
   });
   if (ctx.flags.dryRun) {

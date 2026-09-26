@@ -127,6 +127,8 @@ export const en = {
     "Refusing to run `{{command}}` ({{reason}}). Fix the task's Verification section.",
   "verify.failed": "Verification failed: `{{command}}` exited with {{code}}.",
   "verify.passed": "Verification passed.",
+  "verify.stillFailing":
+    "`{{command}}` failed before the task and still fails (exit {{code}}), so it did not block. If an acceptance criterion needs it to pass, the task is not done.",
   "review.intro": "builder-assistant-engineer · review",
   "review.running": "The reviewer is checking {{id}}…",
   "review.findings": "Review findings",

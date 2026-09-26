@@ -43,6 +43,14 @@ export async function runSuite(
   return results;
 }
 
+export function failingBefore(
+  suite: SuiteCommand[],
+  baseline: SuiteBaseline | undefined,
+): Set<string> {
+  const failing = suite.filter((item) => (baseline?.exitCodes[item.key] ?? 0) !== 0);
+  return new Set(failing.map((item) => item.command));
+}
+
 export function checkRegressions(
   results: SuiteResult[],
   baseline: SuiteBaseline | undefined,

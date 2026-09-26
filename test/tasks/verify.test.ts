@@ -55,4 +55,15 @@ describe("runVerification", () => {
       cwd.split(/[\\/]/).at(-1)?.toLowerCase(),
     );
   });
+  it("goes past a command that failed before the task only when another command checks the task", async () => {
+    const cwd = await tempDir();
+    const broken = 'node -e "process.exit(1)"';
+    const own = 'node -e "process.exit(0)"';
+    const tolerated = new Set([broken]);
+    const checked = await runVerification(cwd, [broken, own], undefined, tolerated);
+    expect(checked.passed).toBe(true);
+    expect(checked.runs.map((run) => run.exitCode)).toEqual([1, 0]);
+    expect((await runVerification(cwd, [broken], undefined, tolerated)).passed).toBe(false);
+    expect((await runVerification(cwd, [broken, own])).passed).toBe(false);
+  });
 });

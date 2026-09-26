@@ -4,12 +4,20 @@ import type { Config } from "../config/schema.js";
 import { readTextIfExists } from "../core/fs.js";
 import type { ShellResult } from "../core/process.js";
 import { t } from "../i18n/index.js";
+import type { ReviewFinding } from "../review/parse.js";
 import { formatFindings, reviewTask } from "../review/run.js";
 import type { GateStage } from "../tasks/attempts.js";
 import { logLines, MAX_LOG_LINES } from "../tasks/handoff.js";
 import { parseTask, type Task } from "../tasks/schema.js";
 import { findUnsafe, runVerification, type VerificationRun } from "../tasks/verify.js";
-import { checkRegressions, readSuiteBaseline, runSuite, type SuiteCommand } from "./regression.js";
+import {
+  checkRegressions,
+  failingBefore,
+  readSuiteBaseline,
+  runSuite,
+  type SuiteBaseline,
+  type SuiteCommand,
+} from "./regression.js";
 
 export type Approval = { granted: boolean };
 export type Checks = { commands: string[]; suite: SuiteCommand[] };
@@ -30,7 +38,8 @@ export async function runGate(
   checks: Checks,
   approval: Approval,
 ): Promise<Gate> {
-  const suite = await activeSuite(ctx, task, checks.suite);
+  const baseline = await suiteBaseline(ctx, config, task);
+  const suite = baseline?.skipped ? [] : checks.suite;
   const refused = refuse(ctx, checks.commands, suite);
   if (refused) return refused;
   if (!approval.granted) {
@@ -44,8 +53,9 @@ export async function runGate(
     }
     approval.granted = true;
   }
-  const verification = await runVerification(ctx.cwd, checks.commands, ctx.print);
-  const verificationText = verificationReport(verification);
+  const preexisting = failingBefore(suite, baseline);
+  const verification = await runVerification(ctx.cwd, checks.commands, ctx.print, preexisting);
+  const verificationText = verificationReport(verification, preexisting);
   if (!verification.passed) {
     const last = verification.runs.at(-1);
     ctx.prompter.warn(
@@ -54,7 +64,7 @@ export async function runGate(
     return failure("verification", verificationText);
   }
   ctx.prompter.success(t("verify.passed"));
-  const regression = await regressionGate(ctx, config, task, suite, verification.runs);
+  const regression = await regressionGate(ctx, suite, baseline, verification.runs);
   const checked = [verificationText, regression?.report].filter(Boolean).join("\n\n");
   const regressions = regression?.regressions.map((result) => result.key) ?? [];
   if (regressions.length > 0) return { ...failure("regression", checked), regressions };
@@ -64,7 +74,7 @@ export async function runGate(
     return failure("handoff", `${checked}\n\n## Handoff note\n\n${handoff}`);
   }
   ctx.prompter.success(t("handoff.passed"));
-  const review = await reviewTask(ctx, config, task);
+  const review = await reviewTask(ctx, config, task, stillFailing(verification));
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);
   if (findings) ctx.prompter.note(findings, t("review.findings"));
@@ -78,27 +88,24 @@ function failure(stage: GateStage, report: string, retryable = true): Gate {
   return { passed: false, retryable, report, stage, regressions: [] };
 }
 
-async function activeSuite(
+async function suiteBaseline(
   ctx: CommandContext,
+  config: Config,
   task: Task,
-  suite: SuiteCommand[],
-): Promise<SuiteCommand[]> {
-  if (suite.length === 0) return suite;
-  return (await readSuiteBaseline(ctx.cwd, task.meta.id))?.skipped ? [] : suite;
+): Promise<SuiteBaseline | undefined> {
+  if (config.gates.regression !== "full") return undefined;
+  return readSuiteBaseline(ctx.cwd, task.meta.id);
 }
 
 async function regressionGate(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
   suite: SuiteCommand[],
+  baseline: SuiteBaseline | undefined,
   runs: VerificationRun["runs"],
 ) {
   if (suite.length === 0) return undefined;
   const known = new Map<string, ShellResult>(runs.map((run) => [run.command, run]));
   const results = await runSuite(ctx.cwd, suite, ctx.print, known);
-  const baseline =
-    config.gates.regression === "full" ? await readSuiteBaseline(ctx.cwd, task.meta.id) : undefined;
   const check = checkRegressions(results, baseline);
   for (const result of check.regressions) {
     ctx.prompter.warn(t("regression.found", { command: result.command, code: result.exitCode }));
@@ -130,12 +137,25 @@ function refuse(ctx: CommandContext, commands: string[], suite: SuiteCommand[]):
   return failure("refused", lines.join("\n"), false);
 }
 
-function verificationReport(verification: VerificationRun): string {
-  const runs = verification.runs.map(
-    (run) =>
-      `$ ${run.command} (exit ${run.exitCode})\n\n\`\`\`text\n${run.output.slice(-OUTPUT_TAIL).trim()}\n\`\`\``,
-  );
+function verificationReport(verification: VerificationRun, preexisting: Set<string>): string {
+  const runs = verification.runs.map((run) => {
+    const note =
+      run.exitCode !== 0 && preexisting.has(run.command)
+        ? ", preexisting: it already failed before the task"
+        : "";
+    const output = run.output.slice(-OUTPUT_TAIL).trim();
+    return `$ ${run.command} (exit ${run.exitCode}${note})\n\n\`\`\`text\n${output}\n\`\`\``;
+  });
   return ["## Verification", ...runs].join("\n\n");
+}
+
+function stillFailing(verification: VerificationRun): ReviewFinding[] {
+  return verification.runs
+    .filter((run) => run.exitCode !== 0)
+    .map((run) => ({
+      severity: "minor",
+      message: t("verify.stillFailing", { command: run.command, code: run.exitCode }),
+    }));
 }
 
 async function reloadTask(ctx: CommandContext, task: Task): Promise<Task> {

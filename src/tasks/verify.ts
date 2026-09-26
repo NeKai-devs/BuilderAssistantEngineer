@@ -47,15 +47,18 @@ export async function runVerification(
   cwd: string,
   commands: string[],
   onOutput?: (chunk: string) => void,
+  preexisting: ReadonlySet<string> = new Set(),
 ): Promise<VerificationRun> {
   const runs: CommandRun[] = [];
   for (const command of commands) {
     onOutput?.(`$ ${command}\n`);
     const result = await runShell(command, { cwd, onOutput });
     runs.push({ command, ...result });
-    if (result.exitCode !== 0) return { passed: false, runs };
+    if (result.exitCode !== 0 && !preexisting.has(command)) return { passed: false, runs };
   }
-  return { passed: true, runs };
+  const excused = runs.some((run) => run.exitCode !== 0);
+  const checked = runs.some((run) => !preexisting.has(run.command));
+  return { passed: !excused || checked, runs };
 }
 
 function hasRecursiveForceRm(command: string): boolean {

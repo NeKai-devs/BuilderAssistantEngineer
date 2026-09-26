@@ -132,6 +132,8 @@ export const es: Messages = {
     "No se ejecuta `{{command}}` ({{reason}}). Corrige la sección Verification de la tarea.",
   "verify.failed": "La verificación falló: `{{command}}` terminó con {{code}}.",
   "verify.passed": "Verificación superada.",
+  "verify.stillFailing":
+    "`{{command}}` ya fallaba antes de la tarea y sigue fallando (salida {{code}}), así que no bloqueó. Si algún criterio de aceptación exige que pase, la tarea no está hecha.",
   "review.intro": "builder-assistant-engineer · review",
   "review.running": "El revisor está comprobando {{id}}…",
   "review.findings": "Hallazgos de la revisión",
