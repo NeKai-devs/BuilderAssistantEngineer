@@ -15,6 +15,7 @@ import { taskChanges } from "./changes.js";
 import { taskDiff } from "./diff.js";
 import { mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
+import { readSnapshot, unchangedSince } from "./snapshot.js";
 
 export type ReviewResult = {
   status: "pass" | "fail" | "skipped";
@@ -34,14 +35,21 @@ export async function reviewTask(
   task: Task,
 ): Promise<ReviewResult> {
   const base = await readBase(ctx.cwd, task.meta.id);
-  const exclude = [BAE_DIR, task.path];
-  const diff = await taskDiff(ctx.cwd, base, exclude);
-  if (diff === undefined) return { status: "skipped", findings: [], reason: t("review.noGit") };
+  const changes = await taskChanges(ctx.cwd, base, [BAE_DIR, task.path]);
+  if (changes === undefined) {
+    return { status: "skipped", findings: [], reason: t("review.noGit") };
+  }
+  const snapshot = await readSnapshot(ctx.cwd, task.meta.id);
+  const before = await unchangedSince(ctx.cwd, snapshot, changes.files);
+  const own = {
+    files: changes.files.filter((file) => !before.has(file)),
+    added: changes.added.filter((item) => !before.has(item.path)),
+  };
+  const diff = (await taskDiff(ctx.cwd, base, [BAE_DIR, task.path, ...before])) ?? "";
   if (diff.trim() === "") {
     return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
   }
-  const changes = await taskChanges(ctx.cwd, base, exclude);
-  const mechanical = changes ? mechanicalReview(task, changes) : { passed: true, findings: [] };
+  const mechanical = mechanicalReview(task, own);
   if (!mechanical.passed) {
     return {
       status: "fail",

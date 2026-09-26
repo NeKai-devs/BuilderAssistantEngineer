@@ -2,6 +2,7 @@ import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
 import { headCommit } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { BAE_DIR } from "../core/paths.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { type Approval, type Checks, type Gate, runGate } from "../gates/gate.js";
 import {
@@ -12,6 +13,7 @@ import {
   suiteCommands,
 } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
+import { saveSnapshot, takeSnapshot } from "../review/snapshot.js";
 import { type AttemptOutcome, readAttempts, recordAttempt } from "../tasks/attempts.js";
 import { MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
@@ -68,6 +70,8 @@ async function start(
   if (!(await readBase(ctx.cwd, task.meta.id))) {
     const head = await headCommit(ctx.cwd);
     if (head) await saveBase(ctx.cwd, task.meta.id, head);
+    const snapshot = await takeSnapshot(ctx.cwd, [BAE_DIR, task.path]);
+    if (snapshot) await saveSnapshot(ctx.cwd, task.meta.id, snapshot);
   }
   if (task.meta.status === "pending" && config.gates.regression === "full") {
     await recordBaseline(ctx, task, suite);

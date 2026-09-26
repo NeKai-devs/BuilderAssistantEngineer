@@ -312,6 +312,26 @@ describe("next regression gate", () => {
 });
 
 describe("next mechanical review", () => {
+  it("ignores files that were already uncommitted before the task, unless the task changes them", async () => {
+    const cwd = await repo(PASS);
+    await writeFiles(cwd, { ".env": "API_TOKEN=abc\n", "docs/plan/00-overview.md": "# Plan\n" });
+    const first = await runNext(cwd, ["--yes"], [writesFile(cwd, "feature.txt"), REVIEW_PASS]);
+    expect(first.code).toBe(0);
+    expect(first.calls[1]?.prompt).not.toContain(".env");
+    expect(first.calls[1]?.prompt).not.toContain("docs/plan/00-overview.md");
+    expect(first.calls[1]?.prompt).toContain("new file: feature.txt");
+    const cwd2 = await repo(PASS);
+    await writeFiles(cwd2, { ".env": "API_TOKEN=abc\n" });
+    const edits: Step = async () => {
+      await writeFiles(cwd2, { ".env": "API_TOKEN=changed\n" });
+      await addLog(cwd2);
+      return "";
+    };
+    const second = await runNext(cwd2, ["--yes"], [edits]);
+    expect(second.code).toBe(1);
+    expect(second.ui.log.join("\n")).toContain("- [blocker] .env: Looks like a secrets file");
+  });
+
   it("skips the reviewer when the change adds a secrets file and retries with the finding", async () => {
     const cwd = await repo(PASS);
     const cleans: Step = async () => {
@@ -443,5 +463,7 @@ describe("next lessons", () => {
     expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toContain(
       "- Add a test for every new route.",
     );
+    expect(calls[6]?.prompt).not.toContain("diff --git a/AGENTS.md");
+    expect(calls[6]?.prompt).toContain("new file: c.txt");
   });
 });

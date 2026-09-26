@@ -12,6 +12,7 @@ import { readTextIfExists, writeText } from "../core/fs.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
 import { t } from "../i18n/index.js";
+import { markUnchanged } from "../review/snapshot.js";
 import { runDir } from "./runs.js";
 import type { Task } from "./schema.js";
 
@@ -24,6 +25,7 @@ export const LESSON_FORMAT =
   'JSON only: {"root_cause": "one or two sentences", "rule": "one imperative line"}';
 
 const LESSON_FILE = "lesson.md";
+const AGENTS_MD = "AGENTS.md";
 const RECENT_RUNS = 3;
 const MAX_RUN_CHARS = 6_000;
 const MAX_AGENTS_MD = 20_000;
@@ -76,16 +78,17 @@ export async function learnFromFailure(
     return;
   }
   await addLesson(ctx.cwd, lesson.rule);
+  await markUnchanged(ctx.cwd, id, [AGENTS_MD]);
   ctx.prompter.success(t("lesson.added"));
 }
 
 export async function addLesson(cwd: string, rule: string): Promise<void> {
-  const path = join(cwd, "AGENTS.md");
+  const path = join(cwd, AGENTS_MD);
   const before = await readTextIfExists(path);
   const lessons = readLessons(before ?? "");
   if (lessons.includes(rule)) return;
   const body = withLessons(managedBody(before ?? ""), [...lessons, rule]);
-  await writeText(path, mergeManaged(before, body, "AGENTS.md"));
+  await writeText(path, mergeManaged(before, body, AGENTS_MD));
 }
 
 async function askLesson(
