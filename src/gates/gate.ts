@@ -58,14 +58,13 @@ export async function runGate(
   const checked = [verificationText, regression?.report].filter(Boolean).join("\n\n");
   const regressions = regression?.regressions.map((result) => result.key) ?? [];
   if (regressions.length > 0) return { ...failure("regression", checked), regressions };
-  const current = await reloadTask(ctx, task);
-  const handoff = handoffProblem(current);
+  const handoff = handoffProblem(await reloadTask(ctx, task));
   if (handoff) {
     ctx.prompter.warn(handoff);
     return failure("handoff", `${checked}\n\n## Handoff note\n\n${handoff}`);
   }
   ctx.prompter.success(t("handoff.passed"));
-  const review = await reviewTask(ctx, config, current);
+  const review = await reviewTask(ctx, config, task);
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);
   if (findings) ctx.prompter.note(findings, t("review.findings"));

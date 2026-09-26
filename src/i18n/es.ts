@@ -237,4 +237,8 @@ export const es: Messages = {
   "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
   "evidence.retryFailed":
     "Falló la petición para corregir las rutas citadas, así que el plan las conserva tal cual: {{details}}",
+  "regression.lateBaseline":
+    "{{id}} ya estaba en curso sin línea base de regresión; se registra ahora, así que los fallos que causaron sus cambios anteriores cuentan como preexistentes.",
+  "regression.noCommands":
+    "No hay comando de lint ni de test en .bae/config.json ni en los manifiestos; el chequeo de regresión queda desactivado hasta que los añadas en commands.",
 };

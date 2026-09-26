@@ -1,7 +1,7 @@
 import type { Config } from "../config/schema.js";
 import { COMMAND_KEYS } from "../config/schema.js";
 import { compareIds } from "./load.js";
-import { sectionText, type Task } from "./schema.js";
+import { sectionTexts, type Task } from "./schema.js";
 import { waitingOn } from "./select.js";
 
 export const MAX_LOG_LINES = 8;
@@ -11,7 +11,8 @@ const LOG_HEADING = /^##[ \t]+(log|registro|bitácora|bitacora)[ \t]*$/im;
 const COMMENT = /<!--[\s\S]*?-->/g;
 
 export function logLines(task: Task): string[] {
-  return (sectionText(task.body, "log") ?? "")
+  return sectionTexts(task.body, "log")
+    .join("\n")
     .replace(COMMENT, "")
     .split(/\r?\n/)
     .map((line) => line.trimEnd())

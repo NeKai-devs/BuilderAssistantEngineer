@@ -230,6 +230,10 @@ export const en = {
   "format.repaired": "Repaired the answer locally: {{repairs}}.",
   "evidence.retryFailed":
     "The request to fix the cited paths failed, so the plan keeps them as they are: {{details}}",
+  "regression.lateBaseline":
+    "{{id}} was already in progress without a regression baseline; recording it now, so failures its earlier changes caused count as preexisting.",
+  "regression.noCommands":
+    "No lint or test command in .bae/config.json or the manifests; the regression check is off until you add them under commands.",
 } as const;
 
 export type MessageKey = keyof typeof en;

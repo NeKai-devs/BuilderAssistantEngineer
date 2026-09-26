@@ -68,13 +68,18 @@ export function taskProblems(task: Task): string[] {
 }
 
 export function sectionText(body: string, key: SectionKey): string | undefined {
+  return sectionTexts(body, key)[0];
+}
+
+export function sectionTexts(body: string, key: SectionKey): string[] {
   const aliases: readonly string[] = SECTIONS[key];
   const parts = body.split(/^##[ \t]+(.+?)[ \t]*$/m);
+  const found: string[] = [];
   for (let index = 1; index < parts.length; index += 2) {
     const heading = (parts[index] ?? "").trim().toLowerCase();
-    if (aliases.includes(heading)) return (parts[index + 1] ?? "").trim();
+    if (aliases.includes(heading)) found.push((parts[index + 1] ?? "").trim());
   }
-  return undefined;
+  return found;
 }
 
 export function verificationCommands(body: string): string[] {

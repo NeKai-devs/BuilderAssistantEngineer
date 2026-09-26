@@ -1,5 +1,6 @@
-import type { Config } from "../config/schema.js";
-import { readConfig } from "../config/store.js";
+import { fillCommands, proposeCommands } from "../config/commands.js";
+import { COMMAND_KEYS, type Commands, type Config } from "../config/schema.js";
+import { readConfig, writeConfig } from "../config/store.js";
 import { UserError } from "../core/errors.js";
 import { t } from "../i18n/index.js";
 import { loadTaskFiles } from "../tasks/load.js";
@@ -16,6 +17,17 @@ export async function requireConfig(ctx: CommandContext): Promise<Config> {
     backend: ctx.flags.backend ?? config.backend,
     lang: ctx.flags.lang ?? config.lang,
   };
+}
+
+export async function saveCommands(ctx: CommandContext, analyst: Commands = {}): Promise<Commands> {
+  const stored = await readConfig(ctx.cwd);
+  if (!stored) return analyst;
+  const commands = fillCommands(stored.commands, analyst, await proposeCommands(ctx.cwd));
+  const added = COMMAND_KEYS.filter((key) => commands[key] && !stored.commands[key]);
+  if (added.length === 0 || ctx.flags.dryRun) return commands;
+  await writeConfig(ctx.cwd, { ...stored, commands });
+  ctx.prompter.note(added.map((key) => `${key}: ${commands[key]}`).join("\n"), t("plan.commands"));
+  return commands;
 }
 
 export function isAgentBackend(backend: Config["backend"]): boolean {

@@ -7,6 +7,7 @@ import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { type Approval, type Checks, type Gate, runGate } from "../gates/gate.js";
 import {
   baselineFrom,
+  readSuiteBaseline,
   runSuite,
   type SuiteCommand,
   saveSuiteBaseline,
@@ -24,7 +25,7 @@ import { pickNext, waitingOn } from "../tasks/select.js";
 import { setTaskStatus } from "../tasks/status.js";
 import { findUnsafe } from "../tasks/verify.js";
 import type { CommandContext } from "./context.js";
-import { CLI, isAgentBackend, loadValidTasks, requireConfig } from "./shared.js";
+import { CLI, isAgentBackend, loadValidTasks, requireConfig, saveCommands } from "./shared.js";
 
 export type NextOptions = { headless?: boolean };
 
@@ -32,8 +33,9 @@ export const MAX_RETRIES = 2;
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
 export async function runNext(ctx: CommandContext, options: NextOptions): Promise<void> {
-  const config = await requireConfig(ctx);
+  const stored = await requireConfig(ctx);
   ctx.prompter.intro(t("next.intro"));
+  const config = await withSuiteCommands(ctx, stored);
   const tasks = await loadValidTasks(ctx);
   const task = pickNext(tasks);
   if (!task) {
@@ -73,10 +75,22 @@ async function start(
     const snapshot = await takeSnapshot(ctx.cwd, [BAE_DIR, task.path]);
     if (snapshot) await saveSnapshot(ctx.cwd, task.meta.id, snapshot);
   }
-  if (task.meta.status === "pending" && config.gates.regression === "full") {
+  if (config.gates.regression === "full" && !(await readSuiteBaseline(ctx.cwd, task.meta.id))) {
+    if (task.meta.status === "in_progress" && suite.length > 0) {
+      ctx.prompter.warn(t("regression.lateBaseline", { id: task.meta.id }));
+    }
     await recordBaseline(ctx, task, suite);
   }
   return task.meta.status === "in_progress" ? task : setTaskStatus(ctx.cwd, task, "in_progress");
+}
+
+async function withSuiteCommands(ctx: CommandContext, config: Config): Promise<Config> {
+  if (config.gates.regression === "off" || config.commands.test || config.commands.lint) {
+    return config;
+  }
+  const commands = await saveCommands(ctx);
+  if (!commands.test && !commands.lint) ctx.prompter.info(t("regression.noCommands"));
+  return { ...config, commands };
 }
 
 async function recordBaseline(ctx: CommandContext, task: Task, suite: SuiteCommand[]) {
@@ -152,6 +166,8 @@ async function headlessLoop(
       task: task.text,
       failure: gate.report,
       attempt: String(attempt),
+      task_path: task.path,
+      max_log_lines: String(MAX_LOG_LINES),
     });
   }
   await setTaskStatus(ctx.cwd, task, "blocked");

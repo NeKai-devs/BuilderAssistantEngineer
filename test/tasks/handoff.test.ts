@@ -12,6 +12,11 @@ describe("handoff note", () => {
     ]);
   });
 
+  it("reads the note from every Log heading, English or Spanish", () => {
+    const text = taskFile("T-001").replace("## Log\n", "## Registro\n\n## Log\nNota del agente.\n");
+    expect(logLines(parseTask("docs/plan/tasks/T-001-a.md", text))).toEqual(["Nota del agente."]);
+  });
+
   it("adds a Log heading only when the task has none", () => {
     expect(withLogSection("## Goal\nx\n")).toBe("## Goal\nx\n\n## Log\n");
     expect(withLogSection("## Goal\nx\n## Registro\n")).toBe("## Goal\nx\n## Registro\n");

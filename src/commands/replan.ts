@@ -6,8 +6,8 @@ import { buildPriorPlan } from "../plan/prior.js";
 import { generatePlan } from "../plan/run.js";
 import { loadTaskFiles } from "../tasks/load.js";
 import type { CommandContext } from "./context.js";
-import { obsoleteTasks, reportPlan, saveCommands, writePlanFiles } from "./plan.js";
-import { CLI, requireConfig } from "./shared.js";
+import { obsoleteTasks, reportPlan, writePlanFiles } from "./plan.js";
+import { CLI, requireConfig, saveCommands } from "./shared.js";
 
 const CHANGELOG = "docs/plan/CHANGELOG.md";
 
@@ -37,6 +37,6 @@ async function replanOnce(ctx: CommandContext, config: Config): Promise<boolean>
   const files = selectFiles(parsed.files, { targets: config.targets });
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsoleteTasks(tasks, parsed)];
   const written = await writePlanFiles(ctx, changes);
-  if (written.length > 0) await saveCommands(ctx, parsed.commands);
+  await saveCommands(ctx, parsed.commands);
   return reportPlan(ctx, parsed, written);
 }

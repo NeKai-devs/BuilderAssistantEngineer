@@ -144,6 +144,9 @@ describe("next", () => {
     expect(code).toBe(0);
     expect(calls[0]?.options).toMatchObject({ access: "edit" });
     expect(calls[1]?.prompt).toContain("The previous attempt did not pass (attempt 1)");
+    expect(calls[1]?.prompt).toContain(
+      "rewrite the handoff note under `## Log` in docs/plan/tasks/T-001-first.md so it covers every attempt in at most 8 lines",
+    );
     expect(calls[1]?.prompt).toContain("(exit 1)");
     expect(ui.log.filter((line) => line.includes("Attempt "))).toHaveLength(2);
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("done");
@@ -289,6 +292,43 @@ describe("next regression gate", () => {
     expect(second.printed.split(`$ ${PASS}`)).toHaveLength(3);
   });
 
+  it("keeps the first baseline when a task is started again, and records a late one with a warning", async () => {
+    const test = BREAKS_WITH("broken.txt");
+    const cwd = await repo(PASS, { commands: { test } });
+    await writeFiles(cwd, {
+      ".bae/runs/T-001/baseline.json": JSON.stringify({ skipped: false, exitCodes: { test: 0 } }),
+      "broken.txt": "left by an earlier attempt\n",
+    });
+    const reset = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    expect(reset.code).toBe(1);
+    expect(reset.ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
+    const late = await repo(PASS, { commands: { test: FAIL } });
+    await writeFiles(late, {
+      "docs/plan/tasks/T-001-first.md": taskFile("T-001", { status: "in_progress", command: PASS }),
+    });
+    const resumed = await runNext(late, ["--yes"], [writesFile(late, "a.txt"), REVIEW_PASS]);
+    expect(resumed.code).toBe(0);
+    expect(resumed.ui.log).toContain(
+      "warn: T-001 was already in progress without a regression baseline; recording it now, so failures its earlier changes caused count as preexisting.",
+    );
+  });
+
+  it("proposes lint and test from the manifests when the config has none", async () => {
+    const cwd = await repo(PASS);
+    await writeFiles(cwd, {
+      "package.json": JSON.stringify({ scripts: { test: PASS } }),
+    });
+    const { ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt"), REVIEW_PASS]);
+    expect(ui.log.join("\n")).toContain(
+      "note: Project commands saved to .bae/config.json test: npm test",
+    );
+    const none = await repo(PASS);
+    const second = await runNext(none, ["--yes"], [writesFile(none, "a.txt"), REVIEW_PASS]);
+    expect(second.ui.log).toContain(
+      "info: No lint or test command in .bae/config.json or the manifests; the regression check is off until you add them under commands.",
+    );
+  });
+
   it("lets the user skip the baseline, which turns the check off for that task", async () => {
     const cwd = await repo(PASS, { commands: { test: FAIL } });
     const { code, ui } = await runNext(
@@ -312,6 +352,24 @@ describe("next regression gate", () => {
 });
 
 describe("next mechanical review", () => {
+  it("checks the task as it was handed over, even if the agent edits its frontmatter", async () => {
+    const cwd = await repo(PASS);
+    const path = "docs/plan/tasks/T-001-first.md";
+    await writeFiles(cwd, { [path]: taskFile("T-001", { command: PASS, tests: "required" }) });
+    const cheats: Step = async () => {
+      const text = await readFile(join(cwd, path), "utf8");
+      await writeFiles(cwd, {
+        [path]: text.replace("tests: required", "tests: optional"),
+        "feature.txt": "work\n",
+      });
+      await addLog(cwd);
+      return "";
+    };
+    const { code, ui } = await runNext(cwd, ["--yes"], [cheats]);
+    expect(code).toBe(1);
+    expect(ui.log.join("\n")).toContain("The task requires tests (tests: required)");
+  });
+
   it("ignores files that were already uncommitted before the task, unless the task changes them", async () => {
     const cwd = await repo(PASS);
     await writeFiles(cwd, { ".env": "API_TOKEN=abc\n", "docs/plan/00-overview.md": "# Plan\n" });

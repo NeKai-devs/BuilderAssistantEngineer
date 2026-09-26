@@ -1,8 +1,6 @@
 import { type Change, planChanges } from "../artifacts/merge.js";
 import { applyChanges, confirmChanges } from "../artifacts/write.js";
-import { fillCommands, proposeCommands } from "../config/commands.js";
-import { COMMAND_KEYS, type Commands, type Config } from "../config/schema.js";
-import { readConfig, writeConfig } from "../config/store.js";
+import type { Config } from "../config/schema.js";
 import { ensureGitignore } from "../core/gitignore.js";
 import { t } from "../i18n/index.js";
 import { type OnlyGroup, selectFiles } from "../plan/filter.js";
@@ -11,7 +9,7 @@ import { closeQuestions } from "../plan/questions.js";
 import { generatePlan } from "../plan/run.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import type { CommandContext } from "./context.js";
-import { CLI, requireConfig } from "./shared.js";
+import { CLI, requireConfig, saveCommands } from "./shared.js";
 
 export type PlanOptions = { only?: OnlyGroup };
 
@@ -44,7 +42,7 @@ async function planOnce(
   const obsolete = replaced ? obsoleteTasks(existing, parsed) : [];
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsolete];
   const written = await writePlanFiles(ctx, changes);
-  if (written.length > 0) await saveCommands(ctx, parsed.commands);
+  await saveCommands(ctx, parsed.commands);
   return reportPlan(ctx, parsed, written);
 }
 
@@ -53,16 +51,6 @@ export function obsoleteTasks(tasks: LoadedTask[], parsed: ParsedPlan): Change[]
   return tasks
     .filter((task) => task.task?.meta.status === "pending" && !kept.has(task.id))
     .map((task) => ({ path: task.path, before: task.text, after: "", kind: "delete" }));
-}
-
-export async function saveCommands(ctx: CommandContext, analyst: Commands): Promise<void> {
-  const stored = await readConfig(ctx.cwd);
-  if (!stored) return;
-  const commands = fillCommands(stored.commands, analyst, await proposeCommands(ctx.cwd));
-  const added = COMMAND_KEYS.filter((key) => commands[key] && !stored.commands[key]);
-  if (added.length === 0) return;
-  await writeConfig(ctx.cwd, { ...stored, commands });
-  ctx.prompter.note(added.map((key) => `${key}: ${commands[key]}`).join("\n"), t("plan.commands"));
 }
 
 export async function writePlanFiles(ctx: CommandContext, changes: Change[]): Promise<Change[]> {
