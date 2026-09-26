@@ -46,7 +46,7 @@ describe("agent CLI backends", () => {
         args: [
           "-p",
           "--output-format",
-          "text",
+          "json",
           "--no-session-persistence",
           "--permission-prompts",
           "none",
@@ -57,6 +57,37 @@ describe("agent CLI backends", () => {
         mode: "run",
       },
     ]);
+  });
+
+  it("reads claude's JSON result, model and cost", async () => {
+    const stdout = JSON.stringify({
+      type: "result",
+      result: "PLAN",
+      total_cost_usd: 0.25,
+      modelUsage: { "claude-opus-5-5": {} },
+    });
+    const { runner } = fakeRunner({ stdout });
+    const infos: unknown[] = [];
+    const chunks: string[] = [];
+    const output = await createBackend("claude", { runner }).run("P", {
+      cwd: await tempDir(),
+      onInfo: (info) => infos.push(info),
+      stream: (chunk) => chunks.push(chunk),
+    });
+    expect(output).toBe("PLAN");
+    expect(chunks).toEqual(["PLAN"]);
+    expect(infos).toEqual([{ model: "claude-opus-5-5", costUsd: 0.25 }]);
+  });
+
+  it("reads the model opencode prints on stderr", async () => {
+    const { runner } = fakeRunner({ stdout: "TEXT", stderr: "\u001b[0m\n> plan · big-pickle\n" });
+    const infos: unknown[] = [];
+    const output = await createBackend("opencode", { runner }).run("P", {
+      cwd: await tempDir(),
+      onInfo: (info) => infos.push(info),
+    });
+    expect(output).toBe("TEXT");
+    expect(infos).toEqual([{ model: "big-pickle" }]);
   });
 
   it.each([

@@ -1,11 +1,13 @@
 import { mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
+import { asRecord, parseObject } from "../core/json.js";
 import { baePaths } from "../core/paths.js";
 import { type CommandResult, runCommand, runInteractive } from "../core/process.js";
 import { t } from "../i18n/index.js";
-import type { Access, Backend, RunOptions } from "./types.js";
+import type { Access, Backend, RunInfo, RunOptions } from "./types.js";
 
 export type AgentName = "claude" | "opencode" | "codex" | "gemini";
 
@@ -15,7 +17,11 @@ export type AgentSpec = {
   headless(access: Access, outputFile: string): string[];
   interactive(instruction: string): string[];
   readsOutputFile?: boolean;
+  jsonOutput?: boolean;
+  parse?: (result: CommandResult) => Parsed;
 };
+
+type Parsed = { text: string; info: RunInfo };
 
 export type ProcessRunner = {
   run: typeof runCommand;
@@ -32,19 +38,25 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
     headless: (access) => [
       "-p",
       "--output-format",
-      "text",
+      "json",
       "--no-session-persistence",
       "--permission-prompts",
       "none",
       ...(access === "read" ? ["--tools", "Read,Grep,Glob"] : ["--permission-mode", "acceptEdits"]),
     ],
     interactive: (instruction) => [instruction],
+    jsonOutput: true,
+    parse: parseClaudeJson,
   },
   opencode: {
     name: "opencode",
     command: "opencode",
     headless: (access) => ["run", ...(access === "read" ? ["--agent", "plan"] : [])],
     interactive: (instruction) => ["--prompt", instruction],
+    parse: (result) => ({
+      text: result.stdout,
+      info: { model: stderrModel(result, /^> \S+ · (.+)$/m) },
+    }),
   },
   codex: {
     name: "codex",
@@ -62,6 +74,10 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
     ],
     interactive: (instruction) => [instruction],
     readsOutputFile: true,
+    parse: (result) => ({
+      text: result.stdout,
+      info: { model: stderrModel(result, /^model:\s*(.+)$/m) },
+    }),
   },
   gemini: {
     name: "gemini",
@@ -103,11 +119,26 @@ async function runHeadless(
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,
     input: prompt,
-    onStdout: options.stream,
+    onStdout: spec.jsonOutput ? undefined : options.stream,
   });
   assertSucceeded(spec, result);
-  if (!spec.readsOutputFile) return result.stdout;
-  return (await readTextIfExists(outputFile)) ?? result.stdout;
+  const parsed = spec.parse?.(result) ?? { text: result.stdout, info: {} };
+  options.onInfo?.(parsed.info);
+  if (spec.jsonOutput) options.stream?.(parsed.text);
+  if (!spec.readsOutputFile) return parsed.text;
+  return (await readTextIfExists(outputFile)) ?? parsed.text;
+}
+
+function parseClaudeJson(result: CommandResult): Parsed {
+  const data = parseObject(result.stdout);
+  if (!data || typeof data.result !== "string") return { text: result.stdout, info: {} };
+  const models = Object.keys(asRecord(data.modelUsage));
+  const cost = typeof data.total_cost_usd === "number" ? data.total_cost_usd : undefined;
+  return { text: data.result, info: { model: models.join(", ") || undefined, costUsd: cost } };
+}
+
+function stderrModel(result: CommandResult, pattern: RegExp): string | undefined {
+  return pattern.exec(stripVTControlCharacters(result.stderr))?.[1]?.trim() || undefined;
 }
 
 async function runSession(

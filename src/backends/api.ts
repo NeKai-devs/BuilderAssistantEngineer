@@ -42,6 +42,7 @@ export function createApiBackend(overrides: Partial<ApiDeps> = {}): Backend {
     run: async (prompt, options) => {
       if (options.interactive) throw new UserError(t("backend.apiInteractive"));
       const target = resolveApiTarget(deps.env);
+      options.onInfo?.({ model: target.model });
       return target.provider === "anthropic"
         ? callAnthropic(target, prompt, options, deps)
         : callOpenAi(target, prompt, options, deps);

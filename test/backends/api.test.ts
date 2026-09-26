@@ -53,7 +53,14 @@ describe("api backend", () => {
     const { fetch, requests } = fakeFetch([sse(anthropicEvents(["Hel", "lo"]))]);
     const chunks: string[] = [];
     const backend = createApiBackend({ env: { ANTHROPIC_API_KEY: "key" }, fetch, sleep: noSleep });
-    expect(await backend.run("PROMPT", { cwd: ".", stream: (c) => chunks.push(c) })).toBe("Hello");
+    const infos: unknown[] = [];
+    const options = {
+      cwd: ".",
+      stream: (c: string) => chunks.push(c),
+      onInfo: (i: unknown) => infos.push(i),
+    };
+    expect(await backend.run("PROMPT", options)).toBe("Hello");
+    expect(infos).toEqual([{ model: DEFAULT_ANTHROPIC_MODEL }]);
     expect(chunks).toEqual(["Hel", "lo"]);
     const [request] = requests;
     expect(request?.url).toBe("https://api.anthropic.com/v1/messages");

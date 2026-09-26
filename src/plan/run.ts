@@ -1,6 +1,6 @@
 import { buildAnalystPrompt } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
-import type { Backend } from "../backends/types.js";
+import type { Backend, RunOptions } from "../backends/types.js";
 import type { CommandContext } from "../commands/context.js";
 import { isAgentBackend } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
@@ -10,6 +10,7 @@ import { buildDigest } from "../digest/index.js";
 import { t } from "../i18n/index.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
 import { type ParsedPlan, PLAN_FORMAT, type PlanQuestion, parsePlan } from "./parser.js";
+import { newPlanStats, type PlanStats, recordInfo, writePlanReport } from "./report.js";
 
 export type PlanRequest = { priorPlan: string; knownTaskIds: string[] };
 
@@ -39,21 +40,48 @@ export async function generatePlan(
     ctx.print(`${prompt}\n`);
     return undefined;
   }
+  const stats = newPlanStats(config.backend);
+  try {
+    const parsed = await requestPlan(ctx, config, request, prompt, stats);
+    await writePlanReport(ctx.cwd, stats, parsed);
+    return parsed;
+  } catch (error) {
+    await writePlanReport(ctx.cwd, stats, undefined, error);
+    throw error;
+  }
+}
+
+async function requestPlan(
+  ctx: CommandContext,
+  config: Config,
+  request: PlanRequest,
+  prompt: string,
+  stats: PlanStats,
+): Promise<ParsedPlan> {
   const backend = ctx.createBackend(config.backend);
   const requireReviewer = config.targets.some(
     (target) => target === "claude-code" || target === "opencode",
   );
-  return ctx.prompter.spinner(t("plan.analyzing"), (update) =>
-    runWithFormatRetry({
+  return ctx.prompter.spinner(t("plan.analyzing"), (update) => {
+    const options: RunOptions = {
+      cwd: ctx.cwd,
+      access: "read",
+      stream: progress(update),
+      onInfo: (info) => recordInfo(stats, info),
+    };
+    return runWithFormatRetry({
       backend,
       prompt,
-      options: { cwd: ctx.cwd, access: "read", stream: progress(update) },
+      options,
       parse: (text) => parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer }),
       format: PLAN_FORMAT,
-      onRetry: () => ctx.prompter.warn(t("format.retrying")),
-      complete: (text) => continueTruncated(ctx, backend, prompt, text, progress(update)),
-    }),
-  );
+      onRetry: () => {
+        stats.formatRetries++;
+        ctx.prompter.warn(t("format.retrying"));
+      },
+      complete: (text) => continueTruncated(ctx, backend, prompt, text, options, stats),
+    });
+  });
 }
 
 async function continueTruncated(
@@ -61,19 +89,21 @@ async function continueTruncated(
   backend: Backend,
   prompt: string,
   text: string,
-  stream: (chunk: string) => void,
+  options: RunOptions,
+  stats: PlanStats,
 ): Promise<string> {
   let current = text;
   for (let round = 0; round < MAX_CONTINUATIONS; round++) {
     const cut = findTruncation(current);
     if (!cut) return current;
+    stats.continuations++;
     ctx.prompter.warn(t("plan.continuing", { marker: cut.marker }));
     const request = renderPrompt(await loadPrompt("continue", ctx.cwd), {
       prompt,
       partial: cut.complete,
       next_marker: cut.marker,
     });
-    const more = await backend.run(request, { cwd: ctx.cwd, access: "read", stream });
+    const more = await backend.run(request, options);
     current = mergeContinuation(cut.complete, more);
   }
   return current;

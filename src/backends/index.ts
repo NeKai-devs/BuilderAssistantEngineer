@@ -4,7 +4,7 @@ import { type ApiDeps, createApiBackend } from "./api.js";
 import { createManualBackend, type ManualIo } from "./manual.js";
 import type { Backend } from "./types.js";
 
-export type { Access, Backend, RunOptions } from "./types.js";
+export type { Access, Backend, RunInfo, RunOptions } from "./types.js";
 
 export type BackendDeps = {
   runner: ProcessRunner;

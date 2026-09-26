@@ -47,7 +47,8 @@ describe("plan", () => {
   it("sends the PLAN prompt and writes the targeted artifacts", async () => {
     const cwd = await setup();
     await writeFiles(cwd, { "AGENTS.md": "# Team notes\n" });
-    const questions = '[{"question": "Which DB?", "why": "schema", "blocking": true}]';
+    const questions =
+      '[{"question": "Which DB?", "why": "schema", "blocking": true}, {"question": "Name?", "why": "branding"}]';
     const { code, ui, ai } = await runPlan(cwd, ["--yes"], [planOutput({ questions })]);
     expect(code).toBe(0);
     expect(ai.prompts[0]).toContain("- MODE: PLAN");
@@ -63,6 +64,11 @@ describe("plan", () => {
     expect(await exists(cwd, ".claude/agents/reviewer.md")).toBe(true);
     expect(await exists(cwd, ".opencode/agent/reviewer.md")).toBe(false);
     expect(ui.log.join("\n")).toContain("1. [blocking] Which DB? — schema");
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      questions: 2,
+      blockingQuestions: 1,
+      files: 8,
+    });
     expect(ui.log.at(-1)).toBe(
       "outro: 7 file(s) written. Next: npx builder-assistant-engineer next",
     );
@@ -104,6 +110,13 @@ describe("plan", () => {
     expect(ai.prompts[1]).toContain("start with <<<FILE: docs/plan/tasks/T-002-add-feature.md>>>");
     expect(await exists(cwd, "docs/plan/tasks/T-002-add-feature.md")).toBe(true);
     expect(await exists(cwd, ".claude/commands/next.md")).toBe(true);
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      backend: "claude",
+      ok: true,
+      continuations: 1,
+      formatRetries: 0,
+      tasks: 2,
+    });
   });
 
   it("retries once when the answer is malformed", async () => {
@@ -112,6 +125,18 @@ describe("plan", () => {
     expect(code).toBe(0);
     expect(ai.prompts[1]).toContain("expected exactly one SUMMARY block, found 0");
     expect(await exists(cwd, "docs/plan/00-overview.md")).toBe(true);
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      formatRetries: 1,
+    });
+  });
+
+  it("writes a failed report when the answer cannot be parsed", async () => {
+    const cwd = await setup();
+    const { code } = await runPlan(cwd, ["--yes"], ["nope", "still nope"]);
+    expect(code).toBe(1);
+    const report = JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"));
+    expect(report).toMatchObject({ ok: false, formatRetries: 1, tasks: 0 });
+    expect(report.error).toContain("output format");
   });
 
   it("asks before regenerating an existing plan and never overwrites done tasks", async () => {
