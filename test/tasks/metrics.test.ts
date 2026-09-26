@@ -34,6 +34,7 @@ describe("planContext", () => {
       commands: {},
       gates: { regression: "full" as const },
       verify: { allow: [] },
+      secrets: { allow: [] },
       agent: { timeoutMinutes: 45 },
     };
     const text = planContext(config, tasks, current, finished);

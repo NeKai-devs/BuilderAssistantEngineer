@@ -66,6 +66,7 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
     commands: existing?.commands ?? {},
     gates: existing?.gates ?? { regression: "full" },
     verify: existing?.verify ?? { allow: [] },
+    secrets: existing?.secrets ?? { allow: [] },
     agent: existing?.agent ?? { timeoutMinutes: DEFAULT_AGENT_TIMEOUT_MINUTES },
   };
   const interview = await interviewFor(ctx, config, options);

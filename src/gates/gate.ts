@@ -135,6 +135,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   ctx.prompter.success(t("handoff.passed"));
   const review = await safeReview(ctx, capture, stillFailing(verification, known), acceptance, {
     testsGrew: testsGrew(checksRun),
+    secrets: capture.config.secrets,
   });
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);

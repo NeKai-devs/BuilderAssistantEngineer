@@ -303,6 +303,8 @@ export const en = {
   "verify.unsafeWarning": "`{{command}}` looks dangerous ({{reason}}); read it before you confirm.",
   "verify.onlyExcused":
     "Verification only runs commands that already failed before the task, so it checks nothing about this task.",
+  "evidence.linesFailed":
+    "The plan cites lines that do not exist, even after asking the analyst to fix them:\n{{list}}\nThe plan was not written; the rejected answer is in {{path}}. Run plan again.",
 } as const;
 
 export type MessageKey = keyof typeof en;

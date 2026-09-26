@@ -43,6 +43,7 @@ describe("init", () => {
       commands: {},
       gates: { regression: "full" },
       verify: { allow: [] },
+      secrets: { allow: [] },
       agent: { timeoutMinutes: 45 },
     });
     const interview = await read(cwd, ".bae/interview.md");

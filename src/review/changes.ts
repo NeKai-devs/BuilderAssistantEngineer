@@ -1,5 +1,7 @@
+import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import { readTextIfExists } from "../core/fs.js";
 import { EMPTY_TREE, excluded, git, gitPaths, isGitRepo, verifyCommit } from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
@@ -21,6 +23,10 @@ export type ChangeView =
   | { ok: false; reason: "noGit" | "noBase" };
 
 const MAX_NEW_FILE_BYTES = 1_000_000;
+const MAX_SUSPICIOUS_LINES = 5_000;
+const MAX_LINE_CHARS = 2_000;
+const SUSPICIOUS =
+  /AKIA|gh[pousr]_|github_pat_|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@/i;
 const TARGET_FILE = /^\+\+\+ (?:b\/)?(.+)$/;
 export const GATE_EXCLUDED = [BAE_DIR, TASKS_DIR];
 
@@ -100,6 +106,18 @@ function isExcluded(path: string): boolean {
 async function newFileText(cwd: string, path: string): Promise<string> {
   const target = join(cwd, ...path.split("/"));
   const info = await stat(target).catch(() => undefined);
-  if (!info?.isFile() || info.size > MAX_NEW_FILE_BYTES || isBinaryPath(path)) return "";
+  if (!info?.isFile() || isBinaryPath(path)) return "";
+  if (info.size > MAX_NEW_FILE_BYTES) return suspiciousLines(target);
   return (await readTextIfExists(target)) ?? "";
+}
+
+async function suspiciousLines(target: string): Promise<string> {
+  const kept: string[] = [];
+  const lines = createInterface({ input: createReadStream(target, "utf8"), crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (SUSPICIOUS.test(line)) kept.push(line.slice(0, MAX_LINE_CHARS));
+    if (kept.length >= MAX_SUSPICIOUS_LINES) break;
+  }
+  lines.close();
+  return kept.join("\n");
 }

@@ -1,20 +1,20 @@
 import { isTestFile } from "../digest/baseline.js";
-import { isLockfile, isSecretPath } from "../digest/files.js";
-import { SECRET_TOKENS } from "../digest/redact.js";
-import { type Acceptance, accept, findingId, newAcceptance } from "../gates/findings.js";
+import { isLockfile } from "../digest/files.js";
+import { type Acceptance, accept, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import type { Task } from "../tasks/schema.js";
 import type { TaskChanges } from "./changes.js";
 import { staticIntegrity } from "./integrity.js";
 import type { ReviewFinding } from "./parse.js";
 import { inScope, scopePaths } from "./scope.js";
+import { type SecretOptions, secretFindings } from "./secrets.js";
 import { addsAssertions } from "./tests.js";
 
 export type MechanicalReview = { passed: boolean; findings: ReviewFinding[] };
 
 const ALWAYS_IN_SCOPE = new Set([".gitignore"]);
 
-export type MechanicalFacts = { testsGrew: boolean };
+export type MechanicalFacts = { testsGrew: boolean; secrets?: SecretOptions };
 
 export function mechanicalReview(
   task: Task,
@@ -23,37 +23,14 @@ export function mechanicalReview(
   facts: MechanicalFacts = { testsGrew: false },
 ): MechanicalReview {
   const findings = [
-    ...secretFindings(changes).map((finding) => accept(acceptance, finding, true)),
+    ...secretFindings(changes, facts.secrets ?? { allow: [] }).map((finding) =>
+      accept(acceptance, finding, true),
+    ),
     ...staticIntegrity(task, changes, acceptance),
     ...testFindings(task, changes, facts),
     ...scopeFindings(task, changes),
   ];
   return { passed: !findings.some((finding) => finding.severity === "blocker"), findings };
-}
-
-function secretFindings(changes: TaskChanges): ReviewFinding[] {
-  const files = changes.files.filter(isSecretPath).map((file) => ({
-    severity: "blocker" as const,
-    id: findingId("secret", file),
-    file,
-    message: t("mechanical.secretFile"),
-  }));
-  const values = changes.added.flatMap(({ path, text }) => {
-    const kinds = SECRET_TOKENS.filter(([, pattern]) => text.search(pattern) !== -1).map(
-      ([kind]) => kind,
-    );
-    if (kinds.length === 0 || isSecretPath(path)) return [];
-    const kind = [...new Set(kinds)].join(", ");
-    return [
-      {
-        severity: "blocker" as const,
-        id: findingId("secret", path, kind),
-        file: path,
-        message: t("mechanical.secretValue", { kind }),
-      },
-    ];
-  });
-  return [...files, ...values];
 }
 
 function testFindings(task: Task, changes: TaskChanges, facts: MechanicalFacts): ReviewFinding[] {

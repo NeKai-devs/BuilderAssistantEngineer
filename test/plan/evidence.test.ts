@@ -72,4 +72,16 @@ describe("findUnverified", () => {
       "`src/phantom/` in docs/plan/tasks/T-002-add-feature.md",
     ]);
   });
+
+  it("checks bare names with lines against every file of that name, and bad ranges", async () => {
+    const architecture = [
+      "Tests in `users.test.ts:999`, entry in `src/index.ts:0` and `src/index.ts:5-2`.",
+      "Compiled import `src/index.js:3`, and `.env` is local only.",
+    ].join("\n");
+    expect(await unverified({ "docs/plan/02-architecture.md": architecture })).toEqual([
+      "`users.test.ts:999` in docs/plan/02-architecture.md (the file has 3 lines)",
+      "`src/index.ts:0` in docs/plan/02-architecture.md",
+      "`src/index.ts:5-2` in docs/plan/02-architecture.md",
+    ]);
+  });
 });

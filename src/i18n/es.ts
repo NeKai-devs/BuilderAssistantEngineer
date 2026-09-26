@@ -313,4 +313,6 @@ export const es: Messages = {
   "verify.unsafeWarning": "`{{command}}` parece peligroso ({{reason}}); léelo antes de confirmar.",
   "verify.onlyExcused":
     "La Verificación solo ejecuta comandos que ya fallaban antes de la tarea, así que no comprueba nada de esta tarea.",
+  "evidence.linesFailed":
+    "El plan cita líneas que no existen, incluso después de pedir al analista que las corrija:\n{{list}}\nEl plan no se escribió; la respuesta rechazada está en {{path}}. Vuelve a correr plan.",
 };

@@ -75,6 +75,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     commands: {},
     gates: { regression: "full" },
     verify: { allow: [] },
+    secrets: { allow: [] },
     agent: { timeoutMinutes: 45 },
     ...overrides,
   };

@@ -15,7 +15,7 @@ export type Citation = {
 };
 export type Unverified = Citation & { lines?: number };
 
-type RepoIndex = { names: Set<string>; roots: Set<string> };
+type RepoIndex = { names: Map<string, string[]>; roots: Set<string> };
 
 const CODE_SPAN = /`([^`\n]+)`([ \t]*\((?:new|nuevo|nueva)\))?/gi;
 const NEW_INSIDE = /^(.+?)\s+\((?:new|nuevo|nueva)\)$/i;
@@ -77,8 +77,15 @@ const KNOWN_FILES = new Set([
   ".npmrc",
   ".python-version",
   ".tool-versions",
-  ".env",
 ]);
+
+const TS_SOURCES: Record<string, string[]> = {
+  ".js": [".ts", ".tsx"],
+  ".jsx": [".tsx"],
+  ".mjs": [".mts"],
+  ".cjs": [".cts"],
+};
+const MAX_BARE_CANDIDATES = 20;
 
 export type PlanEvidence = Pick<ParsedPlan, "files" | "tasks">;
 export type EvidenceCheck = { checked: number; unverified: Unverified[] };
@@ -165,7 +172,12 @@ function toCitation(span: string, roots: Set<string>): Omit<Citation, "source"> 
       ? KNOWN_FILES.has(path) || (line !== undefined && hasFileExtension(path))
       : hasFileExtension(path) || roots.has(first);
   if (!checked) return undefined;
-  return { text: span, path, ...(line ? { line } : {}), ...(endLine ? { endLine } : {}) };
+  return {
+    text: span,
+    path,
+    ...(line !== undefined ? { line } : {}),
+    ...(endLine !== undefined ? { endLine } : {}),
+  };
 }
 
 function hasFileExtension(path: string): boolean {
@@ -187,26 +199,62 @@ async function verify(
   planned: Set<string>,
 ): Promise<Unverified | undefined> {
   const bare = !citation.path.includes("/");
-  const info = await stat(join(cwd, ...citation.path.split("/"))).catch(() => undefined);
-  if (citation.line) {
-    if (!info?.isFile()) return bare && repo.names.has(citation.path) ? undefined : citation;
-    const text = (await readTextIfExists(join(cwd, ...citation.path.split("/")))) ?? "";
-    const lines = text.split(/\r?\n/).length - (text.endsWith("\n") ? 1 : 0);
-    return (citation.endLine ?? citation.line) <= lines ? undefined : { ...citation, lines };
-  }
-  if (info || (bare && repo.names.has(citation.path))) return undefined;
+  if (citation.line !== undefined) return verifyLines(cwd, citation, repo, bare);
+  const path = await existing(cwd, citation.path);
+  if (path || (bare && repo.names.has(citation.path))) return undefined;
   const isPlanned =
     planned.has(citation.path) ||
     [...planned].some(
-      (path) => path.startsWith(`${citation.path}/`) || (bare && baseName(path) === citation.path),
+      (item) => item.startsWith(`${citation.path}/`) || (bare && baseName(item) === citation.path),
     );
   return isPlanned ? undefined : citation;
 }
 
+async function verifyLines(
+  cwd: string,
+  citation: Citation,
+  repo: RepoIndex,
+  bare: boolean,
+): Promise<Unverified | undefined> {
+  const line = citation.line ?? 0;
+  const last = citation.endLine ?? line;
+  if (line < 1 || last < line) return citation;
+  const direct = await existing(cwd, citation.path);
+  const candidates = direct
+    ? [direct]
+    : bare
+      ? (repo.names.get(citation.path) ?? []).slice(0, MAX_BARE_CANDIDATES)
+      : [];
+  if (candidates.length === 0) return citation;
+  const counts = await Promise.all(candidates.map((path) => lineCount(cwd, path)));
+  const lines = Math.max(...counts);
+  return last <= lines ? undefined : { ...citation, lines };
+}
+
+async function existing(cwd: string, path: string): Promise<string | undefined> {
+  for (const candidate of [path, ...sourceAlternatives(path)]) {
+    if (await stat(join(cwd, ...candidate.split("/"))).catch(() => undefined)) return candidate;
+  }
+  return undefined;
+}
+
+function sourceAlternatives(path: string): string[] {
+  const extension = extensionOf(path);
+  const stem = path.slice(0, path.length - extension.length);
+  return (TS_SOURCES[extension] ?? []).map((replacement) => `${stem}${replacement}`);
+}
+
+async function lineCount(cwd: string, path: string): Promise<number> {
+  const text = (await readTextIfExists(join(cwd, ...path.split("/")))) ?? "";
+  return text.split(/\r?\n/).length - (text.endsWith("\n") ? 1 : 0);
+}
+
 async function indexRepo(cwd: string): Promise<RepoIndex> {
   const { files } = await scanFiles(cwd);
-  return {
-    names: new Set(files.map((file) => baseName(file.path))),
-    roots: new Set(files.map((file) => file.path.split("/")[0] ?? "")),
-  };
+  const names = new Map<string, string[]>();
+  for (const file of files) {
+    const name = baseName(file.path);
+    names.set(name, [...(names.get(name) ?? []), file.path]);
+  }
+  return { names, roots: new Set(files.map((file) => file.path.split("/")[0] ?? "")) };
 }

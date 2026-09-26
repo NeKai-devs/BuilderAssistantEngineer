@@ -1,3 +1,4 @@
+import { join, relative } from "node:path";
 import { buildAnalystPrompt } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import type { Backend, RunOptions } from "../backends/types.js";
@@ -6,6 +7,8 @@ import { isAgentBackend } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
 import { readInterview } from "../config/store.js";
 import { FormatError, UserError } from "../core/errors.js";
+import { writeText } from "../core/fs.js";
+import { baePaths } from "../core/paths.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
 import { buildDigest } from "../digest/index.js";
@@ -23,6 +26,7 @@ type Parse = (text: string) => ParsedPlan;
 type Ending = { truncated?: boolean };
 
 const MAX_CONTINUATIONS = 3;
+const REJECTED_PLAN = "rejected-plan.md";
 const MAX_REPO_FILES_CHARS = 20_000;
 
 export async function generatePlan(
@@ -58,7 +62,7 @@ export async function generatePlan(
     parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer });
   try {
     const parsed = await requestPlan(ctx, backend, parse, prompt, stats);
-    const checked = await checkEvidence(ctx, backend, parsed, parse, stats);
+    const checked = await checkEvidence(ctx, backend, parsed, parse, stats, config.mode);
     await writePlanReport(ctx.cwd, stats, checked);
     return checked;
   } catch (error) {
@@ -146,6 +150,7 @@ async function checkEvidence(
   parsed: ParsedPlan,
   parse: Parse,
   stats: PlanStats,
+  mode: Config["mode"],
 ): Promise<ParsedPlan> {
   const missing = await findUnverified(ctx.cwd, parsed);
   if (missing.length === 0) return parsed;
@@ -160,6 +165,17 @@ async function checkEvidence(
   if (remaining.length === 0) {
     ctx.prompter.success(t("evidence.fixed"));
     return plan;
+  }
+  const lines = remaining.filter((item) => item.line !== undefined);
+  if (mode === "brownfield" && lines.length > 0) {
+    const path = join(baePaths(ctx.cwd).tmp, REJECTED_PLAN);
+    await writeText(path, renderPlan(plan));
+    throw new UserError(
+      t("evidence.linesFailed", {
+        list: lines.map((item) => `- ${describeUnverified(item)}`).join("\n"),
+        path: relative(ctx.cwd, path).split("\\").join("/"),
+      }),
+    );
   }
   ctx.prompter.warn(t("evidence.unverified", { count: remaining.length }));
   const list = stats.unverifiedPaths.map((line) => `- ${line}`).join("\n");
