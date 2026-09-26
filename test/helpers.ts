@@ -73,7 +73,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     lang: "en",
     digest: { maxChars: 20_000 },
     commands: {},
-    gates: { regression: "full" },
+    gates: { regression: "full", timeoutMinutes: 15 },
     verify: { allow: [] },
     secrets: { allow: [] },
     agent: { timeoutMinutes: 45 },

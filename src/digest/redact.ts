@@ -2,7 +2,12 @@ const REDACTED = "[REDACTED]";
 
 export const SECRET_TOKENS: [string, RegExp][] = [
   ["private key", /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g],
-  ["AWS access key", /\bAKIA[0-9A-Z]{16}\b/g],
+  [
+    "private key",
+    /-----BEGIN PGP PRIVATE KEY BLOCK-----[\s\S]*?-----END PGP PRIVATE KEY BLOCK-----/g,
+  ],
+  ["AWS access key", /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
+  ["Slack webhook", /https:\/\/hooks\.slack\.com\/services\/T\w+\/B\w+\/\w+/g],
   ["GitHub token", /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g],
   ["GitHub token", /\bgithub_pat_[A-Za-z0-9_]{22,}/g],
   ["Slack token", /\bxox[abprs]-[A-Za-z0-9-]{10,}/g],

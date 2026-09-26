@@ -86,13 +86,14 @@ export async function untrackedFiles(
 
 async function walk(cwd: string, dir: string, isIgnored: IgnoreMatcher): Promise<string[]> {
   const entries = await listDir(join(cwd, ...dir.split("/")));
-  if (entries.some((entry) => entry.name === ".git")) return [];
   const found: string[] = [];
   for (const entry of entries) {
     const path = `${dir}/${entry.name}`;
     if (entry.isDirectory()) {
-      if (!isIgnored(path, true)) found.push(...(await walk(cwd, path, isIgnored)));
-    } else if (entry.isFile() && !isIgnored(path, false)) {
+      if (entry.name !== ".git" && !isIgnored(path, true)) {
+        found.push(...(await walk(cwd, path, isIgnored)));
+      }
+    } else if ((entry.isFile() || entry.isSymbolicLink()) && !isIgnored(path, false)) {
       found.push(path);
     }
   }

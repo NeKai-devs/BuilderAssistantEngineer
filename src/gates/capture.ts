@@ -117,8 +117,10 @@ export async function readActive(cwd: string): Promise<string | undefined> {
 export async function trustAgentsMd(cwd: string, capture: Capture, trusted: string): Promise<void> {
   const current = await readTextIfExists(join(cwd, AGENTS_MD));
   capture.agentsMd = trusted;
-  if (current !== undefined) capture.protected[AGENTS_MD] = current;
-  if (current === trusted) Object.assign(capture.snapshot, await hashPaths(cwd, [AGENTS_MD]));
+  if (current === trusted) {
+    capture.protected[AGENTS_MD] = trusted;
+    Object.assign(capture.snapshot, await hashPaths(cwd, [AGENTS_MD]));
+  }
   await saveCapture(cwd, capture);
 }
 

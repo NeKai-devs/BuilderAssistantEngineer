@@ -32,7 +32,7 @@ describe("planContext", () => {
       lang: "en" as const,
       digest: { maxChars: 1 },
       commands: {},
-      gates: { regression: "full" as const },
+      gates: { regression: "full" as const, timeoutMinutes: 15 },
       verify: { allow: [] },
       secrets: { allow: [] },
       agent: { timeoutMinutes: 45 },

@@ -31,11 +31,25 @@ const GIT_READ = new Set([
   "describe",
   "blame",
 ]);
-const DYNAMIC = new Set(["eval", "source", ".", "exec", "xargs"]);
+const DYNAMIC = new Set(["eval", "source", ".", "exec", "xargs", "command", "builtin", "env"]);
+const RELEASING = new Set([
+  "publish",
+  "deploy",
+  "release",
+  "upload",
+  "push",
+  "login",
+  "adduser",
+  "owner",
+  "unpublish",
+  "deprecate",
+  "yank",
+]);
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd"]);
 const MASKING =
   /\bset\s+\+[A-Za-z]*e[A-Za-z]*\b|\bset\s+\+o\s+(?:errexit|pipefail)\b|\btrap\s+-?\s*['"]?\s*['"]?\s+ERR\b/;
-const FALLBACK_OK = /^\s*(?:exit\s+[1-9]\d*|false)\b/;
+const FALLBACK_OK =
+  /^\s*(?:exit\s+(?:[1-9]\d*|\$\?)|false|\{[^}]*\bexit\s+(?:[1-9]\d*|\$\?)\s*;?\s*\})/;
 
 export function trivialityProblems(lines: string[]): CheckProblem[] {
   const logical = logicalLines(lines);
@@ -54,10 +68,13 @@ export function trivialityProblems(lines: string[]): CheckProblem[] {
 
 export function allowlistProblems(lines: string[], allow: string[]): CheckProblem[] {
   return logicalLines(lines).flatMap((line) => {
-    if (allow.some((prefix) => line.startsWith(prefix))) return [];
     const parsed = parseLine(line);
-    if (parsed.substitution) return [{ command: line, reason: "dynamic" as const }];
-    const bad = parsed.commands.find((command) => !allowed(command));
+    if (parsed.substitution || /[<>]\(/.test(line)) {
+      return [{ command: line, reason: "dynamic" as const }];
+    }
+    const bad = parsed.commands.find(
+      (command) => !allow.some((prefix) => command.text.startsWith(prefix)) && !allowed(command),
+    );
     if (!bad) return [];
     const { name } = program(bad);
     const dynamic = DYNAMIC.has(name) || SHELLS.has(name);
@@ -69,7 +86,7 @@ function masksWithOperators(line: string): boolean {
   const unquoted = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
   const fallbacks = unquoted.split("||").slice(1);
   if (fallbacks.some((fallback) => !FALLBACK_OK.test(fallback))) return true;
-  return /(^|[^&])&(\s*$|\s*[;)]|\s+\S)/.test(unquoted.replace(/&&|&>|>&|\d>&\d/g, ""));
+  return /(^|[^&|])&(\s*$|\s*[;)]|\s+\S)/.test(unquoted.replace(/&&|&>|>&|\|&|\d>&\d/g, ""));
 }
 
 function runsOrChecks(command: SimpleCommand): boolean {
@@ -89,6 +106,7 @@ function allowed(command: SimpleCommand): boolean {
   const { name, args } = program(command);
   const base = baseName(name);
   if (DYNAMIC.has(base) || SHELLS.has(base)) return false;
+  if (args.some((arg) => RELEASING.has(arg)) && !args.includes("--dry-run")) return false;
   if (base === "git") return GIT_READ.has(args[0] ?? "");
   if (base === "curl" || base === "jq") return true;
   if (

@@ -6,6 +6,7 @@ import { readTextIfExists } from "../core/fs.js";
 import { renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
 import { type Capture, capturedPrompt } from "../gates/capture.js";
+import { withoutLog } from "../gates/contract.js";
 import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import { logLines } from "../tasks/handoff.js";
@@ -71,7 +72,7 @@ export async function reviewTask(
   const prompt = renderPrompt(capturedPrompt(capture, "review"), {
     reviewer: capture.reviewer,
     agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),
-    task: capture.task,
+    task: withoutLog(capture.task),
     diff: diff.text,
     checks: formatFindings([...mechanical.findings, ...notes]) || "(none)",
     output_language: LANGUAGE_NAMES[capture.config.lang],

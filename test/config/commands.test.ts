@@ -40,7 +40,7 @@ describe("proposeCommands", () => {
       lint: "ruff check .",
     });
     expect(await proposeCommands(await copyFixture("go-service"))).toEqual({
-      test: "go test ./...",
+      test: "go test -v ./...",
       lint: "go vet ./...",
       build: "go build ./...",
     });

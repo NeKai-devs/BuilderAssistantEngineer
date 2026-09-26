@@ -8,6 +8,7 @@ export const COMMAND_KEYS = ["test", "lint", "typecheck", "build"] as const;
 export const REGRESSION_MODES = ["full", "task", "off"] as const;
 export const DEFAULT_DIGEST_MAX_CHARS = 100_000;
 export const DEFAULT_AGENT_TIMEOUT_MINUTES = 45;
+export const DEFAULT_CHECK_TIMEOUT_MINUTES = 15;
 
 const command = z.string().trim().min(1).optional();
 
@@ -29,8 +30,11 @@ export const configSchema = z.object({
     .default({ maxChars: DEFAULT_DIGEST_MAX_CHARS }),
   commands: commandsSchema.default({}),
   gates: z
-    .object({ regression: z.enum(REGRESSION_MODES).default("full") })
-    .default({ regression: "full" }),
+    .object({
+      regression: z.enum(REGRESSION_MODES).default("full"),
+      timeoutMinutes: z.number().int().positive().default(DEFAULT_CHECK_TIMEOUT_MINUTES),
+    })
+    .default({ regression: "full", timeoutMinutes: DEFAULT_CHECK_TIMEOUT_MINUTES }),
   verify: z.object({ allow: z.array(z.string().trim().min(1)).default([]) }).default({ allow: [] }),
   secrets: z
     .object({ allow: z.array(z.string().trim().min(1)).default([]) })

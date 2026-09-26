@@ -15,7 +15,7 @@ const config: Config = {
   lang: "es",
   digest: { maxChars: 50_000 },
   commands: { test: "npm test", lint: "npm run lint" },
-  gates: { regression: "task" },
+  gates: { regression: "task", timeoutMinutes: 20 },
   verify: { allow: ["./scripts/check.sh"] },
   secrets: { allow: ["test/fixtures/**"] },
   agent: { timeoutMinutes: 30 },
@@ -52,7 +52,7 @@ describe("config store", () => {
     expect(await readConfig(cwd)).toMatchObject({
       digest: { maxChars: 100_000 },
       commands: {},
-      gates: { regression: "full" },
+      gates: { regression: "full", timeoutMinutes: 15 },
       agent: { timeoutMinutes: 45 },
       verify: { allow: [] },
       secrets: { allow: [] },

@@ -41,7 +41,7 @@ describe("init", () => {
       lang: "es",
       digest: { maxChars: 100_000 },
       commands: {},
-      gates: { regression: "full" },
+      gates: { regression: "full", timeoutMinutes: 15 },
       verify: { allow: [] },
       secrets: { allow: [] },
       agent: { timeoutMinutes: 45 },

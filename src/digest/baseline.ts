@@ -135,6 +135,8 @@ const CI_PATHS = [
 ];
 
 const TEST_PATHS = [
+  /(^|\/)tests?\.(py|js|ts|mjs|cjs|rb)$/,
+  /_(?:unit)?test\.(cc|cpp|cxx|c)$/,
   /(^|\/)(__tests__|tests?|spec|e2e|cypress)\//,
   /\.(test|spec|cy|e2e)\.[a-z0-9]+$/i,
   /(^|\/)test_[^/]+\.py$/,

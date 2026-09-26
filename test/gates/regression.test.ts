@@ -71,6 +71,7 @@ describe("failing test names", () => {
     expect(
       parseFailing("FAILED tests/test_api.py::test_login - assert 1 == 2", ["pytest"]),
     ).toEqual(["tests/test_api.py::test_login"]);
-    expect(parseFailing(output, [])).toBeUndefined();
+    expect(parseFailing(output, [])).toEqual(["test/b.test.ts > users > rejects"]);
+    expect(parseFailing("ERROR connecting to db", [])).toBeUndefined();
   });
 });

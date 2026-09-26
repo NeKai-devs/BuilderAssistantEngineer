@@ -336,4 +336,11 @@ export const es: Messages = {
     "Quita {{count}} línea(s) de aserción de un archivo de test sin volver a añadirlas.",
   "capture.headMoved":
     "{{id}} conserva el commit registrado cuando empezó; los commits hechos desde entonces cuentan como parte de los cambios de la tarea.",
+  "contract.restoreFailed":
+    "No se pudo restaurar {{files}} desde la captura. Corrígelos a mano; la siguiente ejecución los vuelve a comprobar antes de empezar.",
+  "integrity.suppression": "Añade un comentario que silencia un chequeo ({{markers}}).",
+  "integrity.expectedOutput":
+    "Cambia un snapshot o un archivo de salida esperada, que decide qué aceptan los tests.",
+  "regression.baselineTampered":
+    "Correr los comandos del proyecto para la línea base cambió archivos de los que dependen los chequeos ({{files}}); se restauraron y no se lanzó nada.",
 };

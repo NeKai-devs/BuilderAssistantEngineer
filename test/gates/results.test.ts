@@ -17,7 +17,7 @@ describe("parseCounts", () => {
     ],
     [
       "go -v",
-      "--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.00s)\n--- SKIP: TestC (0.00s)",
+      "=== RUN   TestA\n--- PASS: TestA (0.00s)\n--- FAIL: TestB (0.00s)\n--- SKIP: TestC (0.00s)",
       [1, 1, 1],
     ],
     ["mocha", "  12 passing (30ms)\n  1 pending\n  2 failing", [12, 2, 1]],

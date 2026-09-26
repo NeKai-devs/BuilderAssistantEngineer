@@ -1,10 +1,14 @@
+import { createHash } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { readdir, rm, stat } from "node:fs/promises";
+import { lstat, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { gitPaths, isGitRepo } from "../core/git.js";
 import { asRecord, parseObject } from "../core/json.js";
 import { scanFiles } from "../digest/walk.js";
+import { t } from "../i18n/index.js";
+import { inScope } from "../review/scope.js";
 import { type IgnoreSource, ignoreMatcher, untrackedFiles } from "./ignore-rules.js";
 import {
   AGENT_FILES,
@@ -31,6 +35,7 @@ export type ContractChange = {
   change: "modified" | "deleted" | "created";
   detail: string;
   restored: string | null;
+  fingerprint?: string;
 };
 export type Protected = Record<string, string>;
 export type ContractInputs = { suite: string[]; verification: string[]; own: string[] };
@@ -46,7 +51,15 @@ const LOG_HEADING = /^##[ \t]+(log|registro|bitácora|bitacora)[ \t]*$/i;
 const SECTION_HEADING = /^##(?!#)/;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
 const MAX_PROTECTED_CHARS = 1_000_000;
-const PACKAGE_KEYS = ["jest", "mocha", "ava"];
+const PACKAGE_KEYS = ["jest", "mocha", "ava", "eslintConfig", "prettier", "babel", "c8", "nyc"];
+const ROOT_TOOLCHAIN = [
+  ".npmrc",
+  ".yarnrc",
+  ".yarnrc.yml",
+  ".envrc",
+  "bunfig.toml",
+  ".pnpmfile.cjs",
+];
 
 export async function collectProtected(
   cwd: string,
@@ -58,12 +71,13 @@ export async function collectProtected(
   );
   const suite = executedBy(inputs.suite, scripts);
   const verification = executedBy(inputs.verification, scripts);
-  const own = new Set(inputs.own);
+  const own = (path: string) => inScope(path, inputs.own);
   const candidates = [
     ...(await watchedFiles(cwd)),
     ...listing.filter(repoProtected),
     ...suite.files,
-    ...verification.files.filter((path) => !own.has(path)),
+    ...verification.files.filter((path) => !own(path)),
+    ...(await rootToolchain(cwd)),
     ...(await gitFiles(cwd)),
   ];
   const result: Protected = {};
@@ -94,9 +108,12 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
   const captured = state.protected;
   const changes: ContractChange[] = [];
   for (const [path, before] of Object.entries(captured)) {
-    const after = await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
+    const linked = (await lstat(absolute(cwd, path)).catch(() => undefined))?.isSymbolicLink();
+    const after = linked
+      ? undefined
+      : await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
     const change = compare(path, kindOf(path, state.taskPath), before, after);
-    if (change) changes.push(change);
+    if (change) changes.push({ ...change, fingerprint: fingerprint(after) });
   }
   const created = (path: string, kind: ContractKind): ContractChange => ({
     path,
@@ -104,6 +121,7 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
     change: "created",
     detail: "",
     restored: null,
+    fingerprint: fingerprint(path),
   });
   for (const path of await watchedFiles(cwd)) {
     if (!Object.hasOwn(captured, path)) changes.push(created(path, kindOf(path, state.taskPath)));
@@ -129,11 +147,18 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
 }
 
 export async function restoreContract(cwd: string, changes: ContractChange[]): Promise<void> {
+  const failed: string[] = [];
   for (const change of changes) {
     const target = absolute(cwd, change.path);
-    if (change.restored === null) await rm(target, { force: true });
-    else await writeText(target, change.restored);
+    try {
+      await rm(target, { force: true, recursive: true });
+      if (change.restored !== null) await writeText(target, change.restored);
+    } catch {
+      failed.push(change.path);
+    }
   }
+  if (failed.length > 0)
+    throw new UserError(t("contract.restoreFailed", { files: failed.join(", ") }));
 }
 
 export function taskContract(text: string): string {
@@ -151,8 +176,10 @@ export function spliceLog(captured: string, current: string): string {
   const output: string[] = [];
   let inLog = false;
   let inserted = false;
+  let fenced = false;
   for (const line of captured.replace(/\r\n/g, "\n").split("\n")) {
-    if (SECTION_HEADING.test(line)) inLog = LOG_HEADING.test(line.trimEnd());
+    if (!fenced && SECTION_HEADING.test(line)) inLog = LOG_HEADING.test(line.trimEnd());
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
     if (!inLog) {
       output.push(line);
       continue;
@@ -168,11 +195,17 @@ function splitLog(body: string): { kept: string[]; log: string[] } {
   const kept: string[] = [];
   const log: string[] = [];
   let inLog = false;
+  let fenced = false;
   for (const line of body.split("\n")) {
-    if (SECTION_HEADING.test(line)) inLog = LOG_HEADING.test(line.trimEnd());
+    if (!fenced && SECTION_HEADING.test(line)) inLog = LOG_HEADING.test(line.trimEnd());
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
     (inLog ? log : kept).push(line);
   }
   return { kept, log };
+}
+
+export function withoutLog(text: string): string {
+  return splitLog(unix(text)).kept.join("\n").trimEnd();
 }
 
 function compare(
@@ -238,25 +271,34 @@ function restorePackage(before: string, after: string): string {
   return `${JSON.stringify(restored, null, indent)}${after.endsWith("\n") ? "\n" : ""}`;
 }
 
-function sectionOf(text: string, header: string): string | undefined {
-  const lines = unix(text).split("\n");
-  const start = lines.findIndex((line) => line.trim() === header);
-  if (start === -1) return undefined;
-  const end = lines.findIndex((line, index) => index > start && /^\s*\[/.test(line));
-  return lines
-    .slice(start, end === -1 ? lines.length : end)
-    .join("\n")
-    .trimEnd();
+function sectionOf(text: string, prefix: string): string | undefined {
+  const tables = tablesOf(text).filter((table) => matchesTable(table.name, prefix));
+  if (tables.length === 0) return undefined;
+  return tables.map((table) => table.lines.join("\n").trimEnd()).join("\n\n");
 }
 
-function replaceSection(text: string, header: string, section: string): string {
-  const lines = unix(text).split("\n");
-  const start = lines.findIndex((line) => line.trim() === header);
-  if (start === -1) return section ? `${unix(text).trimEnd()}\n\n${section}\n` : text;
-  const found = lines.findIndex((line, index) => index > start && /^\s*\[/.test(line));
-  const end = found === -1 ? lines.length : found;
-  const rest = end < lines.length ? ["", ...lines.slice(end)] : [""];
-  return [...lines.slice(0, start), ...(section ? [section] : []), ...rest].join("\n");
+function replaceSection(text: string, prefix: string, section: string): string {
+  const kept = tablesOf(text)
+    .filter((table) => !matchesTable(table.name, prefix))
+    .map((table) => table.lines.join("\n").trimEnd())
+    .filter((block) => block !== "");
+  return `${[...kept, ...(section ? [section] : [])].join("\n\n")}\n`;
+}
+
+function tablesOf(text: string): { name: string; lines: string[] }[] {
+  const tables: { name: string; lines: string[] }[] = [{ name: "", lines: [] }];
+  for (const line of unix(text).split("\n")) {
+    const header = /^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(?:[#;].*)?$/.exec(line)?.[1];
+    if (header !== undefined) tables.push({ name: header.trim(), lines: [] });
+    tables.at(-1)?.lines.push(line);
+  }
+  return tables;
+}
+
+function matchesTable(name: string, prefix: string): boolean {
+  return (
+    name === prefix || [".", "-", ":"].some((separator) => name.startsWith(`${prefix}${separator}`))
+  );
 }
 
 async function walk(cwd: string, dir: string): Promise<string[]> {
@@ -266,7 +308,7 @@ async function walk(cwd: string, dir: string): Promise<string[]> {
     entries.map(async (entry) => {
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) return walk(cwd, path);
-      return entry.isFile() ? [path] : [];
+      return entry.isFile() || entry.isSymbolicLink() ? [path] : [];
     }),
   );
   return nested.flat();
@@ -282,6 +324,13 @@ async function listDir(path: string): Promise<Dirent[]> {
 
 function absolute(cwd: string, path: string): string {
   return join(cwd, ...path.split("/"));
+}
+
+function fingerprint(text: string | undefined): string {
+  return createHash("sha1")
+    .update(text ?? "deleted")
+    .digest("hex")
+    .slice(0, 12);
 }
 
 function unix(text: string): string {
@@ -320,10 +369,22 @@ async function repoFiles(cwd: string): Promise<string[]> {
 }
 
 async function currentFiles(cwd: string, ignore: IgnoreSource[]): Promise<string[]> {
-  if (!(await isGitRepo(cwd))) return (await scanFiles(cwd)).files.map((file) => file.path);
+  const scanned = async () => (await scanFiles(cwd)).files.map((file) => file.path);
+  const root = await rootToolchain(cwd);
+  if (!(await isGitRepo(cwd))) return [...(await scanned()), ...root];
   const [tracked, untracked] = await Promise.all([
     gitPaths(cwd, ["ls-files", "--cached"]),
     untrackedFiles(cwd, ignoreMatcher(ignore)),
   ]);
-  return [...(tracked ?? []), ...(untracked ?? [])];
+  if (!tracked || !untracked) return [...(await scanned()), ...root];
+  return [...new Set([...tracked, ...untracked, ...root])];
+}
+
+async function rootToolchain(cwd: string): Promise<string[]> {
+  const found = await Promise.all(
+    ROOT_TOOLCHAIN.map(async (name) =>
+      (await lstat(absolute(cwd, name)).catch(() => undefined)) ? [name] : [],
+    ),
+  );
+  return found.flat();
 }

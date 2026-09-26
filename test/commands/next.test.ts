@@ -255,7 +255,11 @@ describe("next regression gate", () => {
       excluded: [],
       commands: {
         [PASS]: { exitCode: 0 },
-        [RED]: { exitCode: 1, counts: { passed: 2, failed: 1, skipped: 0 } },
+        [RED]: {
+          exitCode: 1,
+          counts: { passed: 2, failed: 1, skipped: 0 },
+          source: "vitest",
+        },
       },
     });
     expect(await statusOf(cwd, TASK)).toBe("done");

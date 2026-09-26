@@ -12,6 +12,7 @@ import { renderPrompt } from "../core/prompt-loader.js";
 import { displayPath } from "../core/state.js";
 import { truncateText } from "../digest/format.js";
 import { type Capture, capturedPrompt, trustAgentsMd } from "../gates/capture.js";
+import { withoutLog } from "../gates/contract.js";
 import { t } from "../i18n/index.js";
 import { runDir } from "./runs.js";
 
@@ -101,7 +102,7 @@ async function askLesson(
 ): Promise<Lesson | undefined> {
   const prompt = renderPrompt(capturedPrompt(capture, "lesson"), {
     reason: REASONS[reason],
-    task: capture.task,
+    task: withoutLog(capture.task),
     failures: await recentRuns(ctx.cwd, capture.id),
     agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),
     output_language: LANGUAGE_NAMES[capture.config.lang],

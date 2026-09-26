@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
+import { readlink, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { readTextIfExists } from "../core/fs.js";
+import { isSymlink, looksBinary, readTextIfExists } from "../core/fs.js";
 import { DIFF_FLAGS, excluded, git, unquotePath } from "../core/git.js";
-import { isBinaryPath, isLockfile } from "../digest/files.js";
+import { isLockfile } from "../digest/files.js";
 import { truncateText } from "../digest/format.js";
 import { GATE_EXCLUDED, type TaskChanges } from "./changes.js";
 import { inScope } from "./scope.js";
@@ -12,7 +13,8 @@ export type ReviewDiff = { text: string; shown: string[]; omitted: string[]; gen
 
 const MAX_DIFF_CHARS = 60_000;
 const MIN_PARTIAL_CHARS = 2_000;
-const GENERATED = [/\.min\.(js|css|mjs)$/i, /\.(js|css)\.map$/i];
+const GENERATED = [/\.(js|css|mjs)\.map$/i];
+const MINIFIED = /\.min\.(js|css|mjs)$/i;
 const DOCS = [/^docs\//, /\.(md|mdx|rst|adoc|txt)$/i];
 
 export async function reviewDiff(
@@ -98,7 +100,7 @@ function headerPath(header: string): string | undefined {
 
 function rank(path: string, scope: string[]): number {
   if (scope.length > 0 && inScope(path, scope)) return 0;
-  if (isLockfile(path)) return 3;
+  if (isLockfile(path) || MINIFIED.test(path)) return 3;
   return DOCS.some((pattern) => pattern.test(path)) ? 2 : 1;
 }
 
@@ -107,7 +109,14 @@ function isGenerated(path: string): boolean {
 }
 
 async function newFilePiece(cwd: string, path: string): Promise<DiffPiece> {
-  if (isBinaryPath(path)) return { path, text: `new binary file: ${path}` };
-  const text = (await readTextIfExists(join(cwd, ...path.split("/")))) ?? "";
+  const target = join(cwd, ...path.split("/"));
+  if (await isSymlink(target)) {
+    const link = await readlink(target).catch(() => "?");
+    return { path, text: `new symlink: ${path} -> ${link}` };
+  }
+  if (!(await stat(target).catch(() => undefined))?.isFile())
+    return { path, text: `new file: ${path}` };
+  if (await looksBinary(target)) return { path, text: `new binary file: ${path}` };
+  const text = (await readTextIfExists(target)) ?? "";
   return { path, text: `new file: ${path}\n${text.trimEnd()}` };
 }

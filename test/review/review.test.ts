@@ -54,14 +54,14 @@ describe("reviewDiff", () => {
         piece("docs/guide.md", 500),
         piece("src/other.ts", 500),
         piece("src/feature.ts", 500),
-        piece("dist/bundle.min.js", 500),
+        piece("dist/bundle.js.map", 500),
       ],
       ["src/feature.ts"],
       3_000,
     );
     expect(diff.shown).toEqual(["src/feature.ts", "src/other.ts", "docs/guide.md"]);
     expect(diff.omitted).toEqual(["package-lock.json"]);
-    expect(diff.generated).toEqual(["dist/bundle.min.js"]);
+    expect(diff.generated).toEqual(["dist/bundle.js.map"]);
     expect(diff.text).toContain("Not shown, over the size budget: package-lock.json");
   });
 

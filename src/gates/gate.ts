@@ -67,7 +67,12 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (tampered.length > 0) {
     const reason = t("state.tampered", { files: tampered.join(", ") });
     ctx.prompter.warn(reason);
-    return fail("contract", `## ${t("contract.title")}\n\n${reason}`, reason);
+    const restored = await enforceContract(ctx, capture, acceptance);
+    return fail(
+      "contract",
+      joinSections([`## ${t("contract.title")}\n\n${reason}`, restored.report]),
+      reason,
+    );
   }
   const contract = await enforceContract(ctx, capture, acceptance);
   if (contract.blocked) return fail("contract", contract.report, t("contract.failed"));
@@ -106,7 +111,15 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   const fix = capturedTask(capture).meta.tests === "fix";
   let guard = await guardState(ctx.cwd);
   const regression =
-    suite.length > 0 ? await regressionStage(ctx, suite, baseline, fix) : undefined;
+    suite.length > 0
+      ? await regressionStage(
+          ctx,
+          suite,
+          baseline,
+          fix,
+          capture.config.gates.timeoutMinutes * 60_000,
+        )
+      : undefined;
   const sections = [contract.report, regression?.report];
   const afterSuite = await recheck();
   if (afterSuite)
@@ -135,6 +148,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   guard = await guardState(ctx.cwd);
   const verification = await runVerification(ctx.cwd, checks.script, {
     bash,
+    timeoutMs: capture.config.gates.timeoutMinutes * 60_000,
     onOutput: ctx.print,
     known,
     excused,
@@ -238,8 +252,9 @@ async function regressionStage(
   suite: SuiteCommand[],
   baseline: SuiteBaseline | undefined,
   fix: boolean,
+  timeout: number,
 ): Promise<RegressionCheck> {
-  const check = checkRegressions(await runSuite(ctx.cwd, suite, ctx.print), baseline, fix);
+  const check = checkRegressions(await runSuite(ctx.cwd, suite, ctx.print, timeout), baseline, fix);
   for (const item of check.regressions) ctx.prompter.warn(regressionMessage(item));
   for (const item of check.preexisting) {
     ctx.prompter.info(t("regression.stillFailing", { command: item.command, code: item.exitCode }));

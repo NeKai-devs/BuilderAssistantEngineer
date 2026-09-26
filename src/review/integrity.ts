@@ -1,4 +1,5 @@
 import { isTestFile } from "../digest/baseline.js";
+import { isLockfile, languageOf } from "../digest/files.js";
 import { type Acceptance, accept, findingId } from "../gates/findings.js";
 import type { SuiteCheck } from "../gates/regression.js";
 import { type Counts, executed } from "../gates/results.js";
@@ -11,9 +12,11 @@ import {
   annotatedCount,
   assertionCount,
   exclusionKeys,
+  isExpectedOutput,
   isRunnerConfig,
   isTestChange,
   skipMarkers,
+  suppressions,
   testNames,
 } from "./tests.js";
 
@@ -26,7 +29,7 @@ export function staticIntegrity(
   const texts = new Map(changes.added.map((item) => [item.path, item.text]));
   const findings = [
     ...changes.deleted
-      .filter(isTestFile)
+      .filter((file) => isTestFile(file) && !movedElsewhere(file, changes))
       .map((file) => blocker(file, t("integrity.deleted"), "deleted")),
     ...changes.added.flatMap((item) =>
       skipMarkers(item).map((marker) =>
@@ -35,6 +38,17 @@ export function staticIntegrity(
     ),
     ...removedTests(changes),
     ...lostAssertions(changes),
+    ...changes.added.flatMap((item) => {
+      const names = suppressions(item);
+      if (names.length === 0 || isLockfile(item.path) || !languageOf(item.path)) return [];
+      const what = names.join(", ");
+      return [
+        blocker(item.path, t("integrity.suppression", { markers: what }), `suppress:${what}`),
+      ];
+    }),
+    ...changes.files
+      .filter(isExpectedOutput)
+      .map((file) => blocker(file, t("integrity.expectedOutput"), "expected-output")),
     ...changes.untracked.filter(isRunnerConfig).flatMap((path) => {
       const keys = exclusionKeys(texts.get(path) ?? "");
       if (keys.length === 0) return [];
@@ -76,8 +90,16 @@ function comparable(checks: SuiteCheck[]) {
   );
 }
 
+function movedElsewhere(file: string, changes: TaskChanges): boolean {
+  const removed = changes.removed.find((item) => item.path === file);
+  const names = testNames(removed?.text ?? "");
+  if (names.length === 0) return false;
+  const kept = new Set(changes.added.filter(isTestChange).flatMap((item) => testNames(item.text)));
+  return names.every((name) => kept.has(name));
+}
+
 function removedTests(changes: TaskChanges): ReviewFinding[] {
-  const kept = new Set(changes.added.flatMap((item) => testNames(item.text)));
+  const kept = new Set(changes.added.filter(isTestChange).flatMap((item) => testNames(item.text)));
   const added = new Map(changes.added.map((item) => [item.path, annotatedCount(item.text)]));
   return changes.removed
     .filter((item) => isTestChange(item) || isTestFile(item.path))

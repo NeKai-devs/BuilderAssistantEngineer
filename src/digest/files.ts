@@ -47,6 +47,9 @@ const SECRET_NAMES = new Set([
   "id_dsa",
   "id_ecdsa",
   "id_ed25519",
+  ".pypirc",
+  ".git-credentials",
+  "secrets.env",
 ]);
 
 const SECRET_EXTENSIONS = new Set([
@@ -58,6 +61,8 @@ const SECRET_EXTENSIONS = new Set([
   ".keystore",
   ".tfstate",
   ".tfvars",
+  ".p8",
+  ".ppk",
 ]);
 
 const LANGUAGES: Record<string, string> = {
@@ -135,7 +140,7 @@ export function isLockfile(path: string): boolean {
 
 export function isSecretPath(path: string): boolean {
   const name = baseName(path).toLowerCase();
-  if (/^\.env(\..+)?$/.test(name)) return !/\.(example|sample|template|dist)$/.test(name);
+  if (/^\.env([.-].+)?$/.test(name)) return !/[.-](example|sample|template|dist)$/.test(name);
   return SECRET_NAMES.has(name) || SECRET_EXTENSIONS.has(extensionOf(name));
 }
 

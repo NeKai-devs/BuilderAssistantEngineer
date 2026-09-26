@@ -15,10 +15,15 @@ export type VerificationRun = {
 
 const HEADER = [
   "set -Eeuo pipefail",
-  `trap 'bae_status=$?; printf "\\nbae: line %s failed with exit %s: %s\\n" "$((LINENO - 3))" "$bae_status" "$BASH_COMMAND" >&2' ERR`,
+  "export CI=true",
+  `trap 'bae_status=$?; printf "\\nbae: failed with exit %s: %s\\n" "$bae_status" "$BASH_COMMAND" >&2' ERR`,
   `bae_reuse() { printf '$ %s (%s)\\n' "$2" "$3"; return "$1"; }`,
+  `bae_ok() { [ "$1" -eq 0 ] || { printf '\\nbae: failed with exit %s: %s\\n' "$1" "$2" >&2; exit "$1"; }; }`,
 ];
-const FAILED_LINE = /^bae: line \d+ failed with exit \d+: (.*)$/gm;
+const FAILED_LINE = /^bae: failed with exit \d+: (.*)$/gm;
+const OPENERS = /(^|[;&|]\s*)(if|while|until|for|case|select)\b/g;
+const CLOSERS = /(^|[;&|]\s*)(fi|done|esac)\b/g;
+const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_]\w*)\1/;
 
 const RULES: [string, (command: string) => boolean][] = [
   ["sudo", (command) => /(^|[\s;&|(`$])(sudo|doas)(\s|$)/.test(command)],
@@ -67,6 +72,7 @@ export async function runVerification(
     onOutput?: (chunk: string) => void;
     known?: ReadonlyMap<string, ShellResult>;
     excused?: ReadonlySet<string>;
+    timeoutMs?: number;
   },
 ): Promise<VerificationRun> {
   const known = options.known ?? new Map<string, ShellResult>();
@@ -98,9 +104,10 @@ export async function runVerification(
     return `bae_reuse ${code} ${quote(line.trim())} ${quote(note)}`;
   });
   options.onOutput?.(`${lines.map((line) => `$ ${line}`).join("\n")}\n`);
-  const result = await runScript(options.bash, [...HEADER, ...body, ""].join("\n"), {
+  const result = await runScript(options.bash, [...HEADER, ...checked(body), ""].join("\n"), {
     cwd,
     onOutput: options.onOutput,
+    ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
   });
   const failed = [...result.output.matchAll(FAILED_LINE)].at(-1)?.[1];
   return {
@@ -111,6 +118,37 @@ export async function runVerification(
     tolerated,
     ...(failed ? { failed } : {}),
   };
+}
+
+function checked(lines: string[]): string[] {
+  const output: string[] = [];
+  let depth = 0;
+  let heredoc: string | undefined;
+  let pending = "";
+  for (const line of lines) {
+    output.push(line);
+    if (heredoc) {
+      if (line.trim() === heredoc) heredoc = undefined;
+      continue;
+    }
+    heredoc = HEREDOC.exec(line)?.[2];
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    pending = `${pending} ${trimmed}`.trim();
+    depth += blockDelta(trimmed);
+    if (/(\\|&&|\|\||\|)$/.test(trimmed) || heredoc || depth > 0) continue;
+    depth = Math.max(depth, 0);
+    output.push(`bae_ok $? ${quote(pending)}`);
+    pending = "";
+  }
+  return output;
+}
+
+function blockDelta(line: string): number {
+  const code = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  const opens = [...code.matchAll(OPENERS)].length + (/\{\s*$/.test(code) ? 1 : 0);
+  const closes = [...code.matchAll(CLOSERS)].length + (/^\s*\}/.test(code) ? 1 : 0);
+  return opens - closes;
 }
 
 function quote(text: string): string {

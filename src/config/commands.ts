@@ -22,7 +22,7 @@ const LOCKFILES: [string, Runner][] = [
 ];
 
 const DEFAULTS: [string, Commands][] = [
-  ["go.mod", { test: "go test ./...", lint: "go vet ./...", build: "go build ./..." }],
+  ["go.mod", { test: "go test -v ./...", lint: "go vet ./...", build: "go build ./..." }],
   [
     "Cargo.toml",
     { test: "cargo test", lint: "cargo clippy", typecheck: "cargo check", build: "cargo build" },

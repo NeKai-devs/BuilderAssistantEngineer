@@ -6,17 +6,19 @@ import { readTextIfExists } from "../core/fs.js";
 import { asRecord, parseObject } from "../core/json.js";
 import type { ShellResult } from "../core/process.js";
 import { expandScripts } from "./protected-files.js";
-import { type Counts, countsSchema, parseCounts, parseFailing, runnerHint } from "./results.js";
+import { type Counts, countsSchema, parseFailing, parseSummary, runnerHint } from "./results.js";
 
 export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
 export type SuiteCommand = { key: SuiteKey; command: string };
-export type SuiteResult = SuiteCommand & ShellResult & { counts?: Counts; failing?: string[] };
+export type SuiteResult = SuiteCommand &
+  ShellResult & { counts?: Counts; failing?: string[]; source?: string };
 
 export const commandBaselineSchema = z.object({
   exitCode: z.number(),
   counts: countsSchema.optional(),
   failing: z.array(z.string()).optional(),
+  source: z.string().optional(),
 });
 export const suiteBaselineSchema = z.object({
   skipped: z.boolean().default(false),
@@ -74,6 +76,7 @@ export async function runSuite(
   cwd: string,
   suite: SuiteCommand[],
   onOutput?: (chunk: string) => void,
+  timeoutMs?: number,
 ): Promise<SuiteResult[]> {
   const results: SuiteResult[] = [];
   const bash = await bashPath();
@@ -83,15 +86,20 @@ export async function runSuite(
   for (const item of suite) {
     onOutput?.(`$ ${item.command}\n`);
     const result = bash
-      ? await runScript(bash, `set -o pipefail\n${item.command}\n`, { cwd, onOutput })
+      ? await runScript(bash, `set -o pipefail\nexport CI=true\n${item.command}\n`, {
+          cwd,
+          onOutput,
+          ...(timeoutMs ? { timeoutMs } : {}),
+        })
       : { exitCode: -1, output: "bash was not found" };
     const hint = runnerHint(expandScripts(item.command, scripts));
-    const counts = parseCounts(result.output, hint);
-    const failing = result.exitCode === 0 ? undefined : parseFailing(result.output, hint);
+    const summary = parseSummary(result.output, hint);
+    const counts = summary?.counts;
+    const failing = parseFailing(result.output, hint);
     results.push({
       ...item,
       ...result,
-      ...(counts ? { counts } : {}),
+      ...(counts ? { counts, source: summary?.source } : {}),
       ...(failing ? { failing } : {}),
     });
   }
@@ -109,6 +117,7 @@ export function baselineFrom(results: SuiteResult[], excluded: string[] = []): S
           exitCode: result.exitCode,
           ...(result.counts ? { counts: result.counts } : {}),
           ...(result.failing ? { failing: result.failing } : {}),
+          ...(result.source ? { source: result.source } : {}),
         },
       ]),
     ),
@@ -129,15 +138,17 @@ export function verdictOf(
   fix: boolean,
 ): Verdict {
   if (result.exitCode === -1) return "unfinished";
-  if (fix && result.key === "test") return result.exitCode === 0 ? "passed" : "mustPass";
-  if (!before) return result.exitCode === 0 ? "passed" : "noBaseline";
-  if (before.exitCode === 0) return result.exitCode === 0 ? "passed" : "regression";
-  if (result.exitCode === 0) return "passed";
+  const red = result.exitCode !== 0 || (result.counts?.failed ?? 0) > 0;
+  if (fix && result.key === "test") return red ? "mustPass" : "passed";
+  if (!before) return red ? "noBaseline" : "passed";
+  const wasRed = before.exitCode !== 0 || (before.counts?.failed ?? 0) > 0;
+  if (!wasRed) return red ? "regression" : "passed";
+  if (!red) return "passed";
   if (before.failing && result.failing) {
     const known = new Set(before.failing);
     if (result.failing.some((name) => !known.has(name))) return "regression";
   }
-  if (!before.counts || !result.counts) return "uncomparable";
+  if (!before.counts || !result.counts || before.source !== result.source) return "uncomparable";
   const worse =
     result.counts.failed > before.counts.failed || result.counts.passed < before.counts.passed;
   return worse ? "regression" : "preexisting";

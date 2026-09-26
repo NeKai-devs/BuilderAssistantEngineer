@@ -8,7 +8,7 @@ import { staticIntegrity } from "./integrity.js";
 import type { ReviewFinding } from "./parse.js";
 import { inScope, scopePaths } from "./scope.js";
 import { type SecretOptions, secretFindings } from "./secrets.js";
-import { addsAssertions } from "./tests.js";
+import { addsAssertions, assertionCount } from "./tests.js";
 
 export type MechanicalReview = { passed: boolean; findings: ReviewFinding[] };
 
@@ -34,9 +34,7 @@ export function mechanicalReview(
 }
 
 function testFindings(task: Task, changes: TaskChanges, facts: MechanicalFacts): ReviewFinding[] {
-  if (task.meta.tests !== "required" || facts.testsGrew || changes.added.some(addsAssertions)) {
-    return [];
-  }
+  if (task.meta.tests !== "required" || facts.testsGrew || addsNetAssertions(changes)) return [];
   return [{ severity: "blocker", message: t("mechanical.noTests") }];
 }
 
@@ -54,4 +52,11 @@ function scopeFindings(task: Task, changes: TaskChanges): ReviewFinding[] {
   return [
     { severity: "major", message: t("mechanical.outOfScope", { files: outside.join(", ") }) },
   ];
+}
+
+function addsNetAssertions(changes: TaskChanges): boolean {
+  const removed = new Map(changes.removed.map((item) => [item.path, assertionCount(item.text)]));
+  return changes.added.some(
+    (item) => addsAssertions(item) && assertionCount(item.text) > (removed.get(item.path) ?? 0),
+  );
 }

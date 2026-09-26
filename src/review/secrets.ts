@@ -17,17 +17,23 @@ const TEST_PREFIXES = /^[spr]k_test_/;
 const KEYWORD =
   "[A-Za-z0-9_.-]*(?:passw(?:or)?d|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_.-]*";
 const ASSIGNED = new RegExp(`${KEYWORD}["']?\\s*[:=]\\s*(["'])([^"'\\s]{8,})\\1`, "gi");
+const UNQUOTED = new RegExp(
+  `^\\s*(?:export\\s+)?${KEYWORD}\\s*[:=]\\s*()([^\\s"'#,;]{8,})\\s*(?:#.*)?$`,
+  "gim",
+);
+const IDENTIFIER = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$|^[a-z]{1,15}(_[a-z]{1,15})+$|^\d+$/;
 const CONNECTION = /\b[a-z][a-z0-9+.-]*:\/\/([^\s:@/'"]+):([^\s@/'"]+)@[^\s'"]+/gi;
 const QUOTED_BLOB = /(["'`])([A-Za-z0-9+/_-]{40,}={0,2}|[a-f0-9]{48,})\1/g;
 const LABEL = /^[\p{L}\s.,:;!?¿¡'-]+$/u;
 const PLACEHOLDER =
-  /^(?:\$|<|\{|%|\*+$)|^(?:x+|changeme|change[-_]me|example\w*|placeholder|password|pass|secret|dummy|fake|test\w*|your[-_]\w+|redacted)$/i;
+  /^(?:\$|<|\{|%|\*+$)|^(?:x+|changeme|change[-_]me|example\w*|placeholder|password|pass|secret|dummy|fake|test\w*|your[-_]\w+|redacted|postgres|root|admin|dev|local|mysql|guest|user|sa|app)$/i;
 const MIN_ENTROPY = 4.5;
 
 export function secretFindings(changes: TaskChanges, options: SecretOptions): ReviewFinding[] {
   const allowed = (path: string) => options.allow.length > 0 && inScope(path, options.allow);
+  const deleted = new Set(changes.deleted);
   const files = changes.files
-    .filter((file) => isSecretPath(file) && !allowed(file))
+    .filter((file) => isSecretPath(file) && !allowed(file) && !deleted.has(file))
     .map((file) => ({
       severity: "blocker" as const,
       id: findingId("secret", file),
@@ -69,9 +75,10 @@ function isExample(value: string): boolean {
 }
 
 function hasAssignedSecret(text: string): boolean {
-  return [...text.matchAll(ASSIGNED)].some((match) => {
+  return [...text.matchAll(ASSIGNED), ...text.matchAll(UNQUOTED)].some((match) => {
     const value = match[2] ?? "";
     if (PLACEHOLDER.test(value) || EXAMPLE_VALUES.has(value) || LABEL.test(value)) return false;
+    if (IDENTIFIER.test(value) || /^[$<{%]/.test(value)) return false;
     return !value.includes("/") && !/^[\w.-]+\.[a-z]{2,4}$/i.test(value);
   });
 }
@@ -97,6 +104,7 @@ function hasHighEntropyBlob(text: string): boolean {
     if (/^sha\d+-/i.test(value) || /(data:[^,]*,|integrity["']?\s*[:=]\s*)$/i.test(before)) {
       return false;
     }
+    if (/^[a-f0-9]+$/.test(value)) return value.length >= 48 && entropy(value) >= 3.5;
     return (
       /[A-Z]/.test(value) &&
       /[a-z]/.test(value) &&

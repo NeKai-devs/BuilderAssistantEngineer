@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { readTextIfExists } from "../core/fs.js";
+import { isSymlink, looksBinary, readTextIfExists } from "../core/fs.js";
 import {
   DIFF_FLAGS,
   EMPTY_TREE,
@@ -14,7 +14,6 @@ import {
   verifyCommit,
 } from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
-import { isBinaryPath } from "../digest/files.js";
 import type { Capture } from "../gates/capture.js";
 import { TASKS_DIR } from "../gates/contract.js";
 import { ignoreMatcher, untrackedFiles } from "../gates/ignore-rules.js";
@@ -125,7 +124,7 @@ function isExcluded(path: string): boolean {
 async function newFileText(cwd: string, path: string): Promise<string> {
   const target = join(cwd, ...path.split("/"));
   const info = await stat(target).catch(() => undefined);
-  if (!info?.isFile() || isBinaryPath(path)) return "";
+  if (!info?.isFile() || (await isSymlink(target)) || (await looksBinary(target))) return "";
   if (info.size > MAX_NEW_FILE_BYTES) return suspiciousLines(target);
   return (await readTextIfExists(target)) ?? "";
 }

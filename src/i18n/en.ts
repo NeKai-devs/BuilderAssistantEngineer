@@ -325,6 +325,13 @@ export const en = {
     "Removes {{count}} assertion line(s) from a test file without adding them back.",
   "capture.headMoved":
     "{{id}} keeps the commit recorded when it first started; commits made since then count as part of the task's changes.",
+  "contract.restoreFailed":
+    "Could not restore {{files}} from the capture. Fix them by hand; the next run checks them again before starting.",
+  "integrity.suppression": "Adds a comment that silences a checker ({{markers}}).",
+  "integrity.expectedOutput":
+    "Changes a snapshot or expected-output file, which decides what the tests accept.",
+  "regression.baselineTampered":
+    "Running the project's commands for the baseline changed files the checks depend on ({{files}}); they were restored and nothing was launched.",
 } as const;
 
 export type MessageKey = keyof typeof en;

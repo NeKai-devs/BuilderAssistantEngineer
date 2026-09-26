@@ -30,6 +30,7 @@ const PARSERS = {
   dotnet,
   surefire,
   eslint,
+  playwright,
   errors: errorsFound,
 } satisfies Record<string, Parser>;
 
@@ -50,6 +51,7 @@ const HINTS: [RegExp, RunnerName[]][] = [
   [/\bdeno\s+test\b/, ["deno"]],
   [/\bunittest\b/, ["unittest"]],
   [/\beslint\b/, ["eslint"]],
+  [/\bplaywright\b/, ["playwright"]],
   [/\b(tsc|vue-tsc|biome|ruff|mypy)\b/, ["errors"]],
 ];
 
@@ -57,31 +59,48 @@ export function runnerHint(command: string): RunnerName[] {
   return [...new Set(HINTS.flatMap(([pattern, names]) => (pattern.test(command) ? names : [])))];
 }
 
-export function parseCounts(output: string, hint: RunnerName[] = []): Counts | undefined {
+export type Summary = { counts: Counts; source: RunnerName };
+
+export function parseSummary(output: string, hint: RunnerName[] = []): Summary | undefined {
   const text = stripVTControlCharacters(output).replace(/\r\n?/g, "\n");
   const names = hint.length > 0 ? hint : (Object.keys(PARSERS) as RunnerName[]);
-  const found = names
-    .map((name) => PARSERS[name](text))
-    .filter((item): item is Found => item !== undefined);
-  return found.sort((a, b) => b.at - a.at)[0]?.counts;
+  const found = names.flatMap((name) => {
+    const item = PARSERS[name](text);
+    return item ? [{ ...item, source: name }] : [];
+  });
+  const latest = found.sort((a, b) => b.at - a.at)[0];
+  return latest ? { counts: latest.counts, source: latest.source } : undefined;
 }
 
-const FAILING: Partial<Record<RunnerName, RegExp>> = {
-  vitest: /^\s*FAIL\s+(\S.*? > .+?)\s*$/gm,
-  jest: /^\s*● (?!Test suite failed to run)(.+?)\s*$/gm,
-  pytest: /^(?:FAILED|ERROR) (\S+)/gm,
-  go: /^\s*--- FAIL: (\S+)/gm,
-  cargo: /^test (\S+) \.\.\. FAILED$/gm,
-  rspec: /^rspec (\S+)/gm,
-  unittest: /^(?:FAIL|ERROR): (\S+ \(.+\))$/gm,
+export function parseCounts(output: string, hint: RunnerName[] = []): Counts | undefined {
+  return parseSummary(output, hint)?.counts;
+}
+
+const FAILING: Partial<Record<RunnerName, RegExp[]>> = {
+  vitest: [/^\s*FAIL\s+(\S.*? > .+?)\s*$/gm, /^\s*FAIL\s+(\S+)\s*(?:\[.*\])?\s*$/gm],
+  jest: [/^\s*● (?!Test suite failed to run)(.+?)\s*$/gm, /^FAIL\s+(\S+)/gm],
+  pytest: [/^(?:FAILED|ERROR) (\S+::\S+|\S+\.py)/gm],
+  go: [/^\s*--- FAIL: (\S+)/gm, /^FAIL\s+(\S+)\s+(?:\[.*\]|[\d.]+s)/gm, /^panic: .*/gm],
+  cargo: [/^test (\S+) \.\.\. FAILED$/gm, /^error: test failed, to rerun pass (.+)$/gm],
+  rspec: [/^rspec (\S+)/gm],
+  unittest: [/^(?:FAIL|ERROR): (\S+ \(.+\))$/gm],
+  node: [/^not ok \d+ - (.+)$/gm],
+  mocha: [/^\s+\d+\) (.+):$/gm],
+  phpunit: [/^\d+\) (\S+::\S+)/gm],
+  dotnet: [/^\s+Failed (\S+) \[/gm],
+  errors: [/^(\S[^(\n]*)\(\d+,\d+\): error (TS\d+)/gm, /^(\S+):\d+:\d+ (lint\/\S+)/gm],
+  playwright: [/^\s+\d+\) (\[.+?\] › .+)$/gm],
 };
+const STRICT: RunnerName[] = ["vitest", "go", "cargo", "unittest"];
 
 export function parseFailing(output: string, hint: RunnerName[]): string[] | undefined {
   const text = stripVTControlCharacters(output).replace(/\r\n?/g, "\n");
-  const patterns = hint.flatMap((name) => (FAILING[name] ? [FAILING[name]] : []));
+  const patterns = (hint.length > 0 ? hint : STRICT).flatMap((name) => FAILING[name] ?? []);
   if (patterns.length === 0) return undefined;
   const names = patterns.flatMap((pattern) =>
-    [...text.matchAll(pattern)].map((match) => (match[1] ?? "").trim()),
+    [...text.matchAll(pattern)].map((match) =>
+      (match.slice(1).filter(Boolean).join(" ") || match[0] || "").trim(),
+    ),
   );
   return names.length > 0 ? [...new Set(names)].sort() : undefined;
 }
@@ -121,7 +140,7 @@ function at(match: RegExpExecArray | undefined, value: Counts): Found | undefine
 }
 
 function vitest(text: string): Found | undefined {
-  const match = last(text, /^\s*Tests\s+((?:\d+ [a-z]+(?: \| )?)+)\s*\((\d+)\)/m);
+  const match = last(text, /^\s*Tests\s+((?:\d+ [a-z]+(?: [a-z]+)?(?: \| )?)+)\s*\((\d+)\)/m);
   if (!match) return undefined;
   const found = parts(match[1] ?? "", /\|/);
   return at(
@@ -151,7 +170,7 @@ function jest(text: string): Found | undefined {
 function pytest(text: string): Found | undefined {
   const match = last(
     text,
-    /^=+ ((?:\d+ (?:passed|failed|skipped|errors?|xfailed|xpassed|deselected|warnings?)(?:, )?)+) in [\d.]+s/m,
+    /^(?:=+ )?((?:\d+ (?:passed|failed|skipped|errors?|xfailed|xpassed|deselected|warnings?)(?:, )?)+) in [\d.]+s/m,
   );
   if (!match) return undefined;
   const found = parts(match[1] ?? "", /,/);
@@ -185,7 +204,7 @@ function cargo(text: string): Found | undefined {
 
 function goTest(text: string): Found | undefined {
   const verbose = all(text, /^\s*--- (PASS|FAIL|SKIP): /m);
-  if (verbose.length === 0) return undefined;
+  if (verbose.length === 0 || !/^=== RUN /m.test(text)) return undefined;
   const tally = (kind: string) => verbose.filter((match) => match[1] === kind).length;
   return at(verbose.at(-1), counts(tally("PASS"), tally("FAIL"), tally("SKIP")));
 }
@@ -214,8 +233,9 @@ function bun(text: string): Found | undefined {
   const pass = last(text, /^\s*(\d+) pass$/m);
   const fail = last(text, /^\s*(\d+) fail$/m);
   if (!pass || !fail) return undefined;
-  const skip = last(text, /^\s*(\d+) (?:skip|todo)$/m);
-  return at(fail, counts(number(pass[1]), number(fail[1]), number(skip?.[1])));
+  const skip = last(text, /^\s*(\d+) skip$/m);
+  const todo = last(text, /^\s*(\d+) todo$/m);
+  return at(fail, counts(number(pass[1]), number(fail[1]), number(skip?.[1]) + number(todo?.[1])));
 }
 
 function deno(text: string): Found | undefined {
@@ -294,6 +314,18 @@ function surefire(text: string): Found | undefined {
   return at(match, counts(number(match[1]) - failed - skipped, failed, skipped));
 }
 
+function playwright(text: string): Found | undefined {
+  const passed = last(text, /^\s*(\d+) passed \([\d.]+m?s\)$/m);
+  if (!passed) return undefined;
+  const failed = last(text, /^\s*(\d+) failed$/m);
+  const flaky = last(text, /^\s*(\d+) flaky$/m);
+  const skipped = last(text, /^\s*(\d+) skipped$/m);
+  return at(
+    passed,
+    counts(number(passed[1]) + number(flaky?.[1]), number(failed?.[1]), number(skipped?.[1])),
+  );
+}
+
 function eslint(text: string): Found | undefined {
   const match = last(text, /✖ \d+ problems? \((\d+) errors?, \d+ warnings?\)/);
   return match ? at(match, counts(0, number(match[1]))) : undefined;
@@ -301,5 +333,7 @@ function eslint(text: string): Found | undefined {
 
 function errorsFound(text: string): Found | undefined {
   const match = last(text, /^Found (\d+) errors?\b/m);
-  return match ? at(match, counts(0, number(match[1]))) : undefined;
+  if (match) return at(match, counts(0, number(match[1])));
+  const lines = all(text, /^\S.*\(\d+,\d+\): error TS\d+:/m);
+  return lines.length > 0 ? at(lines.at(-1), counts(0, lines.length)) : undefined;
 }

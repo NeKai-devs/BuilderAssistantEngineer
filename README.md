@@ -168,11 +168,21 @@ Every finding a gate can accept has an id, printed next to it, such as `(secret-
 
 ### What the gates protect against
 
-The gates are built for an agent that makes mistakes or takes shortcuts by editing the repository or running the commands its CLI allows: rewriting a test script, deleting, skipping or swapping a failing test, changing its own task or status, hiding files with `.gitignore`, git attributes, git config or index flags, overriding the review prompt, or crashing before the checks. Two adversarial reviews of the gates found 17 and then 32 ways around them. Each one that is in scope has an end-to-end test in [`test/e2e/bypass`](test/e2e/bypass) that tries it and checks that the gates stop it, and those tests run in CI on Linux, macOS and Windows.
+The gates are built for an agent that makes mistakes or takes shortcuts by editing the repository or running the commands its CLI allows: rewriting a test script, deleting, skipping or swapping a failing test, changing its own task or status, hiding files with `.gitignore`, git attributes, git config or index flags, overriding the review prompt, or crashing before the checks. Three rounds of adversarial review of the gates found 17, then 32, then 60 ways around them. Each one that is in scope has an end-to-end test in [`test/e2e/bypass`](test/e2e/bypass) that tries it and checks that the gates stop it, and those tests run in CI on Linux, macOS and Windows.
 
 The checks run the project's tests, and the tests are code the agent may have written. That code runs with your permissions. bae checks its own state and the protected files after running it, restores anything that changed and fails the attempt, but it cannot stop code that attacks your machine on purpose, for example a process that keeps running after the checks end. For the same reason the gates do not protect against an agent with full access to your machine, which can replace `npm`, `bash` or this CLI, edit dependencies inside ignored folders such as `node_modules`, or write to the state directory in your home. Run agents with the permissions their CLI gives them (`--headless` never bypasses them), run untrusted work in a container, and review what they change.
 
-Known limits: with `gates.regression: task` there is no baseline, so test counts are not compared (the checks on the diff still apply). Build files such as `pom.xml` or `build.gradle` are not protected. Interactive runs never block a task on their own; after three failed attempts the task goes behind the ready ones. With `--yes`, a proposed lesson is added to `AGENTS.md` without asking.
+Known limits:
+
+- With `gates.regression: task` there is no baseline, so test counts are not compared (the checks on the diff still apply).
+- Build files such as `pom.xml` or `build.gradle`, and the scripts of workspace packages other than the root `package.json`, are not protected.
+- Files in ignored folders, other git worktrees and submodules' own settings are outside what the gates see, although the runner may load them.
+- Rewriting a test to expect the broken value, with the same name and the same number of assertion lines, is left to the reviewer.
+- One run decides a regression, so a flaky test can block a task.
+- With `pipefail`, a reader that stops early (`| head`, `| grep -q`) can fail a pipe that would otherwise pass.
+- Evidence checks cited paths between backticks, not paths in prose.
+- Interactive runs never block a task on their own; after three failed attempts the task goes behind the ready ones.
+- With `--yes`, a proposed lesson is added to `AGENTS.md` without asking.
 
 ### Configuration
 
@@ -186,7 +196,7 @@ Known limits: with `gates.regression: task` there is no baseline, so test counts
     "typecheck": "npm run typecheck",
     "build": "npm run build"
   },
-  "gates": { "regression": "full" },
+  "gates": { "regression": "full", "timeoutMinutes": 15 },
   "verify": { "allow": ["./scripts/check.sh"] },
   "secrets": { "allow": ["test/fixtures/**"] },
   "agent": { "timeoutMinutes": 45 }
@@ -197,6 +207,7 @@ Known limits: with `gates.regression: task` there is no baseline, so test counts
 - `verify.allow` lists command prefixes that may run when nobody confirms them, besides the known runners and checks.
 - `secrets.allow` lists path globs that the secret checks skip, such as test fixtures.
 - `agent.timeoutMinutes` stops a headless agent that runs longer. The attempt is recorded.
+- `gates.timeoutMinutes` (15 by default) stops a project command or a Verification block that runs longer; the command then counts as failed.
 
 ## Customizing prompts
 

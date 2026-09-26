@@ -81,7 +81,7 @@ async function newIndexFlags(cwd: string, capture: Capture): Promise<string[]> {
 function contractFinding(change: ContractChange): ReviewFinding {
   return {
     severity: "blocker",
-    id: findingId("contract", change.path, change.detail),
+    id: findingId("contract", change.path, change.detail, change.fingerprint ?? ""),
     file: change.path,
     message: t(MESSAGES[change.kind], { path: change.path, detail: change.detail }),
   };
@@ -96,7 +96,5 @@ function settled(change: ContractChange, finding: ReviewFinding): ReviewFinding 
 }
 
 function acceptable(change: ContractChange, scope: string[]): boolean {
-  return (
-    change.change !== "created" && isAcceptableKind(change.kind) && inScope(change.path, scope)
-  );
+  return isAcceptableKind(change.kind) && inScope(change.path, scope);
 }

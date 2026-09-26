@@ -13,9 +13,11 @@ import {
   readCapture,
   saveCapture,
 } from "../gates/capture.js";
+import { checkContract, collectProtected, restoreContract } from "../gates/contract.js";
 import { enforceContract } from "../gates/enforce.js";
 import type { Acceptance } from "../gates/findings.js";
 import { type Checks, refusal } from "../gates/gate.js";
+import { captureIgnore } from "../gates/ignore-rules.js";
 import {
   baselineFrom,
   runSuite,
@@ -26,6 +28,7 @@ import {
 import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
 import { capturedTask } from "../review/run.js";
+import { scopePaths } from "../review/scope.js";
 import { recordAttempt } from "../tasks/attempts.js";
 import { type Task, verificationCommands, verificationScript } from "../tasks/schema.js";
 import { setTaskStatus } from "../tasks/status.js";
@@ -47,10 +50,13 @@ export async function recoverInterrupted(
   const id = await readActive(ctx.cwd);
   if (!id) return;
   const capture = await readCapture(ctx.cwd, id);
-  await clearActive(ctx.cwd);
-  if (!capture) return;
+  if (!capture) {
+    await clearActive(ctx.cwd);
+    return;
+  }
   const contract = await enforceContract(ctx, capture, acceptance);
   await setTaskStatus(ctx.cwd, capturedTask(capture), "in_progress");
+  await clearActive(ctx.cwd);
   if (contract.blocked) ctx.prompter.warn(t("contract.recovered", { id }));
 }
 
@@ -121,10 +127,22 @@ async function recordBaseline(
     return { skipped: true, commands: {}, excluded: [] };
   }
   const guard = await guardState(ctx.cwd);
-  const results = await runSuite(ctx.cwd, suite, ctx.print);
+  const before = await collectProtected(ctx.cwd, {
+    suite: suite.map((item) => item.command),
+    verification: verificationCommands(task.body),
+    own: scopePaths(task),
+  });
+  const results = await runSuite(ctx.cwd, suite, ctx.print, config.gates.timeoutMinutes * 60_000);
   const tampered = await guard.verify();
-  if (tampered.length > 0) {
-    ctx.prompter.warn(t("state.tampered", { files: tampered.join(", ") }));
+  const changed = await checkContract(ctx.cwd, {
+    ...before,
+    ignore: await captureIgnore(ctx.cwd),
+    taskPath: task.path,
+  });
+  if (tampered.length > 0 || changed.length > 0) {
+    await restoreContract(ctx.cwd, changed);
+    const files = [...tampered, ...changed.map((change) => change.path)].join(", ");
+    ctx.prompter.warn(t("regression.baselineTampered", { files }));
     ctx.prompter.outro(t("skip.stopped"));
     throw new ExitCode(1);
   }
