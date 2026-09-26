@@ -1,0 +1,113 @@
+┌  builder-assistant-engineer · plan
+│
+◇  Reading the repository…
+│
+◇  The analyst is building the plan (this can take several minutes)
+│
+◇  Changes ───────────────────────────────────────────────────────────────────╮
+│                                                                             │
+│  + AGENTS.md (new, 134 lines)                                               │
+│  + CLAUDE.md (new, 16 lines)                                                │
+│  + docs/plan/00-overview.md (new, 49 lines)                                 │
+│  + docs/plan/01-prd.md (new, 95 lines)                                      │
+│  + docs/plan/02-architecture.md (new, 106 lines)                            │
+│  + docs/plan/03-decisions/ADR-001-tooling-baseline.md (new, 38 lines)       │
+│  + docs/plan/03-decisions/ADR-002-sqlite-stdlib-repository.md (new, 39      │
+│  lines)                                                                     │
+│  + docs/plan/03-decisions/ADR-003-tag-storage.md (new, 26 lines)            │
+│  + docs/plan/03-decisions/ADR-004-api-contract.md (new, 35 lines)           │
+│  + docs/plan/03-decisions/ADR-005-runtime-and-process-model.md (new, 34     │
+│  lines)                                                                     │
+│  + docs/plan/04-roadmap.md (new, 62 lines)                                  │
+│  + docs/plan/tasks/T-001-tooling-baseline.md (new, 142 lines)               │
+│  + docs/plan/tasks/T-002-sqlite-persistence-foundation.md (new, 100 lines)  │
+│  + docs/plan/tasks/T-003-create-and-get-notes.md (new, 88 lines)            │
+│  + docs/plan/tasks/T-004-list-notes.md (new, 71 lines)                      │
+│  + docs/plan/tasks/T-005-update-notes.md (new, 73 lines)                    │
+│  + docs/plan/tasks/T-006-delete-notes.md (new, 56 lines)                    │
+│  + docs/plan/tasks/T-007-health-check-and-logging.md (new, 69 lines)        │
+│  + docs/plan/tasks/T-008-linux-deployment-and-smoke-test.md (new, 123       │
+│  lines)                                                                     │
+│  + .claude/agents/backend.md (new, 61 lines)                                │
+│  + .claude/agents/test-engineer.md (new, 37 lines)                          │
+│  + .claude/agents/platform.md (new, 53 lines)                               │
+│  + .claude/agents/reviewer.md (new, 47 lines)                               │
+│  + .opencode/agent/backend.md (new, 64 lines)                               │
+│  + .opencode/agent/test-engineer.md (new, 40 lines)                         │
+│  + .opencode/agent/platform.md (new, 56 lines)                              │
+│  + .opencode/agent/reviewer.md (new, 51 lines)                              │
+│  + .claude/commands/next.md (new, 36 lines)                                 │
+│  + .claude/commands/review.md (new, 12 lines)                               │
+│  + .claude/commands/status.md (new, 14 lines)                               │
+│  + .opencode/command/next.md (new, 35 lines)                                │
+│  + .opencode/command/review.md (new, 13 lines)                              │
+│  + .opencode/command/status.md (new, 13 lines)                              │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Summary ────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  This plan turns the FastAPI service, which today has only `GET /health`     │
+│  (`app/main.py:6-8`), into an internal notes API. It will create, list,      │
+│  update and delete notes with tags, store them in SQLite, and run on Linux   │
+│  with Python 3.12.                                                           │
+│  - **Approach:** keep FastAPI and use Pydantic v2 for validation. Store      │
+│  data with Python's built-in `sqlite3` module: all SQL sits in one           │
+│  repository module, and schema changes are versioned with `PRAGMA            │
+│  user_version`. The first task sets up the missing tooling: a formatter      │
+│  (`ruff format`), type checking (strict `mypy`), real tests with a coverage  │
+│   floor, and CI on GitHub Actions.                                           │
+│  - **Phases (8 tasks):** Phase 1 is tooling plus create/read (T-001–T-003).  │
+│   Phase 2 adds list, update and delete, which completes the first            │
+│  deliverable (T-004–T-006). Phase 3 adds a health check, logging, a systemd  │
+│   unit and a live smoke test (T-007–T-008).                                  │
+│  - **Risk 1:** there is no authentication, by design. Anyone who can reach   │
+│  the port can read or delete every note, so where the service sits on the    │
+│  network is the only protection.                                             │
+│  - **Risk 2:** SQLite handles one writer at a time. Running several worker   │
+│  processes, or starting two at once, can cause lock errors or a race while   │
+│  updating the schema. The plan runs a single uvicorn worker, uses SQLite's   │
+│  write-ahead log (WAL) mode, and takes the write lock before migrating.      │
+│  - **Risk 3:** some assumptions are unconfirmed. There is no git remote, so  │
+│   the CI host is a guess. The validation limits are my choice, and without   │
+│  a lockfile dependency versions can drift.                                   │
+│  - **Next:** answer the questions below (none of them block work), then run  │
+│   `/next`. It will pick up T-001, which the platform agent handles.          │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Open questions — answer them in .bae/interview.md and run replan ───────────╮
+│                                                                              │
+│  1. Where is this repository hosted, i.e. which CI system should T-001       │
+│  configure? — No git remote is configured (.git/config), so the plan         │
+│  assumes GitHub Actions. A different host means rewriting                    │
+│  .github/workflows/ci.yml.                                                   │
+│     GitHub Actions (assumed) / GitLab CI / Other / no CI yet                 │
+│  2. How will the service be deployed on the Linux servers? — This decides    │
+│  what T-008 delivers. The plan assumes a Python 3.12 venv under              │
+│  /opt/notes-api, run by systemd with a single uvicorn worker listening only  │
+│   on localhost or an internal interface.                                     │
+│     venv + systemd (assumed) / Docker/OCI image / An existing internal       │
+│  platform (describe it)                                                      │
+│  3. Are these validation rules acceptable? Title 1-200 chars after           │
+│  trimming; body up to 10,000 chars; at most 20 tags per note; tags trimmed,  │
+│   lowercased and matching ^[a-z0-9][a-z0-9_-]{0,31}$. — T-003 builds these   │
+│  rules into the schemas and tests. Changing them later means updating tests  │
+│   and possibly data already stored.                                          │
+│     Accept / Allow Unicode and spaces in tags / Different limits (specify)   │
+│  4. Is this contract acceptable? PATCH for partial updates, where sending    │
+│  tags replaces the whole set; the last write wins; deletes are permanent;    │
+│  several ?tag filters mean AND (a note must have all of them). — This        │
+│  defines how list, update and delete behave in T-004 to T-006.               │
+│     Accept as planned / Also need PUT (full replace) / Tag filter should be  │
+│   OR / Need soft delete or conflict detection (ETag)                         │
+│  5. Do you need pinned, reproducible dependencies (a lockfile) for server    │
+│  deploys? — pyproject.toml only sets minimum versions, so two installs can   │
+│  get different packages. A lockfile would need a new decision record and     │
+│  task (pip-tools or uv).                                                     │
+│     Not now (assumed) / Yes, pip-tools requirements.lock / Yes, switch to    │
+│  uv with uv.lock                                                             │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+└  33 file(s) written. Next: npx builder-assistant-engineer next

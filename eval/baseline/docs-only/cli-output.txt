@@ -1,0 +1,118 @@
+┌  builder-assistant-engineer · plan
+│
+◇  Reading the repository…
+│
+◇  The analyst is building the plan (this can take several minutes)
+│
+▲  The answer did not follow the output format; asking once more to fix only the format.
+│
+◇  Changes ───────────────────────────────────────────────────────────────────╮
+│                                                                             │
+│  + AGENTS.md (new, 147 lines)                                               │
+│  + CLAUDE.md (new, 14 lines)                                                │
+│  + docs/plan/01-prd.md (new, 143 lines)                                     │
+│  + docs/plan/02-architecture.md (new, 152 lines)                            │
+│  + docs/plan/03-decisions/ADR-001-django-monolith-htmx.md (new, 28 lines)   │
+│  + docs/plan/03-decisions/ADR-002-tooling-and-workflow.md (new, 30 lines)   │
+│  + docs/plan/03-decisions/ADR-003-sqlite-dev-postgres-prod.md (new, 24      │
+│  lines)                                                                     │
+│  + docs/plan/03-decisions/ADR-004-auth-allauth-email.md (new, 25 lines)     │
+│  + docs/plan/03-decisions/ADR-005-team-tenancy.md (new, 30 lines)           │
+│  + docs/plan/03-decisions/ADR-006-time-logging-streaks.md (new, 36 lines)   │
+│  + docs/plan/03-decisions/ADR-007-weekly-digest.md (new, 42 lines)          │
+│  + docs/plan/03-decisions/ADR-008-hosting-render-docker.md (new, 30 lines)  │
+│  + docs/plan/04-roadmap.md (new, 68 lines)                                  │
+│  + docs/plan/tasks/T-001-project-scaffold-and-gates.md (new, 102 lines)     │
+│  + docs/plan/tasks/T-002-ci-github-actions.md (new, 61 lines)               │
+│  + docs/plan/tasks/T-003-custom-user-and-allauth.md (new, 77 lines)         │
+│  + docs/plan/tasks/T-004-teams-onboarding-invites.md (new, 80 lines)        │
+│  + docs/plan/tasks/T-005-habit-management.md (new, 74 lines)                │
+│  + docs/plan/tasks/T-006-team-local-dates-and-streaks.md (new, 104 lines)   │
+│  + docs/plan/tasks/T-007-habit-day-logging-htmx.md (new, 82 lines)          │
+│  + docs/plan/tasks/T-008-weekly-team-board.md (new, 104 lines)              │
+│  + docs/plan/tasks/T-009-production-settings-docker-render.md (new, 99      │
+│  lines)                                                                     │
+│  + docs/plan/tasks/T-010-transactional-email-anymail.md (new, 79 lines)     │
+│  + docs/plan/tasks/T-011-digest-summary-and-rendering.md (new, 83 lines)    │
+│  + docs/plan/tasks/T-012-send-weekly-digests-command.md (new, 86 lines)     │
+│  + docs/plan/tasks/T-013-digest-preferences-unsubscribe.md (new, 70 lines)  │
+│  + docs/plan/tasks/T-014-team-administration.md (new, 73 lines)             │
+│  + docs/plan/tasks/T-015-account-settings-and-deletion.md (new, 67 lines)   │
+│  + docs/plan/tasks/T-016-security-hardening.md (new, 80 lines)              │
+│  + docs/plan/tasks/T-017-accessibility-mobile-pass.md (new, 65 lines)       │
+│  + docs/plan/tasks/T-018-launch-readiness.md (new, 95 lines)                │
+│  + .claude/agents/backend.md (new, 34 lines)                                │
+│  + .opencode/agent/backend.md (new, 37 lines)                               │
+│  + .claude/agents/frontend.md (new, 35 lines)                               │
+│  + .opencode/agent/frontend.md (new, 38 lines)                              │
+│  + .claude/agents/test-engineer.md (new, 33 lines)                          │
+│  + .opencode/agent/test-engineer.md (new, 36 lines)                         │
+│  + .claude/agents/devops.md (new, 31 lines)                                 │
+│  + .opencode/agent/devops.md (new, 35 lines)                                │
+│  + .claude/agents/reviewer.md (new, 47 lines)                               │
+│  + .opencode/agent/reviewer.md (new, 52 lines)                              │
+│  + .claude/commands/next.md (new, 23 lines)                                 │
+│  + .claude/commands/review.md (new, 11 lines)                               │
+│  + .claude/commands/status.md (new, 15 lines)                               │
+│  + .opencode/command/next.md (new, 22 lines)                                │
+│  + .opencode/command/review.md (new, 12 lines)                              │
+│  + .opencode/command/status.md (new, 14 lines)                              │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Summary ────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Greenfield plan for TeamHabits, a habit tracker for small teams. Stack:     │
+│  Django 5.2 LTS monolith, htmx 2 and Pico.css 2, SQLite locally and          │
+│  PostgreSQL 17 in production, hosted on Render, email through Resend.        │
+│  Docs: a PRD, an architecture doc, 8 ADRs, and a roadmap with a timeline,    │
+│  cut list, risks and open questions. AGENTS.md and CLAUDE.md hold the        │
+│  conventions for agents.                                                     │
+│  18 tasks in 3 phases lead to launch on 2026-11-06:                          │
+│    Phase 1 (T-001–T-009, weeks 1–2): project setup, CI, sign-in, teams,      │
+│  habits, date and streak logic, day logging, the weekly board, and           │
+│  production/deploy settings. This is the first deliverable.                  │
+│    Phase 2 (T-010–T-013, weeks 3–4): email setup, digest content, sending    │
+│  the Monday email only once per person per week, and unsubscribe.            │
+│    Phase 3 (T-014–T-018, weeks 5–6): team admin, account deletion,           │
+│  security, accessibility, and launch readiness.                              │
+│  Subagents (backend, frontend, test-engineer, devops, reviewer) plus /next,  │
+│   /review and /status for both Claude Code and OpenCode.                     │
+│  5 open questions; none blocks T-001. Choose the sending domain and start    │
+│  its DNS setup in week 1.                                                    │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Open questions — answer them in .bae/interview.md and run replan ───────────╮
+│                                                                              │
+│  1. What product name and sending domain should the launch use? (Working     │
+│  name: TeamHabits.) — Resend needs SPF and DKIM records on a domain you      │
+│  control, and verification can take days. The domain also sets SITE_URL,     │
+│  DEFAULT_FROM_EMAIL and the custom domain in T-018. Needed by 2026-10-05.    │
+│  2. Do you approve Render (Docker web service, cron job, managed PostgreSQL  │
+│   17) as the host, with a target of under about US$30/month? — ADR-008,      │
+│  T-009 and T-012 build the Render blueprint. Switching hosts later changes   │
+│  render.yaml and the runbooks but not the app. Needed before T-009 (week     │
+│  2).                                                                         │
+│     Render (default) / Fly.io / Railway / A VPS with Docker Compose          │
+│  3. Should 'today' and the Monday email follow one time zone per team, or    │
+│  each member's own time zone? — ADR-006 defaults to one team time zone: one  │
+│   board, one week boundary, one digest hour. With per-member zones, 'today'  │
+│   on the shared board becomes ambiguous. core/dates.py already takes the     │
+│  zone as an argument, so only the call sites would change.                   │
+│     One time zone per team (default) / Each member's own time zone           │
+│  4. Is one team per user enough for v1? — ADR-005 assumes it. It keeps       │
+│  request.team unambiguous and keeps the board, digest and deletion rules     │
+│  simple. Supporting several teams needs a team switcher and changes URLs     │
+│  and constraints.                                                            │
+│     One team per user (default) / Several teams per user                     │
+│  5. Are binary daily habits enough (done or not done each day), with no      │
+│  weekly targets, counts or skip days? — ADR-006 and the streak rules assume  │
+│   binary daily logs. Targets such as '3 times a week' would change the data  │
+│   model, the streak definition, the board and the digest.                    │
+│     Binary daily only (default) / Add weekly targets / Add counts or         │
+│  quantities                                                                  │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+└  47 file(s) written. Next: npx builder-assistant-engineer next

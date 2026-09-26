@@ -1,0 +1,101 @@
+┌  builder-assistant-engineer · plan
+│
+◇  Reading the repository…
+│
+◇  The analyst is building the plan (this can take several minutes)
+│
+◇  Changes ──────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│  + AGENTS.md (new, 107 lines)                                              │
+│  + CLAUDE.md (new, 14 lines)                                               │
+│  + docs/plan/00-overview.md (new, 44 lines)                                │
+│  + docs/plan/01-prd.md (new, 66 lines)                                     │
+│  + docs/plan/02-architecture.md (new, 88 lines)                            │
+│  + docs/plan/03-decisions/ADR-001-package-layout.md (new, 30 lines)        │
+│  + docs/plan/03-decisions/ADR-002-in-memory-user-store.md (new, 32 lines)  │
+│  + docs/plan/03-decisions/ADR-003-http-api-contract.md (new, 44 lines)     │
+│  + docs/plan/03-decisions/ADR-004-quality-gate-and-ci.md (new, 33 lines)   │
+│  + docs/plan/03-decisions/ADR-005-structured-logging-and-request-ids.md    │
+│  (new, 27 lines)                                                           │
+│  + docs/plan/04-roadmap.md (new, 49 lines)                                 │
+│  + docs/plan/tasks/T-001-quality-gate-and-ci.md (new, 93 lines)            │
+│  + docs/plan/tasks/T-002-health-endpoint-and-server.md (new, 106 lines)    │
+│  + docs/plan/tasks/T-003-in-memory-user-store.md (new, 70 lines)           │
+│  + docs/plan/tasks/T-004-users-endpoints.md (new, 104 lines)               │
+│  + docs/plan/tasks/T-005-request-ids-and-structured-logging.md (new, 88    │
+│  lines)                                                                    │
+│  + .claude/agents/go-backend.md (new, 42 lines)                            │
+│  + .claude/agents/go-tests.md (new, 31 lines)                              │
+│  + .claude/agents/tooling-ci.md (new, 34 lines)                            │
+│  + .claude/agents/reviewer.md (new, 48 lines)                              │
+│  + .opencode/agent/go-backend.md (new, 52 lines)                           │
+│  + .opencode/agent/go-tests.md (new, 41 lines)                             │
+│  + .opencode/agent/tooling-ci.md (new, 44 lines)                           │
+│  + .opencode/agent/reviewer.md (new, 61 lines)                             │
+│  + .claude/commands/next.md (new, 28 lines)                                │
+│  + .claude/commands/review.md (new, 12 lines)                              │
+│  + .claude/commands/status.md (new, 11 lines)                              │
+│  + .opencode/command/next.md (new, 27 lines)                               │
+│  + .opencode/command/review.md (new, 13 lines)                             │
+│  + .opencode/command/status.md (new, 10 lines)                             │
+│                                                                            │
+├────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Summary ────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  go-service is an internal Gin HTTP service. It will expose GET /health      │
+│  plus GET and POST /users, with users kept in memory. Right now the repo is  │
+│   a stub: `handler.Run()` does nothing (`internal/handler/handler.go:3`),    │
+│  and gin is listed in `go.mod:5` but no code imports it and there is no      │
+│  go.sum.                                                                     │
+│  Approach: keep the existing `internal/handler` package and add              │
+│  `internal/store` for users. Server startup and shutdown move into           │
+│  `main.go` behind `run()`. One script, `scripts/check.sh`, runs gofmt, vet,  │
+│   staticcheck and the tests, both locally and in CI.                         │
+│  Plan: 3 phases, 5 tasks. Phase 1: quality gates, CI and a working /health   │
+│  (T-001, T-002). Phase 2: the users API, which is the first deliverable      │
+│  (T-003, T-004). Phase 3: request IDs and JSON logs (T-005).                 │
+│  Risks: (1) the user fields are a guess ({id, name, email}, email must be    │
+│  unique) and other teams will code against them, so confirm before T-003.    │
+│  (2) Users are lost on restart and not shared between copies of the          │
+│  service, so run a single instance. (3) Go 1.23 is no longer supported       │
+│  upstream, and staticcheck plus module downloads need network access and a   │
+│  staticcheck version that works with your Go.                                │
+│  Next: answer the questions (the user fields matter most), then run /next    │
+│  to start T-001.                                                             │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Open questions — answer them in .bae/interview.md and run replan ───────────╮
+│                                                                              │
+│  1. Which fields does a user have, and must email be unique? — This is the   │
+│  contract other services will code against, and changing it after they       │
+│  integrate breaks them. Needs an answer before T-003 starts.                 │
+│     {id, name, email}; email required and unique ignoring case (planned) /   │
+│  {id, name, email}; duplicate emails allowed / Different or extra fields     │
+│  (list them)                                                                 │
+│  2. Do callers need GET /users/{id} or pagination on GET /users in the       │
+│  first deliverable? — The brief only lists GET and POST /users. Both extras  │
+│   are deferred unless a caller needs them now.                               │
+│     No, listing everything is enough (planned) / Add GET /users/{id} / Add   │
+│  GET /users/{id} and pagination                                              │
+│  3. Where will CI run? The repo has no git remote configured (.git/config    │
+│  has only [core]). — T-001 writes the CI config. The plan assumes GitHub     │
+│  Actions.                                                                    │
+│     GitHub Actions (planned) / GitLab CI / Other / none yet                  │
+│  4. Can we raise the Go version in go.mod from 1.23 to a release that is     │
+│  still supported? — Go 1.23 lost upstream support when Go 1.25 came out      │
+│  (Aug 2025). The plan leaves go.mod:3 unchanged and runs CI on the latest    │
+│  stable Go.                                                                  │
+│     Keep 1.23 (planned) / Raise to the oldest supported release / Raise to   │
+│  the latest release                                                          │
+│  5. How will the service be deployed, and how many copies will run at once?  │
+│   — With more than one copy, each holds its own separate user list. The      │
+│  deployment target also decides whether we need a Dockerfile and a           │
+│  readiness probe.                                                            │
+│     Single instance, deployment handled elsewhere (planned) / Container on   │
+│  Kubernetes / VM / systemd                                                   │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+└  30 file(s) written. Next: npx builder-assistant-engineer next

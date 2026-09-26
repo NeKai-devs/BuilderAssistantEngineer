@@ -1,0 +1,37 @@
+{
+  "fixture": "node-app",
+  "mode": "brownfield",
+  "exitCode": 0,
+  "files": 36,
+  "durationMs": 716898,
+  "tasks": 8,
+  "tasksWithVerification": {
+    "hits": 8,
+    "total": 8
+  },
+  "lineRefs": {
+    "hits": 1,
+    "total": 1
+  },
+  "paths": {
+    "hits": 22,
+    "total": 113
+  },
+  "backend": "claude",
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "costUsd": 1.9432849999999997,
+  "continuations": 0,
+  "formatRetries": 0,
+  "questions": 5,
+  "blockingQuestions": 0,
+  "lang": "en",
+  "targets": [
+    "claude-code",
+    "opencode"
+  ],
+  "analystSha256": "6e1e7044f25f",
+  "toolCommit": "e68134b",
+  "date": "2026-09-26T10:01:16.226Z"
+}
