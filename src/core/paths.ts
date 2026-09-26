@@ -10,6 +10,7 @@ export function baePaths(cwd: string) {
     interview: join(dir, "interview.md"),
     prompts: join(dir, "prompts"),
     runs: join(dir, "runs"),
+    tmp: join(dir, "tmp"),
     ignore: join(cwd, ".baeignore"),
   };
 }

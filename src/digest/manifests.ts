@@ -1,3 +1,4 @@
+import { asRecord, parseObject } from "../core/json.js";
 import { baseName, byPath, extensionOf } from "./files.js";
 
 export type Ecosystem =
@@ -162,24 +163,10 @@ export function detectPackageManagers(paths: string[], manifests: Manifest[]): s
   return [...new Set([...declared, ...locked])];
 }
 
-export function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
 function declares(manifest: Manifest, name: string): boolean {
   if (JSON_DEPENDENCY_FIELDS.has(baseName(manifest.path))) return manifest.dependencies.has(name);
   const pattern = new RegExp(`(^|[^a-z0-9_.])${escapeRegExp(name.toLowerCase())}`, "m");
   return pattern.test(manifest.text.toLowerCase());
-}
-
-function parseObject(text: string): Record<string, unknown> | undefined {
-  try {
-    return asRecord(JSON.parse(text));
-  } catch {
-    return undefined;
-  }
 }
 
 function escapeRegExp(text: string): string {

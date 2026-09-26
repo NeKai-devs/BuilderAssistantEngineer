@@ -25,4 +25,22 @@ export const es: Messages = {
   "error.configInvalid": "{{path}} no es válido:\n{{details}}",
   "error.promptMissingVars": "{{path}} usa variables que no se proporcionaron: {{vars}}",
   "error.unexpected": "Error inesperado. Repórtalo adjuntando la salida siguiente.",
+  "backend.notInstalled":
+    "`{{command}}` no está instalado o no está en el PATH. Instálalo o elige otro backend con --backend.",
+  "backend.failed": "`{{command}}` terminó con código {{code}}:\n{{details}}",
+  "backend.apiNotConfigured":
+    "El backend api necesita ANTHROPIC_API_KEY, u OPENAI_BASE_URL/OPENAI_API_KEY para un endpoint compatible con OpenAI.",
+  "backend.apiModelRequired": "Define BAE_MODEL con el modelo a usar en {{baseUrl}}.",
+  "backend.apiProviderInvalid": "BAE_API_PROVIDER debe ser anthropic u openai, no {{provider}}.",
+  "backend.apiHttp": "Error de la API de {{provider}} ({{status}}): {{details}}",
+  "backend.apiNetwork": "No se pudo conectar con {{url}}: {{details}}",
+  "backend.apiInteractive": "El backend api no puede abrir una sesión interactiva.",
+  "backend.refusal": "El modelo rechazó la solicitud.",
+  "backend.truncated": "La respuesta alcanzó el límite de tokens de salida y está incompleta.",
+  "manual.copied": "Prompt copiado al portapapeles y guardado en {{path}}.",
+  "manual.notCopied": "No se pudo usar el portapapeles; el prompt está guardado en {{path}}.",
+  "manual.awaitingResponse":
+    "Pégalo en tu IA. Luego pega aquí la respuesta completa y termina con Ctrl-D (Ctrl-Z, Enter en Windows), o guárdala en {{path}} y pulsa Enter.",
+  "manual.awaitingDone": "Ejecútalo con tu agente y pulsa Enter cuando la tarea termine.",
+  "manual.emptyResponse": "No se recibió respuesta. Pégala aquí o guárdala en {{path}}.",
 };

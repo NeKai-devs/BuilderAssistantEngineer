@@ -1,7 +1,8 @@
 import { posix } from "node:path";
+import { asRecord } from "../core/json.js";
 import { isCiPath } from "./baseline.js";
 import { baseName, byPath } from "./files.js";
-import { asRecord, ecosystemOf, type Manifest } from "./manifests.js";
+import { ecosystemOf, type Manifest } from "./manifests.js";
 
 export const MAX_ENTRY_POINTS = 8;
 export const MAX_DOCS = 10;
