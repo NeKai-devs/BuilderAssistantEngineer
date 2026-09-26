@@ -323,6 +323,8 @@ export const en = {
   "integrity.removedTests": "Removes tests that are not added back: {{tests}}.",
   "integrity.lostAssertions":
     "Removes {{count}} assertion line(s) from a test file without adding them back.",
+  "capture.headMoved":
+    "{{id}} keeps the commit recorded when it first started; commits made since then count as part of the task's changes.",
 } as const;
 
 export type MessageKey = keyof typeof en;

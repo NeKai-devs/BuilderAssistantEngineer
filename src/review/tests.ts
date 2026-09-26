@@ -14,8 +14,11 @@ const DECLARATIONS = [
 ];
 const ANNOTATED = /#\[(?:tokio::)?test\]|@Test\b|\[(?:Fact|Test|TestMethod)\]/g;
 const SKIP_MARKERS: [string, RegExp][] = [
-  [".skip", /\b(?:it|test|describe|context|suite)\.skip\b/],
-  [".only", /\b(?:it|test|describe|context|suite)\.only\b/],
+  [".skip", /\b(?:it|test|describe|context|suite)(?:\.\w+)*\.(?:skip|skipIf|runIf)\b/],
+  [".only", /\b(?:it|test|describe|context|suite)(?:\.\w+)*\.only\b/],
+  [".todo", /\b(?:it|test)(?:\.\w+)*\.todo\b/],
+  ["pytestmark", /\bpytestmark\s*=.*pytest\.mark\.(?:skip|skipif|xfail)\b/],
+  ["go:build ignore", /^\/\/\s*(?:go:build|\+build)\s+ignore\b/m],
   ["x-prefixed test", /\bx(?:it|describe|test|context)\s*\(/],
   ["test.fixme", /\btest\.fixme\b/],
   ["@pytest.mark.skip", /@pytest\.mark\.(?:skip|skipif|xfail)\b/],
@@ -31,7 +34,6 @@ const SKIP_MARKERS: [string, RegExp][] = [
 const RUNNER_CONFIG =
   /(^|\/)(vitest\.(config|workspace)|jest\.config|playwright\.config|cypress\.config|karma\.conf|vite\.config)\.[cm]?[jt]s(on)?$|(^|\/)(pytest\.ini|conftest\.py|\.mocharc(\.\w+)?|phpunit\.xml(\.dist)?)$/;
 const EXCLUSIONS: [string, RegExp][] = [
-  ["exclude", /\bexclude\b/],
   ["testPathIgnorePatterns", /testPathIgnorePatterns/],
   ["testIgnore", /\btestIgnore\b/],
   ["--deselect", /--deselect\b/],

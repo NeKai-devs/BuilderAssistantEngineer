@@ -66,9 +66,28 @@ export function parseLine(line: string): ParsedLine {
   return { commands, substitution };
 }
 
+const KEYWORDS = new Set([
+  "if",
+  "then",
+  "else",
+  "elif",
+  "while",
+  "until",
+  "do",
+  "!",
+  "{",
+  "(",
+  "time",
+]);
+
 export function program(command: SimpleCommand): { name: string; args: string[] } {
   let index = 0;
-  while (/^[A-Za-z_]\w*=/.test(command.words[index] ?? "")) index++;
+  while (
+    /^[A-Za-z_]\w*=/.test(command.words[index] ?? "") ||
+    KEYWORDS.has(command.words[index] ?? "")
+  ) {
+    index++;
+  }
   const [first = "", ...args] = command.words.slice(index);
   if (first === "env") return program({ words: args, text: command.text });
   return { name: first, args };

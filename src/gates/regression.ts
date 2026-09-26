@@ -6,16 +6,17 @@ import { readTextIfExists } from "../core/fs.js";
 import { asRecord, parseObject } from "../core/json.js";
 import type { ShellResult } from "../core/process.js";
 import { expandScripts } from "./protected-files.js";
-import { type Counts, countsSchema, parseCounts, runnerHint } from "./results.js";
+import { type Counts, countsSchema, parseCounts, parseFailing, runnerHint } from "./results.js";
 
 export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
 export type SuiteCommand = { key: SuiteKey; command: string };
-export type SuiteResult = SuiteCommand & ShellResult & { counts?: Counts };
+export type SuiteResult = SuiteCommand & ShellResult & { counts?: Counts; failing?: string[] };
 
 export const commandBaselineSchema = z.object({
   exitCode: z.number(),
   counts: countsSchema.optional(),
+  failing: z.array(z.string()).optional(),
 });
 export const suiteBaselineSchema = z.object({
   skipped: z.boolean().default(false),
@@ -84,8 +85,15 @@ export async function runSuite(
     const result = bash
       ? await runScript(bash, `set -o pipefail\n${item.command}\n`, { cwd, onOutput })
       : { exitCode: -1, output: "bash was not found" };
-    const counts = parseCounts(result.output, runnerHint(expandScripts(item.command, scripts)));
-    results.push({ ...item, ...result, ...(counts ? { counts } : {}) });
+    const hint = runnerHint(expandScripts(item.command, scripts));
+    const counts = parseCounts(result.output, hint);
+    const failing = result.exitCode === 0 ? undefined : parseFailing(result.output, hint);
+    results.push({
+      ...item,
+      ...result,
+      ...(counts ? { counts } : {}),
+      ...(failing ? { failing } : {}),
+    });
   }
   return results;
 }
@@ -97,7 +105,11 @@ export function baselineFrom(results: SuiteResult[], excluded: string[] = []): S
     commands: Object.fromEntries(
       results.map((result) => [
         result.command,
-        { exitCode: result.exitCode, ...(result.counts ? { counts: result.counts } : {}) },
+        {
+          exitCode: result.exitCode,
+          ...(result.counts ? { counts: result.counts } : {}),
+          ...(result.failing ? { failing: result.failing } : {}),
+        },
       ]),
     ),
   };
@@ -121,6 +133,10 @@ export function verdictOf(
   if (!before) return result.exitCode === 0 ? "passed" : "noBaseline";
   if (before.exitCode === 0) return result.exitCode === 0 ? "passed" : "regression";
   if (result.exitCode === 0) return "passed";
+  if (before.failing && result.failing) {
+    const known = new Set(before.failing);
+    if (result.failing.some((name) => !known.has(name))) return "regression";
+  }
   if (!before.counts || !result.counts) return "uncomparable";
   const worse =
     result.counts.failed > before.counts.failed || result.counts.passed < before.counts.passed;

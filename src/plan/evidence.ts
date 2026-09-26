@@ -19,7 +19,8 @@ type RepoIndex = { names: Map<string, string[]>; roots: Set<string> };
 
 const CODE_SPAN = /`([^`\n]+)`([ \t]*\((?:new|nuevo|nueva)\))?/gi;
 const NEW_INSIDE = /^(.+?)\s+\((?:new|nuevo|nueva)\)$/i;
-const PATH_TOKEN = /^(?:\.\/)?([\w@.-]+(?:\/[\w@.[\]()-]+)*)\/?(?::(\d+)(?:-(\d+))?)?$/;
+const PATH_TOKEN =
+  /^(?:\.\/)?([\w@.-]+(?:\/[\w@.[\]()-]+)*)\/?(?::(\d+)(?::\d+)?(?:-(\d+))?|#L(\d+)(?:-L?(\d+))?)?$/;
 const DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 const EVIDENCE_FILES = [
   /^docs\/plan\/02-architecture\.md$/,
@@ -165,8 +166,10 @@ function toCitation(span: string, roots: Set<string>): Omit<Citation, "source"> 
     GENERATED_ROOTS.has(first) ||
     (segments.length > 1 && DOMAIN.test(first));
   if (skipped) return undefined;
-  const line = match[2] ? Number(match[2]) : undefined;
-  const endLine = match[3] ? Number(match[3]) : undefined;
+  const start = match[2] ?? match[4];
+  const end = match[3] ?? match[5];
+  const line = start ? Number(start) : undefined;
+  const endLine = end ? Number(end) : undefined;
   const checked =
     segments.length === 1
       ? KNOWN_FILES.has(path) || (line !== undefined && hasFileExtension(path))
@@ -245,7 +248,9 @@ function sourceAlternatives(path: string): string[] {
 }
 
 async function lineCount(cwd: string, path: string): Promise<number> {
-  const text = (await readTextIfExists(join(cwd, ...path.split("/")))) ?? "";
+  const target = join(cwd, ...path.split("/"));
+  if (!(await stat(target).catch(() => undefined))?.isFile()) return 0;
+  const text = (await readTextIfExists(target)) ?? "";
   return text.split(/\r?\n/).length - (text.endsWith("\n") ? 1 : 0);
 }
 

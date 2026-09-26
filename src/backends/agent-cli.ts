@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { UserError } from "../core/errors.js";
@@ -44,7 +44,7 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       "none",
       ...(access === "read"
         ? ["--tools", "Read,Grep,Glob", "--setting-sources", "user"]
-        : ["--permission-mode", "acceptEdits"]),
+        : ["--permission-mode", "acceptEdits", "--setting-sources", "user,project"]),
     ],
     interactive: (instruction) => [instruction],
     jsonOutput: true,
@@ -116,7 +116,10 @@ async function runHeadless(
 ): Promise<string> {
   const tmp = baePaths(options.cwd).tmp;
   const outputFile = join(tmp, `${spec.name}-output.md`);
-  if (spec.readsOutputFile) await mkdir(tmp, { recursive: true });
+  if (spec.readsOutputFile) {
+    await mkdir(tmp, { recursive: true });
+    await rm(outputFile, { force: true });
+  }
   const args = spec.headless(options.access ?? "read", outputFile);
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type SuiteResult, unusableBaseline, verdictOf } from "../../src/gates/regression.js";
+import { parseFailing } from "../../src/gates/results.js";
 
 const result = (
   exitCode: number,
@@ -48,5 +49,28 @@ describe("unusableBaseline", () => {
     const results = [result(-1), result(1), result(1, [1, 1, 0]), result(0)];
     expect(unusableBaseline(results, false)).toEqual([results[0], results[1]]);
     expect(unusableBaseline([result(1)], true)).toEqual([]);
+  });
+});
+
+describe("failing test names", () => {
+  it("blocks a new failing test even when the counts stay the same", () => {
+    const before = {
+      exitCode: 1,
+      counts: { passed: 9, failed: 1, skipped: 0 },
+      failing: ["test/a.test.ts > old"],
+    };
+    const same = { ...result(1, [9, 1, 0]), failing: ["test/a.test.ts > old"] };
+    const swapped = { ...result(1, [9, 1, 0]), failing: ["test/b.test.ts > new"] };
+    expect(verdictOf(same, before, false)).toBe("preexisting");
+    expect(verdictOf(swapped, before, false)).toBe("regression");
+  });
+
+  it("reads failing names for the runner the command uses", () => {
+    const output = " FAIL  test/b.test.ts > users > rejects\n      Tests  1 failed | 9 passed (10)";
+    expect(parseFailing(output, ["vitest"])).toEqual(["test/b.test.ts > users > rejects"]);
+    expect(
+      parseFailing("FAILED tests/test_api.py::test_login - assert 1 == 2", ["pytest"]),
+    ).toEqual(["tests/test_api.py::test_login"]);
+    expect(parseFailing(output, [])).toBeUndefined();
   });
 });

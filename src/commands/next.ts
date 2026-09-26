@@ -23,13 +23,13 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   await recoverInterrupted(ctx, acceptance);
   const stored = await requireConfig(ctx);
   ctx.prompter.intro(t("next.intro"));
-  const config = await withSuiteCommands(ctx, stored);
   const tasks = await loadValidTasks(ctx);
   const task = pickNext(tasks, await exhaustedTasks(ctx, tasks));
   if (!task) {
     reportNoTask(ctx, tasks);
     return;
   }
+  const config = task.meta.status === "pending" ? await withSuiteCommands(ctx, stored) : stored;
   ctx.prompter.note(
     describeTask(task, checksFor(task, config)),
     `${task.meta.id} · ${task.meta.title}`,

@@ -66,6 +66,26 @@ export function parseCounts(output: string, hint: RunnerName[] = []): Counts | u
   return found.sort((a, b) => b.at - a.at)[0]?.counts;
 }
 
+const FAILING: Partial<Record<RunnerName, RegExp>> = {
+  vitest: /^\s*FAIL\s+(\S.*? > .+?)\s*$/gm,
+  jest: /^\s*● (?!Test suite failed to run)(.+?)\s*$/gm,
+  pytest: /^(?:FAILED|ERROR) (\S+)/gm,
+  go: /^\s*--- FAIL: (\S+)/gm,
+  cargo: /^test (\S+) \.\.\. FAILED$/gm,
+  rspec: /^rspec (\S+)/gm,
+  unittest: /^(?:FAIL|ERROR): (\S+ \(.+\))$/gm,
+};
+
+export function parseFailing(output: string, hint: RunnerName[]): string[] | undefined {
+  const text = stripVTControlCharacters(output).replace(/\r\n?/g, "\n");
+  const patterns = hint.flatMap((name) => (FAILING[name] ? [FAILING[name]] : []));
+  if (patterns.length === 0) return undefined;
+  const names = patterns.flatMap((pattern) =>
+    [...text.matchAll(pattern)].map((match) => (match[1] ?? "").trim()),
+  );
+  return names.length > 0 ? [...new Set(names)].sort() : undefined;
+}
+
 export function executed(counts: Counts): number {
   return counts.passed + counts.failed;
 }

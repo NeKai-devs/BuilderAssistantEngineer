@@ -36,7 +36,7 @@ const MAX_NEW_FILE_BYTES = 1_000_000;
 const MAX_SUSPICIOUS_LINES = 5_000;
 const MAX_LINE_CHARS = 2_000;
 const SUSPICIOUS =
-  /AKIA|gh[pousr]_|github_pat_|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@/i;
+  /AKIA|gh[pousr]_|github_pat_|glpat-|eyJ|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@|["'`][A-Za-z0-9+/_-]{40,}/i;
 export const GATE_EXCLUDED = [BAE_DIR, TASKS_DIR];
 
 export async function taskChanges(cwd: string, capture: Capture): Promise<ChangeView> {

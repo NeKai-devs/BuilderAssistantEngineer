@@ -3,7 +3,7 @@ import { saveCommands } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
 import { bashPath } from "../core/bash.js";
 import { ExitCode } from "../core/errors.js";
-import { isGitRepo } from "../core/git.js";
+import { headCommit, isGitRepo } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
 import {
   type Capture,
@@ -87,6 +87,9 @@ export async function start(
   if (!reuse && task.meta.status === "in_progress")
     allow(t("capture.lateStop", { id: task.meta.id }));
   if (!reuse && !(await isGitRepo(ctx.cwd))) allow(t("capture.noGit"));
+  if (reuse?.base && reuse.base !== (await headCommit(ctx.cwd))) {
+    ctx.prompter.warn(t("capture.headMoved", { id: task.meta.id }));
+  }
   let baseline = reuse?.baseline;
   if (config.gates.regression === "full" && baseline === undefined) {
     if (reuse) allow(t("regression.lateStop", { id: task.meta.id }));

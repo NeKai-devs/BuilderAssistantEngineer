@@ -334,4 +334,6 @@ export const es: Messages = {
   "integrity.removedTests": "Quita tests que no vuelven a añadirse: {{tests}}.",
   "integrity.lostAssertions":
     "Quita {{count}} línea(s) de aserción de un archivo de test sin volver a añadirlas.",
+  "capture.headMoved":
+    "{{id}} conserva el commit registrado cuando empezó; los commits hechos desde entonces cuentan como parte de los cambios de la tarea.",
 };

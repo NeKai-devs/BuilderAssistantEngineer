@@ -76,7 +76,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
       ],
       [
         "src/keys.js",
-        "Adds what looks like a credential (GitHub token); read it from the environment instead.",
+        "Adds what looks like a credential (GitHub token, hardcoded password or key); read it from the environment instead.",
       ],
     ]);
   });

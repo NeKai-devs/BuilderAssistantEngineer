@@ -34,12 +34,13 @@ const GIT_READ = new Set([
 const DYNAMIC = new Set(["eval", "source", ".", "exec", "xargs"]);
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd"]);
 const MASKING =
-  /\|\|\s*(?:true|:|exit\s+0|echo\b|printf\b|return\s+0)(?:\s|;|$)|\bset\s+\+[A-Za-z]*e\b|\bset\s+\+o\s+(?:errexit|pipefail)\b/;
+  /\bset\s+\+[A-Za-z]*e[A-Za-z]*\b|\bset\s+\+o\s+(?:errexit|pipefail)\b|\btrap\s+-?\s*['"]?\s*['"]?\s+ERR\b/;
+const FALLBACK_OK = /^\s*(?:exit\s+[1-9]\d*|false)\b/;
 
 export function trivialityProblems(lines: string[]): CheckProblem[] {
   const logical = logicalLines(lines);
   const masked = logical
-    .filter((line) => MASKING.test(line))
+    .filter((line) => MASKING.test(line) || masksWithOperators(line))
     .map((command) => ({ command, reason: "masks" as const }));
   const checks = logical.some((line) =>
     parseLine(line).commands.some((command) => runsOrChecks(command)),
@@ -62,6 +63,13 @@ export function allowlistProblems(lines: string[], allow: string[]): CheckProble
     const dynamic = DYNAMIC.has(name) || SHELLS.has(name);
     return [{ command: line, reason: dynamic ? ("dynamic" as const) : ("notAllowed" as const) }];
   });
+}
+
+function masksWithOperators(line: string): boolean {
+  const unquoted = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  const fallbacks = unquoted.split("||").slice(1);
+  if (fallbacks.some((fallback) => !FALLBACK_OK.test(fallback))) return true;
+  return /(^|[^&])&(\s*$|\s*[;)]|\s+\S)/.test(unquoted.replace(/&&|&>|>&|\d>&\d/g, ""));
 }
 
 function runsOrChecks(command: SimpleCommand): boolean {

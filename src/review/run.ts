@@ -1,13 +1,16 @@
+import { join } from "node:path";
 import { LANGUAGE_NAMES } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import type { CommandContext } from "../commands/context.js";
+import { readTextIfExists } from "../core/fs.js";
 import { renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
 import { type Capture, capturedPrompt } from "../gates/capture.js";
 import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
+import { logLines } from "../tasks/handoff.js";
 import { parseTask, type Task } from "../tasks/schema.js";
-import { taskChanges } from "./changes.js";
+import { type AddedText, taskChanges } from "./changes.js";
 import { reviewDiff } from "./diff.js";
 import { type MechanicalFacts, mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
@@ -46,7 +49,9 @@ export async function reviewTask(
       ? { status: "skipped", findings: [], reason }
       : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
   }
-  const mechanical = mechanicalReview(task, view.changes, acceptance, facts);
+  const log = await currentLog(ctx.cwd, capture);
+  const scanned = log ? { ...view.changes, added: [...view.changes.added, log] } : view.changes;
+  const mechanical = mechanicalReview(task, scanned, acceptance, facts);
   if (mechanical.passed && view.changes.files.length === 0) {
     return { status: "pass", findings: mechanical.findings, reason: t("review.noChanges") };
   }
@@ -93,6 +98,17 @@ export async function reviewTask(
     findings: [...mechanical.findings, ...reply.findings],
     stage: "reviewer",
   };
+}
+
+async function currentLog(cwd: string, capture: Capture): Promise<AddedText | undefined> {
+  const text = await readTextIfExists(join(cwd, ...capture.path.split("/")));
+  if (text === undefined) return undefined;
+  try {
+    const lines = logLines(parseTask(capture.path, text));
+    return lines.length > 0 ? { path: capture.path, text: lines.join("\n") } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function formatFindings(findings: ReviewFinding[]): string {

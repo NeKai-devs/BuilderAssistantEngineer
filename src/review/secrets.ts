@@ -15,13 +15,13 @@ const EXAMPLE_VALUES = new Set([
 ]);
 const TEST_PREFIXES = /^[spr]k_test_/;
 const KEYWORD =
-  "[A-Za-z0-9_.-]*(?:passw(?:or)?d|pwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|private[_-]?key|credential)[A-Za-z0-9_.-]*";
+  "[A-Za-z0-9_.-]*(?:passw(?:or)?d|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_.-]*";
 const ASSIGNED = new RegExp(`${KEYWORD}["']?\\s*[:=]\\s*(["'])([^"'\\s]{8,})\\1`, "gi");
 const CONNECTION = /\b[a-z][a-z0-9+.-]*:\/\/([^\s:@/'"]+):([^\s@/'"]+)@[^\s'"]+/gi;
-const QUOTED_BLOB = /(["'`])([A-Za-z0-9+/_-]{40,}={0,2})\1/g;
+const QUOTED_BLOB = /(["'`])([A-Za-z0-9+/_-]{40,}={0,2}|[a-f0-9]{48,})\1/g;
+const LABEL = /^[\p{L}\s.,:;!?¿¡'-]+$/u;
 const PLACEHOLDER =
   /^(?:\$|<|\{|%|\*+$)|^(?:x+|changeme|change[-_]me|example\w*|placeholder|password|pass|secret|dummy|fake|test\w*|your[-_]\w+|redacted)$/i;
-const ENV_READ = /process\.env|os\.environ|getenv|ENV\[|System\.getenv|import\.meta\.env/;
 const MIN_ENTROPY = 4.5;
 
 export function secretFindings(changes: TaskChanges, options: SecretOptions): ReviewFinding[] {
@@ -55,7 +55,7 @@ export function secretKinds(item: AddedText): string[] {
   const kinds = SECRET_TOKENS.filter(([, pattern]) =>
     [...item.text.matchAll(new RegExp(pattern.source, "g"))].some((match) => !isExample(match[0])),
   ).map(([kind]) => kind);
-  const loose = !isTestFile(item.path) && !isLockfile(item.path) && !isBinaryPath(item.path);
+  const loose = !isTestName(item.path) && !isLockfile(item.path) && !isBinaryPath(item.path);
   if (loose && hasAssignedSecret(item.text)) kinds.push("hardcoded password or key");
   if (hasCredentialUrl(item.text)) kinds.push("credentials in a connection string");
   if (loose && !/\.(svg|map|snap)$/i.test(item.path) && hasHighEntropyBlob(item.text)) {
@@ -71,9 +71,16 @@ function isExample(value: string): boolean {
 function hasAssignedSecret(text: string): boolean {
   return [...text.matchAll(ASSIGNED)].some((match) => {
     const value = match[2] ?? "";
-    const line = lineAround(text, match.index ?? 0);
-    return !PLACEHOLDER.test(value) && !ENV_READ.test(line) && !EXAMPLE_VALUES.has(value);
+    if (PLACEHOLDER.test(value) || EXAMPLE_VALUES.has(value) || LABEL.test(value)) return false;
+    return !value.includes("/") && !/^[\w.-]+\.[a-z]{2,4}$/i.test(value);
   });
+}
+
+function isTestName(path: string): boolean {
+  return (
+    isTestFile(path) &&
+    /(\.|_)(test|spec|cy|e2e)\.|(^|\/)test_[^/]+$|_test\.\w+$|Tests?\.\w+$/.test(path)
+  );
 }
 
 function hasCredentialUrl(text: string): boolean {
@@ -97,12 +104,6 @@ function hasHighEntropyBlob(text: string): boolean {
       entropy(value) >= MIN_ENTROPY
     );
   });
-}
-
-function lineAround(text: string, index: number): string {
-  const start = text.lastIndexOf("\n", index) + 1;
-  const end = text.indexOf("\n", index);
-  return text.slice(start, end === -1 ? text.length : end);
 }
 
 function entropy(value: string): number {
