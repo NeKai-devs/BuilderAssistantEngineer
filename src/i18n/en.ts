@@ -228,6 +228,8 @@ export const en = {
   "status.time": "time per done task: {{average}} on average, {{total}} in total",
   "status.taskRuns": "{{attempts}} attempt(s), {{time}}",
   "format.repaired": "Repaired the answer locally: {{repairs}}.",
+  "evidence.retryFailed":
+    "The request to fix the cited paths failed, so the plan keeps them as they are: {{details}}",
 } as const;
 
 export type MessageKey = keyof typeof en;

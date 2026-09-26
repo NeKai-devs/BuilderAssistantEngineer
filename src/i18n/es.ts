@@ -235,4 +235,6 @@ export const es: Messages = {
   "status.time": "tiempo por tarea hecha: {{average}} de media, {{total}} en total",
   "status.taskRuns": "{{attempts}} intento(s), {{time}}",
   "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
+  "evidence.retryFailed":
+    "Falló la petición para corregir las rutas citadas, así que el plan las conserva tal cual: {{details}}",
 };

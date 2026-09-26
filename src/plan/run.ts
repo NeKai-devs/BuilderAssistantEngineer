@@ -5,7 +5,7 @@ import type { CommandContext } from "../commands/context.js";
 import { isAgentBackend } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
 import { readInterview } from "../config/store.js";
-import { FormatError } from "../core/errors.js";
+import { FormatError, UserError } from "../core/errors.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
 import { buildDigest } from "../digest/index.js";
@@ -183,11 +183,18 @@ async function fixPaths(
       .join("\n\n"),
     repo_files: await repoFiles(ctx.cwd),
   });
-  const reply = await backend.run(prompt, {
-    cwd: ctx.cwd,
-    access: "read",
-    onInfo: (info) => recordInfo(stats, info),
-  });
+  let reply: string;
+  try {
+    reply = await backend.run(prompt, {
+      cwd: ctx.cwd,
+      access: "read",
+      onInfo: (info) => recordInfo(stats, info),
+    });
+  } catch (error) {
+    if (!(error instanceof UserError)) throw error;
+    ctx.prompter.warn(t("evidence.retryFailed", { details: error.message }));
+    return undefined;
+  }
   const replaced = new Map(
     parseFileBlocks(repairPlan(reply, undefined).text)
       .filter((file) => sources.has(file.path))

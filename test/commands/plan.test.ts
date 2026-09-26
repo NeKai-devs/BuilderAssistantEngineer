@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Backend } from "../../src/backends/types.js";
 import { main } from "../../src/cli.js";
 import { readConfig, writeConfig, writeInterview } from "../../src/config/store.js";
+import { UserError } from "../../src/core/errors.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
 import { copyFixture, tempDir, writeFiles } from "../helpers.js";
 import { defaultFiles, planOutput, taskFile } from "../plan-sample.js";
@@ -117,6 +118,39 @@ describe("plan", () => {
     expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
       evidenceRetries: 1,
       unverifiedPaths: [],
+    });
+  });
+
+  it("keeps and writes the plan when the request to fix paths fails", async () => {
+    const cwd = await setup();
+    const files = {
+      ...defaultFiles(),
+      "docs/plan/02-architecture.md": "Routes live in `src/routes/user.ts`.",
+    };
+    const replies = [planOutput({ files })];
+    const backend: Backend = {
+      name: "claude",
+      run: async () => {
+        const reply = replies.shift();
+        if (reply === undefined) throw new UserError("API error (529): overloaded");
+        return reply;
+      },
+    };
+    const ui = fakePrompter([]);
+    const code = await main(["node", "bae", "plan", "--yes"], cwd, {
+      prompter: ui.prompter,
+      createBackend: () => backend,
+      env: {},
+      print: () => {},
+    });
+    expect(code).toBe(0);
+    expect(ui.log).toContain(
+      "warn: The request to fix the cited paths failed, so the plan keeps them as they are: API error (529): overloaded",
+    );
+    expect(await exists(cwd, "docs/plan/02-architecture.md")).toBe(true);
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      ok: true,
+      unverifiedPaths: ["`src/routes/user.ts` in docs/plan/02-architecture.md"],
     });
   });
 
