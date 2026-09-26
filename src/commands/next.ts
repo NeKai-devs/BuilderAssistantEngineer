@@ -1,25 +1,34 @@
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
-import { headCommit } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
-import { BAE_DIR } from "../core/paths.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
-import { type Approval, type Checks, type Gate, runGate } from "../gates/gate.js";
+import { displayPath } from "../core/state.js";
+import {
+  type Capture,
+  capturedPrompt,
+  clearActive,
+  markActive,
+  prepareCapture,
+  readActive,
+  readCapture,
+  saveCapture,
+} from "../gates/capture.js";
+import { type Acceptance, newAcceptance } from "../gates/findings.js";
+import { type Checks, enforceContract, type Gate, type GateRun, runGate } from "../gates/gate.js";
 import {
   baselineFrom,
-  readSuiteBaseline,
   runSuite,
+  type SuiteBaseline,
   type SuiteCommand,
-  saveSuiteBaseline,
   suiteCommands,
 } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
-import { saveSnapshot, takeSnapshot } from "../review/snapshot.js";
+import { capturedTask } from "../review/run.js";
 import { type AttemptOutcome, readAttempts, recordAttempt } from "../tasks/attempts.js";
 import { MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
 import { completionTimes, readMetrics } from "../tasks/metrics.js";
-import { readBase, saveBase, writeRunLog } from "../tasks/runs.js";
+import { runDir, writeRunLog } from "../tasks/runs.js";
 import { type Task, verificationCommands } from "../tasks/schema.js";
 import { pickNext, waitingOn } from "../tasks/select.js";
 import { setTaskStatus } from "../tasks/status.js";
@@ -27,12 +36,14 @@ import { findUnsafe } from "../tasks/verify.js";
 import type { CommandContext } from "./context.js";
 import { CLI, isAgentBackend, loadValidTasks, requireConfig, saveCommands } from "./shared.js";
 
-export type NextOptions = { headless?: boolean };
+export type NextOptions = { headless?: boolean; acceptFinding?: string[] };
 
 export const MAX_RETRIES = 2;
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
 export async function runNext(ctx: CommandContext, options: NextOptions): Promise<void> {
+  const acceptance = newAcceptance(options.acceptFinding);
+  await recoverInterrupted(ctx, acceptance);
   const stored = await requireConfig(ctx);
   ctx.prompter.intro(t("next.intro"));
   const config = await withSuiteCommands(ctx, stored);
@@ -42,46 +53,61 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     reportNoTask(ctx, tasks);
     return;
   }
-  const checks: Checks = {
-    commands: verificationCommands(task.body),
-    suite: suiteCommands(config),
-  };
-  ctx.prompter.note(describeTask(task, checks), `${task.meta.id} · ${task.meta.title}`);
+  ctx.prompter.note(
+    describeTask(task, checksFor(task, config)),
+    `${task.meta.id} · ${task.meta.title}`,
+  );
   if (ctx.flags.dryRun) {
     ctx.print(`${task.text}\n`);
     ctx.prompter.outro(t("next.dryRunDone"));
     return;
   }
-  const started = await start(ctx, config, task, checks.suite);
-  const prompt = await taskPrompt(ctx, config, started, tasks);
-  const headless = Boolean(options.headless) && isAgentBackend(config.backend);
+  const capture = await start(ctx, config, task);
+  const run: GateRun = {
+    capture,
+    checks: checksFor(capturedTask(capture), capture.config),
+    approval: { granted: false },
+    acceptance,
+  };
+  const prompt = await taskPrompt(ctx, capture, tasks);
+  const headless = Boolean(options.headless) && isAgentBackend(capture.config.backend);
   if (options.headless && !headless) ctx.prompter.warn(t("next.headlessNeedsAgent"));
   const done = headless
-    ? await headlessLoop(ctx, config, started, checks, prompt)
-    : await attemptOnce(ctx, config, started, checks, prompt);
+    ? await headlessLoop(ctx, run, prompt)
+    : await attemptOnce(ctx, run, prompt);
   if (!done) throw new ExitCode(1);
 }
 
-async function start(
-  ctx: CommandContext,
-  config: Config,
-  task: Task,
-  suite: SuiteCommand[],
-): Promise<Task> {
+async function recoverInterrupted(ctx: CommandContext, acceptance: Acceptance): Promise<void> {
+  const id = await readActive(ctx.cwd);
+  if (!id) return;
+  const capture = await readCapture(ctx.cwd, id);
+  await clearActive(ctx.cwd);
+  if (!capture) return;
+  const contract = await enforceContract(ctx, capture, acceptance);
+  if (contract.blocked) ctx.prompter.warn(t("contract.recovered", { id }));
+}
+
+function checksFor(task: Task, config: Config): Checks {
+  return { commands: verificationCommands(task.body), suite: suiteCommands(config) };
+}
+
+async function start(ctx: CommandContext, config: Config, task: Task): Promise<Capture> {
   await ensureGitignore(ctx.cwd);
-  if (!(await readBase(ctx.cwd, task.meta.id))) {
-    const head = await headCommit(ctx.cwd);
-    if (head) await saveBase(ctx.cwd, task.meta.id, head);
-    const snapshot = await takeSnapshot(ctx.cwd, [BAE_DIR, task.path]);
-    if (snapshot) await saveSnapshot(ctx.cwd, task.meta.id, snapshot);
+  const previous = await readCapture(ctx.cwd, task.meta.id);
+  const started = await setTaskStatus(ctx.cwd, task, "in_progress");
+  const capture = await prepareCapture(ctx.cwd, config, started);
+  const fresh = !previous || previous.finished;
+  if (fresh && task.meta.status === "in_progress") {
+    ctx.prompter.warn(t("capture.late", { id: task.meta.id }));
+    capture.late = true;
   }
-  if (config.gates.regression === "full" && !(await readSuiteBaseline(ctx.cwd, task.meta.id))) {
-    if (task.meta.status === "in_progress" && suite.length > 0) {
-      ctx.prompter.warn(t("regression.lateBaseline", { id: task.meta.id }));
-    }
-    await recordBaseline(ctx, task, suite);
+  if (config.gates.regression === "full" && capture.baseline === undefined) {
+    const baseline = await recordBaseline(ctx, suiteCommands(config));
+    if (baseline) capture.baseline = baseline;
   }
-  return task.meta.status === "in_progress" ? task : setTaskStatus(ctx.cwd, task, "in_progress");
+  await saveCapture(ctx.cwd, capture);
+  return capture;
 }
 
 async function withSuiteCommands(ctx: CommandContext, config: Config): Promise<Config> {
@@ -93,16 +119,20 @@ async function withSuiteCommands(ctx: CommandContext, config: Config): Promise<C
   return { ...config, commands };
 }
 
-async function recordBaseline(ctx: CommandContext, task: Task, suite: SuiteCommand[]) {
-  if (suite.length === 0 || findUnsafe(suite.map((item) => item.command)).length > 0) return;
+async function recordBaseline(
+  ctx: CommandContext,
+  suite: SuiteCommand[],
+): Promise<SuiteBaseline | undefined> {
+  if (suite.length === 0 || findUnsafe(suite.map((item) => item.command)).length > 0) {
+    return undefined;
+  }
   ctx.prompter.note(
     suite.map((item) => `$ ${item.command}`).join("\n"),
     t("regression.baselineTitle"),
   );
   if (!ctx.flags.yes && !(await ctx.prompter.confirm(t("regression.confirm"), true))) {
-    await saveSuiteBaseline(ctx.cwd, task.meta.id, { skipped: true, exitCodes: {} });
     ctx.prompter.warn(t("regression.skipped"));
-    return;
+    return { skipped: true, exitCodes: {} };
   }
   const results = await runSuite(ctx.cwd, suite, ctx.print);
   for (const result of results.filter((item) => item.exitCode !== 0)) {
@@ -110,129 +140,136 @@ async function recordBaseline(ctx: CommandContext, task: Task, suite: SuiteComma
       t("regression.preexisting", { command: result.command, code: result.exitCode }),
     );
   }
-  await saveSuiteBaseline(ctx.cwd, task.meta.id, baselineFrom(results));
+  return baselineFrom(results);
 }
 
-async function attemptOnce(
+async function runAgent(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
-  checks: Checks,
-  prompt: string,
-): Promise<boolean> {
-  const backend = ctx.createBackend(isAgentBackend(config.backend) ? config.backend : "manual");
+  run: GateRun,
+  launch: () => Promise<unknown>,
+): Promise<void> {
+  await markActive(ctx.cwd, run.capture.id);
+  try {
+    await launch();
+  } catch (error) {
+    await enforceContract(ctx, run.capture, run.acceptance);
+    await clearActive(ctx.cwd);
+    throw error;
+  }
+  await setTaskStatus(ctx.cwd, capturedTask(run.capture), "in_progress");
+}
+
+async function gate(ctx: CommandContext, run: GateRun): Promise<Gate> {
+  const result = await runGate(ctx, run);
+  await clearActive(ctx.cwd);
+  return result;
+}
+
+async function attemptOnce(ctx: CommandContext, run: GateRun, prompt: string): Promise<boolean> {
+  const { capture } = run;
+  const backend = ctx.createBackend(
+    isAgentBackend(capture.config.backend) ? capture.config.backend : "manual",
+  );
   ctx.prompter.info(t("next.launching", { backend: backend.name }));
   const startedAt = new Date();
-  await backend.run(prompt, { cwd: ctx.cwd, interactive: true });
-  await setTaskStatus(ctx.cwd, task, "in_progress");
-  const gate = await runGate(ctx, config, task, checks, { granted: false });
-  await writeRunLog(ctx.cwd, task.meta.id, gate.report);
-  await record(ctx, task, gate, startedAt, false, gate.passed ? "done" : "failed");
-  if (gate.passed) return complete(ctx, task);
-  await learnFromReviews(ctx, config, task, gate);
-  ctx.prompter.outro(t("next.notDone", { id: task.meta.id, command: `${CLI} next` }));
+  await runAgent(ctx, run, () => backend.run(prompt, { cwd: ctx.cwd, interactive: true }));
+  const result = await gate(ctx, run);
+  await writeRunLog(ctx.cwd, capture.id, result.report);
+  await record(ctx, capture, result, startedAt, false, result.passed ? "done" : "failed");
+  if (result.passed) return complete(ctx, capture);
+  await learnFromReviews(ctx, capture, result);
+  ctx.prompter.outro(t("next.notDone", { id: capture.id, command: `${CLI} next` }));
   return false;
 }
 
-async function headlessLoop(
-  ctx: CommandContext,
-  config: Config,
-  task: Task,
-  checks: Checks,
-  first: string,
-): Promise<boolean> {
-  const backend = ctx.createBackend(config.backend);
-  const approval: Approval = { granted: false };
+async function headlessLoop(ctx: CommandContext, run: GateRun, first: string): Promise<boolean> {
+  const { capture } = run;
+  const backend = ctx.createBackend(capture.config.backend);
   let prompt = first;
   const max = MAX_RETRIES + 1;
   for (let attempt = 1; attempt <= max; attempt++) {
     ctx.prompter.info(t("next.attempt", { attempt, max, backend: backend.name }));
     const startedAt = new Date();
-    await backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print });
-    await setTaskStatus(ctx.cwd, task, "in_progress");
-    const gate = await runGate(ctx, config, task, checks, approval);
-    await writeRunLog(ctx.cwd, task.meta.id, `# Attempt ${attempt}\n\n${gate.report}`);
-    const exhausted = !gate.passed && gate.retryable && attempt === max;
-    const outcome = gate.passed ? "done" : exhausted ? "blocked" : "failed";
-    await record(ctx, task, gate, startedAt, true, outcome);
-    if (gate.passed) return complete(ctx, task);
-    if (!gate.retryable) {
-      ctx.prompter.outro(t("next.notDone", { id: task.meta.id, command: `${CLI} next` }));
+    await runAgent(ctx, run, () =>
+      backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print }),
+    );
+    const result = await gate(ctx, run);
+    await writeRunLog(ctx.cwd, capture.id, `# Attempt ${attempt}\n\n${result.report}`);
+    const exhausted = !result.passed && result.retryable && attempt === max;
+    const outcome = result.passed ? "done" : exhausted ? "blocked" : "failed";
+    await record(ctx, capture, result, startedAt, true, outcome);
+    if (result.passed) return complete(ctx, capture);
+    if (!result.retryable) {
+      ctx.prompter.outro(t("next.notDone", { id: capture.id, command: `${CLI} next` }));
       return false;
     }
     if (exhausted) break;
-    await learnFromReviews(ctx, config, task, gate);
-    prompt = renderPrompt(await loadPrompt("retry", ctx.cwd), {
-      task: task.text,
-      failure: gate.report,
+    await learnFromReviews(ctx, capture, result);
+    prompt = renderPrompt(capturedPrompt(capture, "retry"), {
+      task: capture.task,
+      failure: result.report,
       attempt: String(attempt),
-      task_path: task.path,
+      task_path: capture.path,
       max_log_lines: String(MAX_LOG_LINES),
     });
   }
-  await setTaskStatus(ctx.cwd, task, "blocked");
-  await learnFromFailure(ctx, config, task, "blocked");
-  ctx.prompter.outro(t("next.blocked", { id: task.meta.id, path: `.bae/runs/${task.meta.id}/` }));
+  await setTaskStatus(ctx.cwd, capturedTask(capture), "blocked");
+  await learnFromFailure(ctx, capture, "blocked");
+  ctx.prompter.outro(
+    t("next.blocked", { id: capture.id, path: displayPath(runDir(ctx.cwd, capture.id)) }),
+  );
   return false;
 }
 
 async function record(
   ctx: CommandContext,
-  task: Task,
-  gate: Gate,
+  capture: Capture,
+  result: Gate,
   startedAt: Date,
   headless: boolean,
   outcome: AttemptOutcome,
 ): Promise<void> {
-  await recordAttempt(ctx.cwd, task.meta.id, {
+  await recordAttempt(ctx.cwd, capture.id, {
     startedAt: startedAt.toISOString(),
     durationMs: Date.now() - startedAt.getTime(),
     headless,
     outcome,
-    ...(gate.stage ? { stage: gate.stage } : {}),
-    regressions: gate.regressions,
+    ...(result.stage ? { stage: result.stage } : {}),
+    regressions: result.regressions,
   });
 }
 
-async function learnFromReviews(
-  ctx: CommandContext,
-  config: Config,
-  task: Task,
-  gate: Gate,
-): Promise<void> {
-  if (gate.stage !== "review") return;
-  const failures = (await readAttempts(ctx.cwd, task.meta.id)).filter(
+async function learnFromReviews(ctx: CommandContext, capture: Capture, result: Gate) {
+  if (result.stage !== "review") return;
+  const failures = (await readAttempts(ctx.cwd, capture.id)).filter(
     (attempt) => attempt.stage === "review",
   );
   if (failures.length >= REVIEW_FAILURES_FOR_LESSON) {
-    await learnFromFailure(ctx, config, task, "review");
+    await learnFromFailure(ctx, capture, "review");
   }
 }
 
-async function complete(ctx: CommandContext, task: Task): Promise<boolean> {
-  await setTaskStatus(ctx.cwd, task, "done");
-  ctx.prompter.outro(t("next.done", { id: task.meta.id, command: `${CLI} next` }));
+async function complete(ctx: CommandContext, capture: Capture): Promise<boolean> {
+  await setTaskStatus(ctx.cwd, capturedTask(capture), "done");
+  await saveCapture(ctx.cwd, { ...capture, finished: true });
+  ctx.prompter.outro(t("next.done", { id: capture.id, command: `${CLI} next` }));
   return true;
 }
 
-async function taskPrompt(
-  ctx: CommandContext,
-  config: Config,
-  task: Task,
-  tasks: Task[],
-): Promise<string> {
+async function taskPrompt(ctx: CommandContext, capture: Capture, tasks: Task[]): Promise<string> {
+  const task = capturedTask(capture);
   const others = tasks.map((item) => (item.meta.id === task.meta.id ? task : item));
   const metrics = await readMetrics(
     ctx.cwd,
     others.filter((item) => item.meta.status === "done").map((item) => item.meta.id),
   );
   return renderPrompt(await loadPrompt("task", ctx.cwd), {
-    context: planContext(config, others, task, completionTimes(metrics)),
+    context: planContext(capture.config, others, task, completionTimes(metrics)),
     task: task.text.trim(),
     task_path: task.path,
     max_log_lines: String(MAX_LOG_LINES),
     suite:
-      suiteCommands(config).length > 0
+      suiteCommands(capture.config).length > 0
         ? ", then the project's lint and test commands, which must not turn red"
         : "",
   });

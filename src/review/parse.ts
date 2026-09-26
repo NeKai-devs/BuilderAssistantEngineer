@@ -7,6 +7,7 @@ const reviewSchema = z.object({
     .array(
       z.object({
         severity: z.enum(["blocker", "major", "minor"]),
+        id: z.string().optional(),
         file: z.string().optional(),
         message: z.string().min(1),
       }),

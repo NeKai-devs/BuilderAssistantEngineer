@@ -68,7 +68,9 @@ describe("review", () => {
     expect(ui.log).toContain(
       "warn: Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
     );
-    expect(ui.log.join("\n")).toContain("- [blocker] .env: Parece un archivo de secretos");
+    expect(ui.log.join("\n")).toMatch(
+      /- \[blocker\] \(secret-[0-9a-f]{8}\) \.env: Parece un archivo de secretos/,
+    );
   });
 
   it("passes the automatic findings to the reviewer", async () => {

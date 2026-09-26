@@ -1,20 +1,19 @@
 import { readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { LANGUAGE_NAMES } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import { readLessons, withLessons } from "../artifacts/lessons.js";
 import { managedBody, mergeManaged } from "../artifacts/merge.js";
 import type { CommandContext } from "../commands/context.js";
-import type { Config } from "../config/schema.js";
 import { FormatError, UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
-import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
+import { renderPrompt } from "../core/prompt-loader.js";
+import { displayPath } from "../core/state.js";
 import { truncateText } from "../digest/format.js";
+import { type Capture, capturedPrompt, trustAgentsMd } from "../gates/capture.js";
 import { t } from "../i18n/index.js";
-import { markUnchanged } from "../review/snapshot.js";
 import { runDir } from "./runs.js";
-import type { Task } from "./schema.js";
 
 export type LessonReason = "blocked" | "review";
 export type Lesson = { rootCause: string; rule: string };
@@ -58,15 +57,14 @@ export function parseLesson(text: string): Lesson {
 
 export async function learnFromFailure(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
+  capture: Capture,
   reason: LessonReason,
 ): Promise<void> {
-  const path = join(runDir(ctx.cwd, task.meta.id), LESSON_FILE);
-  if (config.backend === "manual" || (await readTextIfExists(path)) !== undefined) return;
-  const lesson = await askLesson(ctx, config, task, reason);
+  const path = join(runDir(ctx.cwd, capture.id), LESSON_FILE);
+  if (capture.config.backend === "manual" || (await readTextIfExists(path)) !== undefined) return;
+  const lesson = await askLesson(ctx, capture, reason);
   if (!lesson) return;
-  const { id } = task.meta;
+  const { id } = capture;
   ctx.prompter.note(
     t("lesson.body", { cause: lesson.rootCause, rule: lesson.rule }),
     t("lesson.title", { id }),
@@ -74,47 +72,49 @@ export async function learnFromFailure(
   const approved = ctx.flags.yes || (await ctx.prompter.confirm(t("lesson.confirm"), true));
   await writeText(path, renderLesson(id, reason, lesson, approved));
   if (!approved) {
-    ctx.prompter.info(t("lesson.skipped", { path: relative(ctx.cwd, path).split("\\").join("/") }));
+    ctx.prompter.info(t("lesson.skipped", { path: displayPath(path) }));
     return;
   }
   await addLesson(ctx.cwd, lesson.rule);
-  await markUnchanged(ctx.cwd, id, [AGENTS_MD]);
+  await trustAgentsMd(ctx.cwd, capture, withRule(capture.agentsMd, lesson.rule));
   ctx.prompter.success(t("lesson.added"));
 }
 
-export async function addLesson(cwd: string, rule: string): Promise<void> {
+export async function addLesson(cwd: string, rule: string): Promise<string> {
   const path = join(cwd, AGENTS_MD);
-  const before = await readTextIfExists(path);
+  const text = withRule(await readTextIfExists(path), rule);
+  await writeText(path, text);
+  return text;
+}
+
+export function withRule(before: string | undefined, rule: string): string {
   const lessons = readLessons(before ?? "");
-  if (lessons.includes(rule)) return;
+  if (lessons.includes(rule)) return before ?? "";
   const body = withLessons(managedBody(before ?? ""), [...lessons, rule]);
-  await writeText(path, mergeManaged(before, body, AGENTS_MD));
+  return mergeManaged(before, body, AGENTS_MD);
 }
 
 async function askLesson(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
+  capture: Capture,
   reason: LessonReason,
 ): Promise<Lesson | undefined> {
-  const prompt = renderPrompt(await loadPrompt("lesson", ctx.cwd), {
+  const prompt = renderPrompt(capturedPrompt(capture, "lesson"), {
     reason: REASONS[reason],
-    task: task.text,
-    failures: await recentRuns(ctx.cwd, task.meta.id),
-    agents_md: truncateText(
-      (await readTextIfExists(join(ctx.cwd, "AGENTS.md"))) ?? "(none)",
-      MAX_AGENTS_MD,
-    ),
-    output_language: LANGUAGE_NAMES[config.lang],
+    task: capture.task,
+    failures: await recentRuns(ctx.cwd, capture.id),
+    agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),
+    output_language: LANGUAGE_NAMES[capture.config.lang],
   });
   try {
-    return await ctx.prompter.spinner(t("lesson.asking", { id: task.meta.id }), () =>
+    return await ctx.prompter.spinner(t("lesson.asking", { id: capture.id }), () =>
       runWithFormatRetry({
-        backend: ctx.createBackend(config.backend),
+        backend: ctx.createBackend(capture.config.backend),
         prompt,
         options: { cwd: ctx.cwd, access: "read" },
         parse: parseLesson,
         format: LESSON_FORMAT,
+        fixPrompt: capturedPrompt(capture, "fix-format"),
         onRetry: () => ctx.prompter.warn(t("format.retrying")),
       }),
     );

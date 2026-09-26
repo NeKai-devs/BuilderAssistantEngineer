@@ -3,7 +3,7 @@ import type { Backend, RunOptions } from "../backends/types.js";
 import { FormatError, UserError } from "../core/errors.js";
 import { writeText } from "../core/fs.js";
 import { baePaths } from "../core/paths.js";
-import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
+import { loadPrompt, type Prompt, renderPrompt } from "../core/prompt-loader.js";
 import { t } from "../i18n/index.js";
 
 export type FormatRequest<T> = {
@@ -12,6 +12,7 @@ export type FormatRequest<T> = {
   options: RunOptions;
   parse: (text: string) => T;
   format: string;
+  fixPrompt?: Prompt;
   onRetry?: (error: FormatError) => void;
   complete?: (text: string) => Promise<string>;
 };
@@ -25,7 +26,7 @@ export async function runWithFormatRetry<T>(request: FormatRequest<T>): Promise<
   } catch (error) {
     if (!(error instanceof FormatError)) throw error;
     request.onRetry?.(error);
-    const fix = renderPrompt(await loadPrompt("fix-format", options.cwd), {
+    const fix = renderPrompt(request.fixPrompt ?? (await loadPrompt("fix-format", options.cwd)), {
       error: error.message,
       format: request.format,
       previous_response: first,

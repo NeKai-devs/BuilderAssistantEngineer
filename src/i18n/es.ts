@@ -230,7 +230,7 @@ export const es: Messages = {
   "lesson.added": "Regla añadida a AGENTS.md.",
   "lesson.skipped": "Regla no añadida; queda en {{path}}.",
   "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
-  "status.metrics": "Métricas de .bae/runs",
+  "status.metrics": "Métricas locales",
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
   "status.regressions": "regresiones atrapadas: {{count}}",
@@ -243,4 +243,28 @@ export const es: Messages = {
     "{{id}} ya estaba en curso sin línea base de regresión; se registra ahora, así que los fallos que causaron sus cambios anteriores cuentan como preexistentes.",
   "regression.noCommands":
     "No hay comando de lint ni de test en .bae/config.json ni en los manifiestos; el chequeo de regresión queda desactivado hasta que los añadas en commands.",
+  "option.acceptFinding":
+    "acepta un hallazgo por su id (repetible); solo secretos, y hallazgos de contrato o de tests en archivos que el Alcance de la tarea lista",
+  "review.noBase":
+    "Revisión fallida: el commit registrado al empezar la tarea ya no existe, así que no se pueden aislar sus cambios.",
+  "review.noCapture": "{{id}} no tiene captura de next; se revisa contra el HEAD actual.",
+  "capture.late":
+    "{{id}} ya estaba en curso sin captura; se captura ahora, así que los cambios anteriores a esta ejecución cuentan como preexistentes.",
+  "contract.title": "Contrato",
+  "contract.failed":
+    "La tarea cambió archivos que definen sus propios chequeos; se restauraron desde el estado capturado antes de la tarea.",
+  "contract.recovered":
+    "Una ejecución anterior de {{id}} terminó antes de sus chequeos; se restauraron los archivos que cambió y que definen los chequeos.",
+  "contract.task": "Editó el archivo de la tarea fuera de ## Log.",
+  "contract.tasks": "Editó otro archivo de tarea.",
+  "contract.bae": "Cambió la configuración o los prompts de bae.",
+  "contract.agents":
+    "Cambió la definición de un agente o la configuración con la que corre el revisor.",
+  "contract.gitignore": "Cambió un archivo de ignore, que decide qué ve la revisión.",
+  "contract.scripts": "Cambió {{detail}}, que los chequeos ejecutan.",
+  "contract.runner": "Cambió la configuración del runner de tests.",
+  "contract.restored": "Restaurado.",
+  "contract.removed": "Eliminado.",
+  "findings.accepted": "Aceptado con --accept-finding.",
+  "findings.acceptedTitle": "Hallazgos aceptados",
 };

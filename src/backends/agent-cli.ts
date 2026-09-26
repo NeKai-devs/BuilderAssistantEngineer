@@ -42,7 +42,9 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       "--no-session-persistence",
       "--permission-prompts",
       "none",
-      ...(access === "read" ? ["--tools", "Read,Grep,Glob"] : ["--permission-mode", "acceptEdits"]),
+      ...(access === "read"
+        ? ["--tools", "Read,Grep,Glob", "--setting-sources", "user"]
+        : ["--permission-mode", "acceptEdits"]),
     ],
     interactive: (instruction) => [instruction],
     jsonOutput: true,

@@ -5,7 +5,7 @@ import { main } from "../../src/cli.js";
 import { writeConfig } from "../../src/config/store.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
 import { fakePrompter, type Step, scriptedBackend } from "../fakes.js";
-import { gitCommitAll, tempDir, writeFiles } from "../helpers.js";
+import { gitCommitAll, runFile, tempDir, writeFiles } from "../helpers.js";
 import { taskFile } from "../plan-sample.js";
 
 const PASS = 'node -e "process.exit(0)"';
@@ -76,7 +76,10 @@ const statusOf = async (cwd: string, path: string) =>
   splitFrontmatter(await readFile(join(cwd, path), "utf8"))?.data.status;
 
 const logs = async (cwd: string, id: string) =>
-  (await readdir(join(cwd, ".bae", "runs", id))).filter((name) => name.endsWith(".md"));
+  (await readdir(runFile(cwd, id))).filter((name) => name.endsWith(".md"));
+
+const capture = async (cwd: string, id = "T-001") =>
+  JSON.parse(await readFile(runFile(cwd, id, "capture.json"), "utf8"));
 
 describe("next", () => {
   it("opens an interactive session, verifies, reviews and marks the task done", async () => {
@@ -97,7 +100,7 @@ describe("next", () => {
     expect(printed).toContain(`$ ${PASS}`);
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("done");
     expect(await logs(cwd, "T-001")).toHaveLength(1);
-    expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(".bae/runs/");
+    expect(await readFile(join(cwd, ".gitignore"), "utf8")).toContain(".bae/tmp/");
     expect(ui.log.at(-1)).toBe("outro: T-001 is done. Next: npx builder-assistant-engineer next");
   });
 
@@ -173,7 +176,7 @@ describe("next", () => {
     expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toBe(
       "# Rules\n\n<!-- bae:begin -->\n## Lessons learned\n\n<!-- bae:lessons -->\n- Run the Verification commands before finishing.\n<!-- bae:lessons:end -->\n<!-- bae:end -->\n",
     );
-    const attempts = (await readFile(join(cwd, ".bae/runs/T-001/attempts.jsonl"), "utf8"))
+    const attempts = (await readFile(runFile(cwd, "T-001", "attempts.jsonl"), "utf8"))
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
@@ -235,7 +238,7 @@ describe("next regression gate", () => {
       `warn: \`${FAIL}\` already fails before the task (exit 1); recorded as preexisting, it will not block.`,
     );
     expect(ui.log).toContain(`info: \`${FAIL}\` still fails (exit 1), as it did before the task.`);
-    expect(JSON.parse(await readFile(join(cwd, ".bae/runs/T-001/baseline.json"), "utf8"))).toEqual({
+    expect((await capture(cwd)).baseline).toEqual({
       skipped: false,
       exitCodes: { lint: 0, test: 1 },
     });
@@ -250,7 +253,7 @@ describe("next regression gate", () => {
       `- [minor] \`${FAIL}\` failed before the task and still fails (exit 1), so it did not block.`,
     );
     const [log] = await logs(cwd, "T-001");
-    const report = await readFile(join(cwd, ".bae/runs/T-001", log ?? ""), "utf8");
+    const report = await readFile(runFile(cwd, "T-001", log ?? ""), "utf8");
     expect(report).toContain(`$ ${FAIL} (exit 1, preexisting: it already failed before the task)`);
     expect(await statusOf(cwd, TASK)).toBe("done");
   });
@@ -272,7 +275,7 @@ describe("next regression gate", () => {
     expect(ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
     expect(await statusOf(cwd, TASK)).toBe("in_progress");
     const [log] = await logs(cwd, "T-001");
-    const report = await readFile(join(cwd, ".bae/runs/T-001", log ?? ""), "utf8");
+    const report = await readFile(runFile(cwd, "T-001", log ?? ""), "utf8");
     expect(report).toContain("regression: it passed before the task");
   });
 
@@ -299,7 +302,7 @@ describe("next regression gate", () => {
     const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(code).toBe(1);
     expect(ui.log).toContain(`warn: Regression: \`${FAIL}\` exits with 1 after the task.`);
-    expect(await readdir(join(cwd, ".bae/runs/T-001"))).not.toContain("baseline.json");
+    expect((await capture(cwd)).baseline).toBeUndefined();
   });
 
   it("runs no suite when the gate is off and reuses verification results", async () => {
@@ -313,16 +316,14 @@ describe("next regression gate", () => {
     expect(second.printed.split(`$ ${PASS}`)).toHaveLength(3);
   });
 
-  it("keeps the first baseline when a task is started again, and records a late one with a warning", async () => {
+  it("keeps the first baseline when a task is started again, and captures a late one with a warning", async () => {
     const test = BREAKS_WITH("broken.txt");
     const cwd = await repo(PASS, { commands: { test } });
-    await writeFiles(cwd, {
-      ".bae/runs/T-001/baseline.json": JSON.stringify({ skipped: false, exitCodes: { test: 0 } }),
-      "broken.txt": "left by an earlier attempt\n",
-    });
-    const reset = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
-    expect(reset.code).toBe(1);
-    expect(reset.ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
+    const first = await runNext(cwd, ["--yes"], [writesFile(cwd, "broken.txt")]);
+    expect(first.code).toBe(1);
+    const again = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    expect(again.code).toBe(1);
+    expect(again.ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
     const late = await repo(PASS, { commands: { test: FAIL } });
     await writeFiles(late, {
       "docs/plan/tasks/T-001-first.md": taskFile("T-001", { status: "in_progress", command: PASS }),
@@ -330,7 +331,7 @@ describe("next regression gate", () => {
     const resumed = await runNext(late, ["--yes"], [writesFile(late, "a.txt"), REVIEW_PASS]);
     expect(resumed.code).toBe(0);
     expect(resumed.ui.log).toContain(
-      "warn: T-001 was already in progress without a regression baseline; recording it now, so failures its earlier changes caused count as preexisting.",
+      "warn: T-001 was already in progress without a capture; capturing it now, so changes made before this run count as preexisting.",
     );
   });
 
@@ -388,7 +389,10 @@ describe("next mechanical review", () => {
     };
     const { code, ui } = await runNext(cwd, ["--yes"], [cheats]);
     expect(code).toBe(1);
-    expect(ui.log.join("\n")).toContain("The task requires tests (tests: required)");
+    expect(ui.log.join("\n")).toContain(`${path}: Edited the task file outside ## Log. Restored.`);
+    const restored = await readFile(join(cwd, path), "utf8");
+    expect(restored).toContain("tests: required");
+    expect(restored).toContain("Added the feature file; no traps.");
   });
 
   it("ignores files that were already uncommitted before the task, unless the task changes them", async () => {
@@ -408,7 +412,9 @@ describe("next mechanical review", () => {
     };
     const second = await runNext(cwd2, ["--yes"], [edits]);
     expect(second.code).toBe(1);
-    expect(second.ui.log.join("\n")).toContain("- [blocker] .env: Looks like a secrets file");
+    expect(second.ui.log.join("\n")).toMatch(
+      /- \[blocker\] \(secret-[0-9a-f]{8}\) \.env: Looks like a secrets file/,
+    );
   });
 
   it("skips the reviewer when the change adds a secrets file and retries with the finding", async () => {
@@ -425,7 +431,9 @@ describe("next mechanical review", () => {
     );
     expect(code).toBe(0);
     expect(calls).toHaveLength(3);
-    expect(calls[1]?.prompt).toContain("- [blocker] .env: Looks like a secrets file");
+    expect(calls[1]?.prompt).toMatch(
+      /- \[blocker\] \(secret-[0-9a-f]{8}\) \.env: Looks like a secrets file/,
+    );
     expect(calls[2]?.options).toMatchObject({ access: "read" });
   });
 });
@@ -513,8 +521,10 @@ describe("next lessons", () => {
     expect(second.ui.log).toContain(
       "note: Lesson from T-001 Root cause: Tests were skipped.\nRule: Add a test for every new route.",
     );
-    expect(second.ui.log).toContain("info: Rule not added; it stays in .bae/runs/T-001/lesson.md.");
-    expect(await readFile(join(cwd, ".bae/runs/T-001/lesson.md"), "utf8")).toContain(
+    expect(second.ui.log.join("\n")).toMatch(
+      /info: Rule not added; it stays in .*T-001\/lesson\.md\./,
+    );
+    expect(await readFile(runFile(cwd, "T-001", "lesson.md"), "utf8")).toContain(
       "- Added to AGENTS.md: no",
     );
     expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toBe("# Rules\n");

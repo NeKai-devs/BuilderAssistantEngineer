@@ -1,21 +1,17 @@
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
 import { LANGUAGE_NAMES } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import type { CommandContext } from "../commands/context.js";
-import type { Config } from "../config/schema.js";
-import { readTextIfExists } from "../core/fs.js";
-import { BAE_DIR } from "../core/paths.js";
-import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
+import { renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
+import { type Capture, capturedPrompt } from "../gates/capture.js";
+import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
-import { readBase } from "../tasks/runs.js";
-import type { Task } from "../tasks/schema.js";
+import { parseTask, type Task } from "../tasks/schema.js";
 import { taskChanges } from "./changes.js";
-import { taskDiff } from "./diff.js";
+import { reviewDiff } from "./diff.js";
 import { mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
-import { readSnapshot, unchangedSince } from "./snapshot.js";
+import { scopePaths } from "./scope.js";
 
 export type ReviewResult = {
   status: "pass" | "fail" | "skipped";
@@ -24,33 +20,30 @@ export type ReviewResult = {
   stage?: "mechanical" | "reviewer";
 };
 
-const AGENT_DIRS = [".claude/agents", ".opencode/agent"];
 const MAX_AGENTS_MD = 20_000;
-const DEFAULT_REVIEWER =
-  "A strict senior code reviewer. Checks that the changes meet every acceptance criterion, follow the project conventions, include tests, stay within the task scope and introduce no security issues.";
+
+export function capturedTask(capture: Capture): Task {
+  return parseTask(capture.path, capture.task);
+}
 
 export async function reviewTask(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
+  capture: Capture,
   notes: ReviewFinding[] = [],
+  acceptance: Acceptance = newAcceptance(),
 ): Promise<ReviewResult> {
-  const base = await readBase(ctx.cwd, task.meta.id);
-  const changes = await taskChanges(ctx.cwd, base, [BAE_DIR, task.path]);
-  if (changes === undefined) {
-    return { status: "skipped", findings: [], reason: t("review.noGit") };
+  const task = capturedTask(capture);
+  const view = await taskChanges(ctx.cwd, capture);
+  if (!view.ok) {
+    const reason = t(view.reason === "noGit" ? "review.noGit" : "review.noBase");
+    return view.reason === "noGit"
+      ? { status: "skipped", findings: [], reason }
+      : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
   }
-  const snapshot = await readSnapshot(ctx.cwd, task.meta.id);
-  const before = await unchangedSince(ctx.cwd, snapshot, changes.files);
-  const own = {
-    files: changes.files.filter((file) => !before.has(file)),
-    added: changes.added.filter((item) => !before.has(item.path)),
-  };
-  const diff = (await taskDiff(ctx.cwd, base, [BAE_DIR, task.path, ...before])) ?? "";
-  if (diff.trim() === "") {
+  if (view.changes.files.length === 0) {
     return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
   }
-  const mechanical = mechanicalReview(task, own);
+  const mechanical = mechanicalReview(task, view.changes, acceptance);
   if (!mechanical.passed) {
     return {
       status: "fail",
@@ -59,22 +52,20 @@ export async function reviewTask(
       stage: "mechanical",
     };
   }
-  const prompt = renderPrompt(await loadPrompt("review", ctx.cwd), {
-    reviewer: await findReviewer(ctx.cwd, config.backend),
-    agents_md: truncateText(
-      (await readTextIfExists(join(ctx.cwd, "AGENTS.md"))) ?? "(none)",
-      MAX_AGENTS_MD,
-    ),
-    task: task.text,
-    diff,
+  const diff = await reviewDiff(ctx.cwd, view.ref, view.changes, scopePaths(task));
+  const prompt = renderPrompt(capturedPrompt(capture, "review"), {
+    reviewer: capture.reviewer,
+    agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),
+    task: capture.task,
+    diff: diff.text,
     checks: formatFindings([...mechanical.findings, ...notes]) || "(none)",
-    output_language: LANGUAGE_NAMES[config.lang],
+    output_language: LANGUAGE_NAMES[capture.config.lang],
   });
   if (ctx.flags.dryRun) {
     ctx.print(`${prompt}\n`);
     return { status: "skipped", findings: [], reason: t("review.dryRun") };
   }
-  const backend = ctx.createBackend(config.backend);
+  const backend = ctx.createBackend(capture.config.backend);
   const reply = await ctx.prompter.spinner(t("review.running", { id: task.meta.id }), () =>
     runWithFormatRetry({
       backend,
@@ -82,6 +73,7 @@ export async function reviewTask(
       options: { cwd: ctx.cwd, access: "read" },
       parse: parseReview,
       format: REVIEW_FORMAT,
+      fixPrompt: capturedPrompt(capture, "fix-format"),
       onRetry: () => ctx.prompter.warn(t("format.retrying")),
     }),
   );
@@ -93,31 +85,11 @@ export async function reviewTask(
   };
 }
 
-export async function findReviewer(cwd: string, backend: Config["backend"]): Promise<string> {
-  const dirs = backend === "opencode" ? [...AGENT_DIRS].reverse() : AGENT_DIRS;
-  for (const dir of dirs) {
-    const path = join(cwd, ...dir.split("/"));
-    const name = (await listNames(path)).find(
-      (entry) => /review/i.test(entry) && entry.endsWith(".md"),
-    );
-    if (name) return (await readTextIfExists(join(path, name))) ?? DEFAULT_REVIEWER;
-  }
-  return DEFAULT_REVIEWER;
-}
-
 export function formatFindings(findings: ReviewFinding[]): string {
   return findings
     .map(
       (finding) =>
-        `- [${finding.severity}] ${finding.file ? `${finding.file}: ` : ""}${finding.message}`,
+        `- [${finding.severity}]${finding.id ? ` (${finding.id})` : ""} ${finding.file ? `${finding.file}: ` : ""}${finding.message}`,
     )
     .join("\n");
-}
-
-async function listNames(dir: string): Promise<string[]> {
-  try {
-    return (await readdir(dir)).sort();
-  } catch {
-    return [];
-  }
 }

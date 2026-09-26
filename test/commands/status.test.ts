@@ -1,7 +1,7 @@
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
-import { tempDir, writeFiles } from "../helpers.js";
+import { runFile, tempDir, writeFiles } from "../helpers.js";
 import { taskFile } from "../plan-sample.js";
 
 describe("status", () => {
@@ -33,7 +33,7 @@ describe("status", () => {
     expect(output).toContain("1/3 done (33%) · next: T-002 Add health");
   });
 
-  it("adds local metrics from the attempts recorded in .bae/runs", async () => {
+  it("adds local metrics from the attempts recorded outside the repository", async () => {
     const cwd = await tempDir();
     const attempt = (outcome: string, durationMs: number, stage?: string) =>
       JSON.stringify({
@@ -49,9 +49,11 @@ describe("status", () => {
       "docs/plan/tasks/T-002-b.md": taskFile("T-002", { status: "done", title: "Second" }),
       "docs/plan/tasks/T-003-c.md": taskFile("T-003", { status: "in_progress", title: "Third" }),
       "docs/plan/tasks/T-004-d.md": taskFile("T-004", { title: "Fourth" }),
-      ".bae/runs/T-001/attempts.jsonl": `${attempt("failed", 60_000, "regression")}\n${attempt("done", 120_000)}\n`,
-      ".bae/runs/T-002/attempts.jsonl": `${attempt("done", 30_000)}\nnot json\n`,
-      ".bae/runs/T-003/attempts.jsonl": `${attempt("failed", 45_000, "review")}\n`,
+    });
+    await writeFiles(runFile(cwd, ""), {
+      "T-001/attempts.jsonl": `${attempt("failed", 60_000, "regression")}\n${attempt("done", 120_000)}\n`,
+      "T-002/attempts.jsonl": `${attempt("done", 30_000)}\nnot json\n`,
+      "T-003/attempts.jsonl": `${attempt("failed", 45_000, "review")}\n`,
     });
     const printed: string[] = [];
     await main(["node", "bae", "status"], cwd, { print: (text) => printed.push(text) });
@@ -61,7 +63,7 @@ describe("status", () => {
     expect(output).toContain("○ T-004  S  low     Fourth  pending\n");
     expect(output).toContain(
       [
-        "Metrics from .bae/runs",
+        "Local metrics",
         "  attempts: 4 over 3 task(s), 1.3 per task",
         "  done on the first attempt: 1/3 (33%)",
         "  regressions caught: 1",

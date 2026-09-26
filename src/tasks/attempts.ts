@@ -5,6 +5,7 @@ import { asRecord } from "../core/json.js";
 import { runDir } from "./runs.js";
 
 export const GATE_STAGES = [
+  "contract",
   "refused",
   "declined",
   "verification",

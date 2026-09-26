@@ -1,17 +1,9 @@
 import { join } from "node:path";
-import { readTextIfExists, writeText } from "../core/fs.js";
-import { baePaths } from "../core/paths.js";
+import { writeText } from "../core/fs.js";
+import { repoState } from "../core/state.js";
 
 export function runDir(cwd: string, id: string): string {
-  return join(baePaths(cwd).runs, id);
-}
-
-export async function readBase(cwd: string, id: string): Promise<string | undefined> {
-  return (await readTextIfExists(join(runDir(cwd, id), "base")))?.trim() || undefined;
-}
-
-export async function saveBase(cwd: string, id: string, commit: string): Promise<void> {
-  await writeText(join(runDir(cwd, id), "base"), `${commit}\n`);
+  return join(repoState(cwd), "runs", id);
 }
 
 export async function writeRunLog(cwd: string, id: string, content: string): Promise<string> {

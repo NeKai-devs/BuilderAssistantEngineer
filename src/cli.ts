@@ -6,7 +6,7 @@ import { type InitOptions, runInit } from "./commands/init.js";
 import { type NextOptions, runNext } from "./commands/next.js";
 import { type PlanOptions, runPlan } from "./commands/plan.js";
 import { runReplan } from "./commands/replan.js";
-import { runReview } from "./commands/review.js";
+import { type ReviewOptions, runReview } from "./commands/review.js";
 import { runStatus } from "./commands/status.js";
 import { BACKENDS } from "./config/schema.js";
 import { type GlobalFlags, resolveSettings } from "./config/settings.js";
@@ -61,6 +61,7 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("next")
     .description(t("command.next"))
     .option("--headless", t("option.headless"))
+    .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
     .action((options: NextOptions, command: Command) => runNext(context(command), options));
   program
     .command("status")
@@ -74,11 +75,16 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("review")
     .description(t("command.review"))
     .argument("[task]", t("argument.task"))
-    .action((task: string | undefined, _options: unknown, command: Command) =>
-      runReview(context(command), task),
+    .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
+    .action((task: string | undefined, options: ReviewOptions, command: Command) =>
+      runReview(context(command), task, options),
     );
 
   return program;
+}
+
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value];
 }
 
 export function scanLang(argv: string[]): Lang | undefined {

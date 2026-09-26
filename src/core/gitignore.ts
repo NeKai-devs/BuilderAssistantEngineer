@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readTextIfExists, writeText } from "./fs.js";
 
-export const BAE_IGNORED = [".bae/runs/", ".bae/tmp/"];
+export const BAE_IGNORED = [".bae/tmp/"];
 
 export async function ensureGitignore(cwd: string): Promise<string[]> {
   const path = join(cwd, ".gitignore");

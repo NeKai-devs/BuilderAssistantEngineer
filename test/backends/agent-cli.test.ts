@@ -52,6 +52,8 @@ describe("agent CLI backends", () => {
           "none",
           "--tools",
           "Read,Grep,Glob",
+          "--setting-sources",
+          "user",
         ],
         input: "PROMPT",
         mode: "run",

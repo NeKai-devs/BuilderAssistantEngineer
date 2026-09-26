@@ -223,7 +223,7 @@ export const en = {
   "lesson.added": "Rule added to AGENTS.md.",
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
-  "status.metrics": "Metrics from .bae/runs",
+  "status.metrics": "Local metrics",
   "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
   "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",
   "status.regressions": "regressions caught: {{count}}",
@@ -236,6 +236,29 @@ export const en = {
     "{{id}} was already in progress without a regression baseline; recording it now, so failures its earlier changes caused count as preexisting.",
   "regression.noCommands":
     "No lint or test command in .bae/config.json or the manifests; the regression check is off until you add them under commands.",
+  "option.acceptFinding":
+    "accept one finding by its id (repeatable); only secrets, and contract or test findings on files the task's Scope lists",
+  "review.noBase":
+    "Review failed: the commit recorded when the task started no longer exists, so the task's changes cannot be isolated.",
+  "review.noCapture": "{{id}} has no capture from next; reviewing it against the current HEAD.",
+  "capture.late":
+    "{{id}} was already in progress without a capture; capturing it now, so changes made before this run count as preexisting.",
+  "contract.title": "Contract",
+  "contract.failed":
+    "The task changed files that define its own checks; they were restored from the state captured before the task.",
+  "contract.recovered":
+    "An earlier run of {{id}} ended before its checks; the files it changed that define the checks were restored.",
+  "contract.task": "Edited the task file outside ## Log.",
+  "contract.tasks": "Edited another task file.",
+  "contract.bae": "Changed bae's own configuration or prompts.",
+  "contract.agents": "Changed an agent definition or the agent settings the reviewer runs with.",
+  "contract.gitignore": "Changed an ignore file, which decides what the review sees.",
+  "contract.scripts": "Changed {{detail}}, which the checks run.",
+  "contract.runner": "Changed the test runner configuration.",
+  "contract.restored": "Restored.",
+  "contract.removed": "Removed.",
+  "findings.accepted": "Accepted with --accept-finding.",
+  "findings.acceptedTitle": "Accepted findings",
 } as const;
 
 export type MessageKey = keyof typeof en;

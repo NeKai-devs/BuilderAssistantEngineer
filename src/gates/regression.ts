@@ -1,15 +1,16 @@
-import { join } from "node:path";
+import { z } from "zod";
 import type { Config } from "../config/schema.js";
-import { readTextIfExists, writeText } from "../core/fs.js";
-import { asRecord, parseObject } from "../core/json.js";
 import { runShell, type ShellResult } from "../core/process.js";
-import { runDir } from "../tasks/runs.js";
 
 export const SUITE_KEYS = ["lint", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
 export type SuiteCommand = { key: SuiteKey; command: string };
 export type SuiteResult = SuiteCommand & ShellResult;
-export type SuiteBaseline = { skipped: boolean; exitCodes: Partial<Record<SuiteKey, number>> };
+export const suiteBaselineSchema = z.object({
+  skipped: z.boolean(),
+  exitCodes: z.object({ lint: z.number().optional(), test: z.number().optional() }),
+});
+export type SuiteBaseline = z.output<typeof suiteBaselineSchema>;
 export type RegressionCheck = {
   passed: boolean;
   regressions: SuiteResult[];
@@ -17,7 +18,6 @@ export type RegressionCheck = {
   report: string;
 };
 
-const BASELINE_FILE = "baseline.json";
 const OUTPUT_TAIL = 3_000;
 
 export function suiteCommands(config: Config): SuiteCommand[] {
@@ -65,29 +65,6 @@ export function checkRegressions(
     preexisting,
     report: ["## Regression check", ...lines].join("\n\n"),
   };
-}
-
-export async function readSuiteBaseline(
-  cwd: string,
-  id: string,
-): Promise<SuiteBaseline | undefined> {
-  const data = parseObject((await readTextIfExists(join(runDir(cwd, id), BASELINE_FILE))) ?? "");
-  if (!data) return undefined;
-  const codes = asRecord(data.exitCodes);
-  const exitCodes: SuiteBaseline["exitCodes"] = {};
-  for (const key of SUITE_KEYS) {
-    const code = codes[key];
-    if (typeof code === "number") exitCodes[key] = code;
-  }
-  return { skipped: data.skipped === true, exitCodes };
-}
-
-export async function saveSuiteBaseline(
-  cwd: string,
-  id: string,
-  baseline: SuiteBaseline,
-): Promise<void> {
-  await writeText(join(runDir(cwd, id), BASELINE_FILE), `${JSON.stringify(baseline, null, 2)}\n`);
 }
 
 export function baselineFrom(results: SuiteResult[]): SuiteBaseline {

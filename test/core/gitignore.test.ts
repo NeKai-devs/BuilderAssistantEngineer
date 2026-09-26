@@ -7,11 +7,9 @@ import { tempDir, writeFiles } from "../helpers.js";
 describe("ensureGitignore", () => {
   it("creates or extends .gitignore once, keeping existing lines", async () => {
     const cwd = await tempDir();
-    await writeFiles(cwd, { ".gitignore": "node_modules/\n.bae/tmp/" });
-    expect(await ensureGitignore(cwd)).toEqual([".bae/runs/"]);
+    await writeFiles(cwd, { ".gitignore": "node_modules/" });
+    expect(await ensureGitignore(cwd)).toEqual([".bae/tmp/"]);
     expect(await ensureGitignore(cwd)).toEqual([]);
-    expect(await readFile(join(cwd, ".gitignore"), "utf8")).toBe(
-      "node_modules/\n.bae/tmp/\n.bae/runs/\n",
-    );
+    expect(await readFile(join(cwd, ".gitignore"), "utf8")).toBe("node_modules/\n.bae/tmp/\n");
   });
 });

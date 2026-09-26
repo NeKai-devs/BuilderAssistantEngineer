@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { taskChanges } from "../../src/review/changes.js";
-import { inScope, mechanicalReview, scopePaths } from "../../src/review/mechanical.js";
+import { mechanicalReview } from "../../src/review/mechanical.js";
+import { inScope, scopePaths } from "../../src/review/scope.js";
 import { parseTask } from "../../src/tasks/schema.js";
-import { copyFixture, gitCommitAll, writeFiles } from "../helpers.js";
+import { captureFor, copyFixture, gitCommitAll, writeFiles } from "../helpers.js";
 import { type TaskOptions, taskFile } from "../plan-sample.js";
 
 const fake = (...parts: string[]) => parts.join("");
@@ -16,10 +17,11 @@ function task(options: TaskOptions = {}) {
 async function changedRepo(files: Record<string, string>) {
   const cwd = await copyFixture("with-secrets");
   await gitCommitAll(cwd, "base");
+  const capture = await captureFor(cwd, task());
   await writeFiles(cwd, files);
-  const changes = await taskChanges(cwd, undefined, [".bae", TASK]);
-  if (!changes) throw new Error("expected a git repository");
-  return changes;
+  const view = await taskChanges(cwd, capture);
+  if (!view.ok) throw new Error("expected a git repository");
+  return view.changes;
 }
 
 describe("scopePaths", () => {
@@ -52,6 +54,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
     expect(result.passed).toBe(false);
     expect(result.findings).toContainEqual({
       severity: "blocker",
+      id: expect.stringMatching(/^secret-[0-9a-f]{8}$/),
       file: ".env",
       message:
         "Looks like a secrets file (.env, private key or credentials); keep it out of the change.",
