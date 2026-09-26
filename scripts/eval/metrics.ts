@@ -1,7 +1,10 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { FormatError } from "../../src/core/errors.js";
 import { readTextIfExists } from "../../src/core/fs.js";
-import { verificationCommands } from "../../src/tasks/schema.js";
+import { checkCitations } from "../../src/plan/evidence.js";
+import { logLines } from "../../src/tasks/handoff.js";
+import { parseTask, sectionText, type Task, verificationCommands } from "../../src/tasks/schema.js";
 
 export type Ratio = { hits: number; total: number };
 export type Citation = { path: string; line?: number; endLine?: number };
@@ -11,6 +14,9 @@ export type PlanMetrics = {
   tasksWithVerification: Ratio;
   lineRefs: Ratio;
   paths: Ratio;
+  claims: Ratio;
+  testsRequired: Ratio;
+  tasksWithLog: Ratio;
 };
 
 const CODE_SPAN = /`([^`\n]+)`/g;
@@ -24,12 +30,35 @@ export async function measurePlan(repo: string, files: ArtifactFile[]): Promise<
   const citations = uniqueCitations(files.flatMap((file) => extractCitations(file.text)));
   const checks = await Promise.all(citations.map((citation) => citationExists(repo, citation)));
   const withLines = citations.flatMap((citation, index) => (citation.line ? [checks[index]] : []));
+  const parsed = tasks.flatMap((task) => safeTask(task));
+  const planFiles = files.map((file) => ({ path: file.path, content: file.text }));
+  const evidence = await checkCitations(repo, { files: planFiles, tasks: parsed });
   return {
     tasks: tasks.length,
     tasksWithVerification: { hits: verified, total: tasks.length },
     lineRefs: { hits: withLines.filter(Boolean).length, total: withLines.length },
     paths: { hits: checks.filter(Boolean).length, total: checks.length },
+    claims: { hits: evidence.checked - evidence.unverified.length, total: evidence.checked },
+    testsRequired: {
+      hits: parsed.filter((task) => task.meta.tests === "required").length,
+      total: tasks.length,
+    },
+    tasksWithLog: {
+      hits: parsed.filter(
+        (task) => sectionText(task.body, "log") !== undefined && logLines(task).length === 0,
+      ).length,
+      total: tasks.length,
+    },
   };
+}
+
+function safeTask(file: ArtifactFile): Task[] {
+  try {
+    return [parseTask(file.path, file.text)];
+  } catch (error) {
+    if (error instanceof FormatError) return [];
+    throw error;
+  }
 }
 
 export function extractCitations(text: string): Citation[] {

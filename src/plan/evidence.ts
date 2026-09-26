@@ -80,30 +80,37 @@ const KNOWN_FILES = new Set([
   ".env",
 ]);
 
-export async function findUnverified(cwd: string, parsed: ParsedPlan): Promise<Unverified[]> {
+export type PlanEvidence = Pick<ParsedPlan, "files" | "tasks">;
+export type EvidenceCheck = { checked: number; unverified: Unverified[] };
+
+export async function findUnverified(cwd: string, plan: PlanEvidence): Promise<Unverified[]> {
+  return (await checkCitations(cwd, plan)).unverified;
+}
+
+export async function checkCitations(cwd: string, plan: PlanEvidence): Promise<EvidenceCheck> {
   const repo = await indexRepo(cwd);
-  const planned = plannedPaths(parsed.files);
+  const planned = plannedPaths(plan.files);
   const roots = new Set([...repo.roots, ...[...planned].map((path) => path.split("/")[0] ?? "")]);
-  const found: Unverified[] = [];
+  const unverified: Unverified[] = [];
   const seen = new Set<string>();
-  for (const { source, text } of evidenceSources(parsed)) {
+  for (const { source, text } of evidenceSources(plan)) {
     for (const citation of extractCitations(text, source, roots)) {
       const key = `${source}|${citation.path}|${citation.line ?? ""}|${citation.endLine ?? ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const problem = await verify(cwd, citation, repo, planned);
-      if (problem) found.push(problem);
+      if (problem) unverified.push(problem);
     }
   }
-  return found;
+  return { checked: seen.size, unverified };
 }
 
-export function evidenceSources(parsed: ParsedPlan): { source: string; text: string }[] {
+export function evidenceSources(plan: PlanEvidence): { source: string; text: string }[] {
   return [
-    ...parsed.files
+    ...plan.files
       .filter((file) => EVIDENCE_FILES.some((pattern) => pattern.test(file.path)))
       .map((file) => ({ source: file.path, text: file.content })),
-    ...parsed.tasks.map((task) => ({
+    ...plan.tasks.map((task) => ({
       source: task.path,
       text: sectionText(task.body, "context") ?? "",
     })),
