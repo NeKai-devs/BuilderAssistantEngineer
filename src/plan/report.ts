@@ -10,6 +10,7 @@ export type PlanStats = {
   costUsd?: number;
   continuations: number;
   formatRetries: number;
+  formatErrors: string[];
 };
 
 export type PlanReport = PlanStats & {
@@ -25,7 +26,7 @@ export type PlanReport = PlanStats & {
 export const PLAN_REPORT = "plan-report.json";
 
 export function newPlanStats(backend: string): PlanStats {
-  return { backend, models: [], continuations: 0, formatRetries: 0 };
+  return { backend, models: [], continuations: 0, formatRetries: 0, formatErrors: [] };
 }
 
 export function recordInfo(stats: PlanStats, info: RunInfo): void {

@@ -28,7 +28,7 @@ const CLI = join(ROOT, "dist", "bin.js");
 const FIXTURES = join(ROOT, "test", "fixtures", "repos");
 const BRIEFS = join(ROOT, "scripts", "eval", "briefs");
 const ARTIFACTS = ["AGENTS.md", "CLAUDE.md", "GEMINI.md", "docs/plan", ".claude", ".opencode"];
-const TIMEOUT_MS = 45 * 60_000;
+const TIMEOUT_MS = 90 * 60_000;
 
 const { values } = parseArgs({
   options: {
@@ -194,6 +194,7 @@ function meta(result: Result) {
     costUsd: report.costUsd,
     continuations: report.continuations ?? 0,
     formatRetries: report.formatRetries ?? 0,
+    formatErrors: report.formatErrors ?? [],
     questions: report.questions ?? 0,
     blockingQuestions: report.blockingQuestions ?? 0,
     lang: values.lang,

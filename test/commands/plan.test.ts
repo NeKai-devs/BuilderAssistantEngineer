@@ -127,6 +127,7 @@ describe("plan", () => {
     expect(await exists(cwd, "docs/plan/00-overview.md")).toBe(true);
     expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
       formatRetries: 1,
+      formatErrors: [expect.stringContaining("expected exactly one SUMMARY block")],
     });
   });
 

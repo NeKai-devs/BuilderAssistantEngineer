@@ -75,8 +75,9 @@ async function requestPlan(
       options,
       parse: (text) => parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer }),
       format: PLAN_FORMAT,
-      onRetry: () => {
+      onRetry: (error) => {
         stats.formatRetries++;
+        stats.formatErrors.push(error.message);
         ctx.prompter.warn(t("format.retrying"));
       },
       complete: (text) => continueTruncated(ctx, backend, prompt, text, options, stats),
