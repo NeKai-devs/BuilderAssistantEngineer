@@ -1,26 +1,37 @@
 import { readFileSync } from "node:fs";
 import { Command, CommanderError, Option } from "commander";
 import pc from "picocolors";
+import { type CommandContext, type CommandDeps, defaultDeps } from "./commands/context.js";
+import { type InitOptions, runInit } from "./commands/init.js";
 import { BACKENDS } from "./config/schema.js";
-import { resolveSettings } from "./config/settings.js";
+import { type GlobalFlags, resolveSettings } from "./config/settings.js";
 import { readConfig } from "./config/store.js";
 import { UserError } from "./core/errors.js";
 import { isLang, LANGS, type Lang, setLang, t } from "./i18n/index.js";
 
 const ONLY_GROUPS = ["plan", "agents", "memory"] as const;
 
-export async function main(argv: string[], cwd: string): Promise<number> {
+export async function main(
+  argv: string[],
+  cwd: string,
+  deps: Partial<CommandDeps> = {},
+): Promise<number> {
   const config = await readConfig(cwd).catch(() => undefined);
   setLang(resolveSettings({ lang: scanLang(argv) }, config).lang);
   try {
-    await buildProgram().parseAsync(argv);
+    await buildProgram({ ...defaultDeps(), ...deps }, cwd).parseAsync(argv);
     return 0;
   } catch (error) {
     return report(error);
   }
 }
 
-export function buildProgram(): Command {
+export function buildProgram(deps: CommandDeps, cwd: string): Command {
+  const context = (command: Command): CommandContext => ({
+    ...deps,
+    cwd,
+    flags: command.optsWithGlobals() as GlobalFlags,
+  });
   const program = new Command("builder-assistant-engineer")
     .description(t("program.description"))
     .exitOverride()
@@ -32,7 +43,11 @@ export function buildProgram(): Command {
     .option("--dry-run", t("option.dryRun"))
     .option("-y, --yes", t("option.yes"));
 
-  program.command("init").description(t("command.init")).action(notImplemented("init"));
+  program
+    .command("init")
+    .description(t("command.init"))
+    .option("--brief <paths>", t("option.brief"))
+    .action((options: InitOptions, command: Command) => runInit(context(command), options));
   program
     .command("plan")
     .description(t("command.plan"))

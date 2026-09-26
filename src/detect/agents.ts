@@ -39,7 +39,11 @@ export async function suggestBackend(
   env: Env = process.env,
   platform: NodeJS.Platform = process.platform,
 ): Promise<Backend> {
-  const [first] = await detectInstalledAgents(env, platform);
+  return pickDefaultBackend(await detectInstalledAgents(env, platform), env);
+}
+
+export function pickDefaultBackend(installed: AgentName[], env: Env): Backend {
+  const [first] = installed;
   if (first) return first;
   return hasApiCredentials(env) ? "api" : "manual";
 }
