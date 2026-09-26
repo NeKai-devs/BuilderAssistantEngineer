@@ -1,6 +1,6 @@
 {
   "name": "builder-assistant-engineer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Turn an idea or an existing repo into an execution plan that console AI agents can run.",
   "license": "MIT",
   "repository": {
