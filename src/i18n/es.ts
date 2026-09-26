@@ -228,4 +228,10 @@ export const es: Messages = {
   "lesson.added": "Regla añadida a AGENTS.md.",
   "lesson.skipped": "Regla no añadida; queda en {{path}}.",
   "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
+  "status.metrics": "Métricas de .bae/runs",
+  "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
+  "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
+  "status.regressions": "regresiones atrapadas: {{count}}",
+  "status.time": "tiempo por tarea hecha: {{average}} de media, {{total}} en total",
+  "status.taskRuns": "{{attempts}} intento(s), {{time}}",
 };

@@ -221,6 +221,12 @@ export const en = {
   "lesson.added": "Rule added to AGENTS.md.",
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
+  "status.metrics": "Metrics from .bae/runs",
+  "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
+  "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",
+  "status.regressions": "regressions caught: {{count}}",
+  "status.time": "time per done task: {{average}} on average, {{total}} in total",
+  "status.taskRuns": "{{attempts}} attempt(s), {{time}}",
 } as const;
 
 export type MessageKey = keyof typeof en;

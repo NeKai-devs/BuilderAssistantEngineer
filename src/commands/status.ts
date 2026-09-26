@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import { t } from "../i18n/index.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
+import { formatDuration, type RunMetrics, readMetrics } from "../tasks/metrics.js";
 import type { Task, TaskStatus } from "../tasks/schema.js";
 import { orderTasks, pickNext, waitingOn } from "../tasks/select.js";
 import type { CommandContext } from "./context.js";
@@ -22,10 +23,14 @@ export async function runStatus(ctx: CommandContext): Promise<void> {
     ctx.print(`${t("status.empty", { command: `${CLI} plan` })}\n`);
     return;
   }
-  ctx.print(`${renderStatus(loaded)}\n`);
+  const metrics = await readMetrics(
+    ctx.cwd,
+    loaded.map((item) => item.id),
+  );
+  ctx.print(`${renderStatus(loaded, metrics)}\n`);
 }
 
-export function renderStatus(loaded: LoadedTask[]): string {
+export function renderStatus(loaded: LoadedTask[], metrics?: RunMetrics): string {
   const tasks = loaded.flatMap((item) => (item.task ? [item.task] : []));
   const phases = [...new Set(orderTasks(tasks).map((task) => task.meta.phase))];
   const blocks = phases.map((phase) =>
@@ -33,37 +38,72 @@ export function renderStatus(loaded: LoadedTask[]): string {
       phase,
       orderTasks(tasks).filter((task) => task.meta.phase === phase),
       tasks,
+      metrics,
     ),
   );
   const invalid = loaded.filter((item) => item.error).map((item) => `${pc.red("!")} ${item.error}`);
-  return [...blocks, ...(invalid.length > 0 ? [invalid.join("\n")] : []), summary(tasks)].join(
-    "\n\n",
-  );
+  return [
+    ...blocks,
+    ...(invalid.length > 0 ? [invalid.join("\n")] : []),
+    summary(tasks),
+    ...(metrics && metrics.attempts > 0 ? [renderMetrics(metrics)] : []),
+  ].join("\n\n");
 }
 
-function renderPhase(phase: number, tasks: Task[], all: Task[]): string {
+function renderPhase(phase: number, tasks: Task[], all: Task[], metrics?: RunMetrics): string {
   const done = tasks.filter((task) => task.meta.status === "done").length;
   const header = `${pc.bold(t("status.phase", { phase }))}  ${bar(done, tasks.length)} ${done}/${tasks.length}`;
-  return [header, ...tasks.map((task) => renderTask(task, all))].join("\n");
+  return [header, ...tasks.map((task) => renderTask(task, all, metrics))].join("\n");
 }
 
-function renderTask(task: Task, all: Task[]): string {
+function renderTask(task: Task, all: Task[], metrics?: RunMetrics): string {
   const { id, size, risk, status, title } = task.meta;
   const waiting = status === "pending" ? waitingOn(task, all) : [];
   const note =
     waiting.length > 0 ? pc.dim(`  ${t("status.waiting", { ids: waiting.join(", ") })}`) : "";
   const label = status === "done" ? "" : pc.dim(`  ${status}`);
-  return `  ${SYMBOLS[status]} ${id}  ${size}  ${risk.padEnd(6)}  ${truncate(title)}${label}${note}`;
+  const runs = metrics?.tasks.get(id);
+  const effort = runs
+    ? pc.dim(
+        `  ${t("status.taskRuns", { attempts: runs.attempts, time: formatDuration(runs.durationMs) })}`,
+      )
+    : "";
+  return `  ${SYMBOLS[status]} ${id}  ${size}  ${risk.padEnd(6)}  ${truncate(title)}${label}${note}${effort}`;
 }
 
 function summary(tasks: Task[]): string {
   const done = tasks.filter((task) => task.meta.status === "done").length;
-  const percent = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
   const next = pickNext(tasks);
   const nextText = next
     ? t("status.next", { id: next.meta.id, title: next.meta.title })
     : t("status.noNext");
-  return `${t("status.total", { done, total: tasks.length, percent })} · ${nextText}`;
+  return `${t("status.total", { done, total: tasks.length, percent: percent(done, tasks.length) })} · ${nextText}`;
+}
+
+function renderMetrics(metrics: RunMetrics): string {
+  const average = (metrics.attempts / Math.max(metrics.attempted, 1)).toFixed(1);
+  const lines = [
+    t("status.attempts", { attempts: metrics.attempts, tasks: metrics.attempted, average }),
+    t("status.firstAttempt", {
+      count: metrics.doneOnFirst,
+      tasks: metrics.attempted,
+      percent: percent(metrics.doneOnFirst, metrics.attempted),
+    }),
+    t("status.regressions", { count: metrics.regressionsCaught }),
+  ];
+  if (metrics.done > 0) {
+    lines.push(
+      t("status.time", {
+        average: formatDuration(metrics.doneDurationMs / metrics.done),
+        total: formatDuration(metrics.doneDurationMs),
+      }),
+    );
+  }
+  return [pc.bold(t("status.metrics")), ...lines.map((line) => `  ${line}`)].join("\n");
+}
+
+function percent(part: number, total: number): number {
+  return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
 function bar(done: number, total: number): string {

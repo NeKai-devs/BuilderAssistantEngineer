@@ -15,6 +15,7 @@ import { t } from "../i18n/index.js";
 import { type AttemptOutcome, readAttempts, recordAttempt } from "../tasks/attempts.js";
 import { MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
+import { completionTimes, readMetrics } from "../tasks/metrics.js";
 import { readBase, saveBase, writeRunLog } from "../tasks/runs.js";
 import { type Task, verificationCommands } from "../tasks/schema.js";
 import { pickNext, waitingOn } from "../tasks/select.js";
@@ -201,8 +202,12 @@ async function taskPrompt(
   tasks: Task[],
 ): Promise<string> {
   const others = tasks.map((item) => (item.meta.id === task.meta.id ? task : item));
+  const metrics = await readMetrics(
+    ctx.cwd,
+    others.filter((item) => item.meta.status === "done").map((item) => item.meta.id),
+  );
   return renderPrompt(await loadPrompt("task", ctx.cwd), {
-    context: planContext(config, others, task),
+    context: planContext(config, others, task, completionTimes(metrics)),
     task: task.text.trim(),
     task_path: task.path,
     max_log_lines: String(MAX_LOG_LINES),
