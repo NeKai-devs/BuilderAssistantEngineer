@@ -5,7 +5,7 @@ import { main } from "../../src/cli.js";
 import { readConfig, writeConfig, writeInterview } from "../../src/config/store.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
 import { copyFixture, tempDir, writeFiles } from "../helpers.js";
-import { planOutput, taskFile } from "../plan-sample.js";
+import { defaultFiles, planOutput, taskFile } from "../plan-sample.js";
 
 const read = (cwd: string, path: string) => readFile(join(cwd, path), "utf8");
 const exists = (cwd: string, path: string) =>
@@ -91,6 +91,49 @@ describe("plan", () => {
     expect(ui.log.join("\n")).toContain(
       "note: Project commands saved to .bae/config.json lint: npm run lint:strict\ntypecheck: npx tsc --noEmit\nbuild: npm run build",
     );
+  });
+
+  it("asks the analyst to fix only the cited paths that do not exist", async () => {
+    const cwd = await setup();
+    const files = {
+      ...defaultFiles(),
+      "docs/plan/02-architecture.md": "Routes live in `src/routes/user.ts`.",
+    };
+    const fix =
+      "<<<FILE: docs/plan/02-architecture.md>>>\nRoutes live in `src/routes/users.ts`.\n<<<END FILE>>>";
+    const { code, ai, ui } = await runPlan(cwd, ["--yes"], [planOutput({ files }), fix]);
+    expect(code).toBe(0);
+    expect(ui.log).toContain(
+      "warn: 1 cited path(s) are not in the repository and not marked (new); asking the analyst to fix only those.",
+    );
+    expect(ai.prompts[1]).toContain("- `src/routes/user.ts` in docs/plan/02-architecture.md");
+    expect(ai.prompts[1]).toContain("<<<FILE: docs/plan/02-architecture.md>>>");
+    expect(ai.prompts[1]).not.toContain("<<<FILE: AGENTS.md>>>");
+    expect(ai.prompts[1]).toMatch(/<repository_files>[\s\S]*src\/routes\/users\.ts/);
+    expect(await read(cwd, "docs/plan/02-architecture.md")).toBe(
+      "Routes live in `src/routes/users.ts`.\n",
+    );
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      evidenceRetries: 1,
+      unverifiedPaths: [],
+    });
+  });
+
+  it("lists paths that stay unverified in the summary and the report", async () => {
+    const cwd = await setup();
+    const architecture = "Routes live in `src/routes/user.ts`.";
+    const files = { ...defaultFiles(), "docs/plan/02-architecture.md": architecture };
+    const same = `<<<FILE: docs/plan/02-architecture.md>>>\n${architecture}\n<<<END FILE>>>`;
+    const { code, ui } = await runPlan(cwd, ["--yes"], [planOutput({ files }), same]);
+    expect(code).toBe(0);
+    expect(ui.log.join("\n")).toContain(
+      "Unverified paths (not in the repository and not marked new):\n- `src/routes/user.ts` in docs/plan/02-architecture.md",
+    );
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      evidenceRetries: 1,
+      unverifiedPaths: ["`src/routes/user.ts` in docs/plan/02-architecture.md"],
+    });
+    expect(await read(cwd, "docs/plan/02-architecture.md")).toBe(`${architecture}\n`);
   });
 
   it("prints the exact prompt on --dry-run without calling the AI or writing", async () => {

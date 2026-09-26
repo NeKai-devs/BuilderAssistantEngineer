@@ -5,16 +5,30 @@ import type { CommandContext } from "../commands/context.js";
 import { isAgentBackend } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
 import { readInterview } from "../config/store.js";
+import { FormatError } from "../core/errors.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
+import { truncateText } from "../digest/format.js";
 import { buildDigest } from "../digest/index.js";
+import { scanFiles } from "../digest/walk.js";
 import { t } from "../i18n/index.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
-import { type ParsedPlan, PLAN_FORMAT, type PlanQuestion, parsePlan } from "./parser.js";
+import { describeUnverified, findUnverified, type Unverified } from "./evidence.js";
+import {
+  type ParsedPlan,
+  PLAN_FORMAT,
+  type PlanQuestion,
+  parseFileBlocks,
+  parsePlan,
+  renderPlan,
+} from "./parser.js";
 import { newPlanStats, type PlanStats, recordInfo, writePlanReport } from "./report.js";
 
 export type PlanRequest = { priorPlan: string; knownTaskIds: string[] };
 
+type Parse = (text: string) => ParsedPlan;
+
 const MAX_CONTINUATIONS = 3;
+const MAX_REPO_FILES_CHARS = 20_000;
 
 export async function generatePlan(
   ctx: CommandContext,
@@ -41,10 +55,17 @@ export async function generatePlan(
     return undefined;
   }
   const stats = newPlanStats(config.backend);
+  const backend = ctx.createBackend(config.backend);
+  const requireReviewer = config.targets.some(
+    (target) => target === "claude-code" || target === "opencode",
+  );
+  const parse: Parse = (text) =>
+    parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer });
   try {
-    const parsed = await requestPlan(ctx, config, request, prompt, stats);
-    await writePlanReport(ctx.cwd, stats, parsed);
-    return parsed;
+    const parsed = await requestPlan(ctx, backend, parse, prompt, stats);
+    const checked = await checkEvidence(ctx, backend, parsed, parse, stats);
+    await writePlanReport(ctx.cwd, stats, checked);
+    return checked;
   } catch (error) {
     await writePlanReport(ctx.cwd, stats, undefined, error);
     throw error;
@@ -53,15 +74,11 @@ export async function generatePlan(
 
 async function requestPlan(
   ctx: CommandContext,
-  config: Config,
-  request: PlanRequest,
+  backend: Backend,
+  parse: Parse,
   prompt: string,
   stats: PlanStats,
 ): Promise<ParsedPlan> {
-  const backend = ctx.createBackend(config.backend);
-  const requireReviewer = config.targets.some(
-    (target) => target === "claude-code" || target === "opencode",
-  );
   return ctx.prompter.spinner(t("plan.analyzing"), (update) => {
     const options: RunOptions = {
       cwd: ctx.cwd,
@@ -73,7 +90,7 @@ async function requestPlan(
       backend,
       prompt,
       options,
-      parse: (text) => parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer }),
+      parse,
       format: PLAN_FORMAT,
       onRetry: (error) => {
         stats.formatRetries++;
@@ -108,6 +125,75 @@ async function continueTruncated(
     current = mergeContinuation(cut.complete, more);
   }
   return current;
+}
+
+async function checkEvidence(
+  ctx: CommandContext,
+  backend: Backend,
+  parsed: ParsedPlan,
+  parse: Parse,
+  stats: PlanStats,
+): Promise<ParsedPlan> {
+  const missing = await findUnverified(ctx.cwd, parsed);
+  if (missing.length === 0) return parsed;
+  stats.evidenceRetries++;
+  ctx.prompter.warn(t("evidence.retrying", { count: missing.length }));
+  const fixed = await ctx.prompter.spinner(t("evidence.fixing"), () =>
+    fixPaths(ctx, backend, parsed, missing, parse, stats),
+  );
+  const plan = fixed ?? parsed;
+  const remaining = fixed ? await findUnverified(ctx.cwd, fixed) : missing;
+  stats.unverifiedPaths = remaining.map(describeUnverified);
+  if (remaining.length === 0) {
+    ctx.prompter.success(t("evidence.fixed"));
+    return plan;
+  }
+  ctx.prompter.warn(t("evidence.unverified", { count: remaining.length }));
+  const list = stats.unverifiedPaths.map((line) => `- ${line}`).join("\n");
+  return { ...plan, summary: `${plan.summary}\n\n${t("evidence.summary")}\n${list}` };
+}
+
+async function fixPaths(
+  ctx: CommandContext,
+  backend: Backend,
+  parsed: ParsedPlan,
+  missing: Unverified[],
+  parse: Parse,
+  stats: PlanStats,
+): Promise<ParsedPlan | undefined> {
+  const sources = new Set(missing.map((item) => item.source));
+  const affected = parsed.files.filter((file) => sources.has(file.path));
+  const prompt = renderPrompt(await loadPrompt("fix-paths", ctx.cwd), {
+    paths: missing.map((item) => `- ${describeUnverified(item)}`).join("\n"),
+    files: affected
+      .map((file) => `<<<FILE: ${file.path}>>>\n${file.content.trimEnd()}\n<<<END FILE>>>`)
+      .join("\n\n"),
+    repo_files: await repoFiles(ctx.cwd),
+  });
+  const reply = await backend.run(prompt, {
+    cwd: ctx.cwd,
+    access: "read",
+    onInfo: (info) => recordInfo(stats, info),
+  });
+  const replaced = new Map(
+    parseFileBlocks(reply)
+      .filter((file) => sources.has(file.path))
+      .map((file) => [file.path, file]),
+  );
+  if (replaced.size === 0) return undefined;
+  const files = parsed.files.map((file) => replaced.get(file.path) ?? file);
+  try {
+    return { ...parse(renderPlan({ ...parsed, files })), warnings: parsed.warnings };
+  } catch (error) {
+    if (error instanceof FormatError) return undefined;
+    throw error;
+  }
+}
+
+async function repoFiles(cwd: string): Promise<string> {
+  const { files } = await scanFiles(cwd);
+  const list = files.map((file) => file.path).join("\n");
+  return truncateText(list || "(no files)", MAX_REPO_FILES_CHARS);
 }
 
 export function formatQuestions(questions: PlanQuestion[]): string {

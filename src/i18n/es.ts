@@ -191,4 +191,10 @@ export const es: Messages = {
   "regression.passed": "Chequeo de regresión superado.",
   "regression.unsafe":
     "No se ejecuta `{{command}}` ({{reason}}). Corrige los comandos en .bae/config.json.",
+  "evidence.retrying":
+    "{{count}} ruta(s) citadas no están en el repositorio ni marcadas (new); se pide al analista corregir solo esas.",
+  "evidence.fixing": "El analista está corrigiendo las rutas citadas…",
+  "evidence.fixed": "Todas las rutas citadas existen o están marcadas (new).",
+  "evidence.unverified": "{{count}} ruta(s) citadas siguen sin verificar; aparecen en el resumen.",
+  "evidence.summary": "Rutas sin verificar (no están en el repositorio ni marcadas como nuevas):",
 };

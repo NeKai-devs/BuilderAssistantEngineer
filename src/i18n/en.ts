@@ -184,6 +184,13 @@ export const en = {
   "regression.passed": "Regression check passed.",
   "regression.unsafe":
     "Refusing to run `{{command}}` ({{reason}}). Fix the commands in .bae/config.json.",
+  "evidence.retrying":
+    "{{count}} cited path(s) are not in the repository and not marked (new); asking the analyst to fix only those.",
+  "evidence.fixing": "The analyst is fixing the cited paths…",
+  "evidence.fixed": "Every cited path now exists or is marked (new).",
+  "evidence.unverified":
+    "{{count}} cited path(s) are still unverified; they are listed in the summary.",
+  "evidence.summary": "Unverified paths (not in the repository and not marked new):",
 } as const;
 
 export type MessageKey = keyof typeof en;

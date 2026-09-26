@@ -93,6 +93,30 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
   return { summary, questions, commands, files, tasks, warnings };
 }
 
+export function parseFileBlocks(text: string): PlanFile[] {
+  const ignored: string[] = [];
+  return collectFiles(tokenize(text, ignored, ignored), ignored);
+}
+
+export function renderPlan(plan: Omit<ParsedPlan, "tasks" | "warnings">): string {
+  return [
+    "<<<SUMMARY>>>",
+    plan.summary,
+    "<<<END SUMMARY>>>",
+    "<<<QUESTIONS>>>",
+    JSON.stringify(plan.questions),
+    "<<<END QUESTIONS>>>",
+    "<<<CONFIG>>>",
+    JSON.stringify({ commands: plan.commands }),
+    "<<<END CONFIG>>>",
+    ...plan.files.flatMap((file) => [
+      `<<<FILE: ${file.path}>>>`,
+      file.content.trimEnd(),
+      "<<<END FILE>>>",
+    ]),
+  ].join("\n");
+}
+
 function tokenize(text: string, problems: string[], warnings: string[]): Block[] {
   const blocks: Block[] = [];
   let open: { kind: Block["kind"]; path: string; end: number } | undefined;
