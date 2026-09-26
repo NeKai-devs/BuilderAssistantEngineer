@@ -1,0 +1,20 @@
+{
+  "name": "node-app",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": { "node-app": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "express": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

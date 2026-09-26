@@ -1,12 +1,29 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { onTestFinished, vi } from "vitest";
+
+const FIXTURES = fileURLToPath(new URL("./fixtures/repos/", import.meta.url));
 
 export async function tempDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "bae-test-"));
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
   return dir;
+}
+
+export async function copyFixture(name: string): Promise<string> {
+  const dir = await tempDir();
+  await cp(join(FIXTURES, name), dir, { recursive: true });
+  return dir;
+}
+
+export async function writeFiles(root: string, files: Record<string, string | Buffer>) {
+  for (const [path, content] of Object.entries(files)) {
+    const target = join(root, ...path.split("/"));
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, content);
+  }
 }
 
 export function captureOutput() {
