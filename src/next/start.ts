@@ -1,6 +1,7 @@
 import type { CommandContext } from "../commands/context.js";
 import { saveCommands } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
+import { bashPath } from "../core/bash.js";
 import { ExitCode } from "../core/errors.js";
 import { isGitRepo } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
@@ -24,13 +25,17 @@ import {
 } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
 import { recordAttempt } from "../tasks/attempts.js";
-import { type Task, verificationCommands } from "../tasks/schema.js";
+import { type Task, verificationCommands, verificationScript } from "../tasks/schema.js";
 import { setTaskStatus } from "../tasks/status.js";
 
-export type StartOptions = { allowSkip: boolean };
+export type StartOptions = { allowSkip: boolean; unattended: boolean };
 
 export function checksFor(task: Task, config: Config): Checks {
-  return { commands: verificationCommands(task.body), suite: suiteCommands(config) };
+  return {
+    commands: verificationCommands(task.body),
+    script: verificationScript(task.body),
+    suite: suiteCommands(config),
+  };
 }
 
 export async function recoverInterrupted(
@@ -61,7 +66,12 @@ export async function start(
   task: Task,
   options: StartOptions,
 ): Promise<Capture | undefined> {
-  const refused = refusal(checksFor(task, config));
+  const bash = await bashPath();
+  const refused = refusal(checksFor(task, config), {
+    unattended: options.unattended,
+    allow: config.verify.allow,
+    ...(bash ? { bash } : {}),
+  });
   if (refused) {
     await blockBeforeAgent(ctx, task, refused);
     return undefined;

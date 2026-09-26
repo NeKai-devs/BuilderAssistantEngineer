@@ -33,6 +33,7 @@ describe("planContext", () => {
       digest: { maxChars: 1 },
       commands: {},
       gates: { regression: "full" as const },
+      verify: { allow: [] },
       agent: { timeoutMinutes: 45 },
     };
     const text = planContext(config, tasks, current, finished);

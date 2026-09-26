@@ -123,8 +123,6 @@ export const en = {
   "verify.confirm": "Run these verification commands now?",
   "verify.declined": "Verification was not run; the task stays in progress.",
   "verify.none": "The task has no verification commands in a ```sh block under Verification.",
-  "verify.unsafe":
-    "Refusing to run `{{command}}` ({{reason}}). Fix the task's Verification section.",
   "verify.failed": "Verification failed: `{{command}}` exited with {{code}}.",
   "verify.passed": "Verification passed.",
   "verify.stillFailing":
@@ -184,8 +182,6 @@ export const en = {
   "regression.stillFailing":
     "`{{command}}` still fails (exit {{code}}), as it did before the task.",
   "regression.passed": "Regression check passed.",
-  "regression.unsafe":
-    "Refusing to run `{{command}}` ({{reason}}). Fix the commands in .bae/config.json.",
   "evidence.retrying":
     "{{count}} cited path(s) are not in the repository and not marked (new); asking the analyst to fix only those.",
   "evidence.fixing": "The analyst is fixing the cited paths…",
@@ -292,6 +288,21 @@ export const en = {
     "`{{command}}` runs fewer tests than before the task ({{now}}; before: {{before}}).",
   "integrity.moreSkipped":
     "`{{command}}` skips more tests than before the task ({{now}}; before: {{before}}).",
+  "verify.noBash":
+    "Verification runs as a bash script and no bash was found. On Windows install Git for Windows, which brings Git Bash; elsewhere put bash on PATH.",
+  "verify.masks":
+    "Verification hides failures in `{{command}}` (|| true, set +e). The block runs with set -euo pipefail and must fail when a check fails.",
+  "verify.trivial":
+    "Verification runs nothing that checks the task:\n{{command}}\nUse the project's test runner, a linter, or a check with an expected result (test -f, grep -q, curl -f).",
+  "verify.notAllowed":
+    "`{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json, or run next without --yes and --headless and confirm it yourself.",
+  "regression.notAllowed":
+    "The project command `{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json.",
+  "verify.dynamic": "it runs code that is built at run time or in another shell",
+  "verify.unknown": "unknown program",
+  "verify.unsafeWarning": "`{{command}}` looks dangerous ({{reason}}); read it before you confirm.",
+  "verify.onlyExcused":
+    "Verification only runs commands that already failed before the task, so it checks nothing about this task.",
 } as const;
 
 export type MessageKey = keyof typeof en;

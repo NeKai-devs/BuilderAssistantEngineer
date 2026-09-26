@@ -151,7 +151,7 @@ describe("next", () => {
     expect(calls[1]?.prompt).toContain(
       "rewrite the handoff note under `## Log` in docs/plan/tasks/T-001-first.md so it covers every attempt in at most 8 lines",
     );
-    expect(calls[1]?.prompt).toContain("(exit 1)");
+    expect(calls[1]?.prompt).toContain("\nexit 1\n");
     expect(ui.log.filter((line) => line.includes("Attempt "))).toHaveLength(2);
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("done");
   });
@@ -193,8 +193,8 @@ describe("next", () => {
     const { code, calls, ui } = await runNext(cwd, ["--headless", "--yes"], [() => ""]);
     expect(code).toBe(1);
     expect(calls).toHaveLength(0);
-    expect(ui.log).toContain(
-      "warn: Refusing to run `rm -rf build` (rm -rf). Fix the task's Verification section.",
+    expect(ui.log.join("\n")).toContain(
+      "`rm -rf build` is not on the list of commands bae runs when nobody confirms them (unknown program).",
     );
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("blocked");
   });
@@ -331,7 +331,8 @@ describe("next regression gate", () => {
     const same = await repo(PASS, { commands: { test: PASS } });
     const second = await runNext(same, ["--yes"], [writesFile(same, "a.txt"), REVIEW_PASS]);
     expect(second.code).toBe(0);
-    expect(second.printed.split(`$ ${PASS}`)).toHaveLength(3);
+    expect(second.printed).toContain(`$ ${PASS} (exit 0, from the regression check)`);
+    expect(second.printed.split(`$ ${PASS}\n`)).toHaveLength(4);
   });
 
   it("keeps the first baseline when a task is started again, and captures a late one with a warning", async () => {
@@ -397,12 +398,22 @@ describe("next regression gate", () => {
     );
   });
 
-  it("refuses unsafe project commands", async () => {
+  it("refuses project commands off the allowlist when nobody confirms them", async () => {
     const cwd = await repo(PASS, { commands: { lint: "sudo make lint" } });
-    const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
+    const { code, ui, calls } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(code).toBe(1);
+    expect(calls).toHaveLength(0);
+    expect(ui.log.join("\n")).toContain(
+      "The project command `sudo make lint` is not on the list of commands bae runs when nobody confirms them (unknown program).",
+    );
+  });
+
+  it("warns about dangerous commands and lets a person confirm them in an interactive run", async () => {
+    const cwd = await repo(`rm -rf build && ${PASS}`);
+    const { code, ui } = await runNext(cwd, [], [writesFile(cwd, "a.txt"), REVIEW_PASS], [true]);
+    expect(code).toBe(0);
     expect(ui.log).toContain(
-      "warn: Refusing to run `sudo make lint` (sudo). Fix the commands in .bae/config.json.",
+      `warn: \`rm -rf build && ${PASS}\` looks dangerous (rm -rf); read it before you confirm.`,
     );
   });
 });

@@ -31,6 +31,7 @@ export const configSchema = z.object({
   gates: z
     .object({ regression: z.enum(REGRESSION_MODES).default("full") })
     .default({ regression: "full" }),
+  verify: z.object({ allow: z.array(z.string().trim().min(1)).default([]) }).default({ allow: [] }),
   agent: z
     .object({
       timeoutMinutes: z.number().int().positive().default(DEFAULT_AGENT_TIMEOUT_MINUTES),

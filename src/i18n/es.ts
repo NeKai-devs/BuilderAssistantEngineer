@@ -128,8 +128,6 @@ export const es: Messages = {
   "verify.declined": "No se ejecutó la verificación; la tarea sigue en curso.",
   "verify.none":
     "La tarea no tiene comandos de verificación en un bloque ```sh dentro de Verification.",
-  "verify.unsafe":
-    "No se ejecuta `{{command}}` ({{reason}}). Corrige la sección Verification de la tarea.",
   "verify.failed": "La verificación falló: `{{command}}` terminó con {{code}}.",
   "verify.passed": "Verificación superada.",
   "verify.stillFailing":
@@ -190,8 +188,6 @@ export const es: Messages = {
   "regression.stillFailing":
     "`{{command}}` sigue fallando (salida {{code}}), igual que antes de la tarea.",
   "regression.passed": "Chequeo de regresión superado.",
-  "regression.unsafe":
-    "No se ejecuta `{{command}}` ({{reason}}). Corrige los comandos en .bae/config.json.",
   "evidence.retrying":
     "{{count}} ruta(s) citadas no están en el repositorio ni marcadas (new); se pide al analista corregir solo esas.",
   "evidence.fixing": "El analista está corrigiendo las rutas citadas…",
@@ -302,4 +298,19 @@ export const es: Messages = {
     "`{{command}}` ejecuta menos tests que antes de la tarea ({{now}}; antes: {{before}}).",
   "integrity.moreSkipped":
     "`{{command}}` omite más tests que antes de la tarea ({{now}}; antes: {{before}}).",
+  "verify.noBash":
+    "La Verificación corre como un script de bash y no se encontró bash. En Windows instala Git for Windows, que trae Git Bash; en otros sistemas pon bash en el PATH.",
+  "verify.masks":
+    "La Verificación oculta fallos en `{{command}}` (|| true, set +e). El bloque corre con set -euo pipefail y debe fallar cuando falla un chequeo.",
+  "verify.trivial":
+    "La Verificación no ejecuta nada que compruebe la tarea:\n{{command}}\nUsa el runner de tests del proyecto, un linter o un chequeo con resultado esperado (test -f, grep -q, curl -f).",
+  "verify.notAllowed":
+    "`{{command}}` no está en la lista de comandos que bae corre cuando nadie los confirma ({{why}}). Añade un prefijo a verify.allow en .bae/config.json, o corre next sin --yes ni --headless y confírmalo tú.",
+  "regression.notAllowed":
+    "El comando del proyecto `{{command}}` no está en la lista de comandos que bae corre cuando nadie los confirma ({{why}}). Añade un prefijo a verify.allow en .bae/config.json.",
+  "verify.dynamic": "ejecuta código que se arma en tiempo de ejecución o en otro shell",
+  "verify.unknown": "programa desconocido",
+  "verify.unsafeWarning": "`{{command}}` parece peligroso ({{reason}}); léelo antes de confirmar.",
+  "verify.onlyExcused":
+    "La Verificación solo ejecuta comandos que ya fallaban antes de la tarea, así que no comprueba nada de esta tarea.",
 };

@@ -40,7 +40,9 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     return;
   }
   const allowSkip = Boolean(options.allowSkip);
-  const capture = await start(ctx, config, task, { allowSkip });
+  const headless = Boolean(options.headless) && isAgentBackend(config.backend);
+  const unattended = headless || Boolean(ctx.flags.yes);
+  const capture = await start(ctx, config, task, { allowSkip, unattended });
   if (!capture) throw new ExitCode(1);
   const run: GateRun = {
     capture,
@@ -48,9 +50,9 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     approval: { granted: false },
     acceptance,
     allowSkip,
+    unattended,
   };
   const prompt = await taskPrompt(ctx, capture, tasks);
-  const headless = Boolean(options.headless) && isAgentBackend(capture.config.backend);
   if (options.headless && !headless) ctx.prompter.warn(t("next.headlessNeedsAgent"));
   const done = headless
     ? await headlessLoop(ctx, run, prompt)

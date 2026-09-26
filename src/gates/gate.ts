@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { CommandContext } from "../commands/context.js";
+import { bashPath } from "../core/bash.js";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
 import { t } from "../i18n/index.js";
@@ -8,6 +9,7 @@ import type { MechanicalFacts } from "../review/mechanical.js";
 import type { ReviewFinding } from "../review/parse.js";
 import { capturedTask, formatFindings, type ReviewResult, reviewTask } from "../review/run.js";
 import type { GateStage } from "../tasks/attempts.js";
+import { allowlistProblems, type CheckProblem, trivialityProblems } from "../tasks/checks.js";
 import { logLines, MAX_LOG_LINES } from "../tasks/handoff.js";
 import { parseTask, type Task } from "../tasks/schema.js";
 import { findUnsafe, runVerification, type VerificationRun } from "../tasks/verify.js";
@@ -25,13 +27,15 @@ import {
 } from "./regression.js";
 
 export type Approval = { granted: boolean };
-export type Checks = { commands: string[]; suite: SuiteCommand[] };
+export type Checks = { commands: string[]; script: string[]; suite: SuiteCommand[] };
+export type Policy = { unattended: boolean; allow: string[]; bash?: string };
 export type GateRun = {
   capture: Capture;
   checks: Checks;
   approval: Approval;
   acceptance: Acceptance;
   allowSkip: boolean;
+  unattended: boolean;
 };
 export type Gate = {
   passed: boolean;
@@ -59,20 +63,24 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   });
   const contract = await enforceContract(ctx, capture, acceptance);
   if (contract.blocked) return fail("contract", contract.report, t("contract.failed"));
-  const refused = refusal(checks);
-  if (refused) {
-    ctx.prompter.warn(refused);
-    return fail("refused", refused, refused, false);
+  const bash = await bashPath();
+  const refused = refusal(checks, {
+    unattended: run.unattended,
+    allow: capture.config.verify.allow,
+    ...(bash ? { bash } : {}),
+  });
+  if (refused || !bash) {
+    const reason = refused ?? t("verify.noBash");
+    ctx.prompter.warn(reason);
+    return fail("refused", reason, reason, false);
   }
   const baseline = suiteBaseline(capture);
   const excluded = new Set(baseline?.excluded ?? []);
   const suite = baseline?.skipped ? [] : checks.suite.filter((item) => !excluded.has(item.command));
   if (!approval.granted) {
-    const all = [...checks.commands, ...suite.map((item) => item.command)];
-    ctx.prompter.note(
-      [...new Set(all)].map((command) => `$ ${command}`).join("\n"),
-      t("verify.commands"),
-    );
+    const all = [...new Set([...checks.commands, ...suite.map((item) => item.command)])];
+    ctx.prompter.note(all.map((command) => `$ ${command}`).join("\n"), t("verify.commands"));
+    for (const item of findUnsafe(all)) ctx.prompter.warn(t("verify.unsafeWarning", item));
     if (!ctx.flags.yes && !(await ctx.prompter.confirm(t("verify.confirm"), true))) {
       return fail("declined", t("verify.declined"), t("verify.declined"), false);
     }
@@ -103,11 +111,18 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     ...(fix ? [] : (regression?.preexisting ?? []).map((check) => check.command)),
     ...excluded,
   ]);
-  const verification = await runVerification(ctx.cwd, checks.commands, ctx.print, known, excused);
-  sections.push(verificationReport(verification, excused));
+  const verification = await runVerification(ctx.cwd, checks.script, {
+    bash,
+    onOutput: ctx.print,
+    known,
+    excused,
+  });
+  sections.push(verificationReport(verification));
   if (!verification.passed) {
-    const last = verification.runs.at(-1);
-    const reason = t("verify.failed", { command: last?.command ?? "", code: last?.exitCode ?? -1 });
+    const reason = t("verify.failed", {
+      command: verification.failed ?? "Verification",
+      code: verification.exitCode,
+    });
     ctx.prompter.warn(reason);
     return fail("verification", joinSections(sections), reason);
   }
@@ -118,7 +133,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     return fail("handoff", joinSections([...sections, `## Handoff note\n\n${handoff}`]), handoff);
   }
   ctx.prompter.success(t("handoff.passed"));
-  const review = await safeReview(ctx, capture, stillFailing(verification), acceptance, {
+  const review = await safeReview(ctx, capture, stillFailing(verification, known), acceptance, {
     testsGrew: testsGrew(checksRun),
   });
   if (review.reason) ctx.prompter.warn(review.reason);
@@ -144,17 +159,35 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   };
 }
 
-export function refusal(checks: Checks): string | undefined {
+export function refusal(checks: Checks, policy: Policy): string | undefined {
   if (checks.commands.length === 0) return t("verify.none");
+  if (!policy.bash) return t("verify.noBash");
+  const suite = checks.suite.map((item) => item.command);
   const lines = [
-    ...findUnsafe(checks.commands).map((item) =>
-      t("verify.unsafe", { command: item.command, reason: item.reason }),
-    ),
-    ...findUnsafe(checks.suite.map((item) => item.command)).map((item) =>
-      t("regression.unsafe", { command: item.command, reason: item.reason }),
-    ),
+    ...trivialityProblems(checks.script).map((problem) => problemText(problem, "verify")),
+    ...(policy.unattended
+      ? [
+          ...allowlistProblems(checks.script, policy.allow).map((problem) =>
+            problemText(problem, "verify"),
+          ),
+          ...allowlistProblems(suite, policy.allow).map((problem) =>
+            problemText(problem, "regression"),
+          ),
+        ]
+      : []),
   ];
   return lines.length > 0 ? lines.join("\n") : undefined;
+}
+
+function problemText(problem: CheckProblem, source: "verify" | "regression"): string {
+  const vars = { command: problem.command };
+  if (problem.reason === "masks") return t("verify.masks", vars);
+  if (problem.reason === "trivial") return t("verify.trivial", vars);
+  const why = t(problem.reason === "dynamic" ? "verify.dynamic" : "verify.unknown");
+  return t(source === "verify" ? "verify.notAllowed" : "regression.notAllowed", {
+    ...vars,
+    why,
+  });
 }
 
 async function safeReview(
@@ -216,25 +249,24 @@ function skippedReport(skips: string[]): string {
   return `## ${t("skip.title")}\n\n${skips.map((skip) => `- ${skip}`).join("\n")}`;
 }
 
-function verificationReport(verification: VerificationRun, excused: Set<string>): string {
-  const runs = verification.runs.map((run) => {
-    const note =
-      run.exitCode !== 0 && excused.has(run.command)
-        ? ", preexisting: it already failed before the task and did not get worse"
-        : "";
-    const output = run.output.slice(-OUTPUT_TAIL).trim();
-    return `$ ${run.command} (exit ${run.exitCode}${note})\n\n\`\`\`text\n${output}\n\`\`\``;
-  });
-  return ["## Verification", ...runs].join("\n\n");
+function verificationReport(verification: VerificationRun): string {
+  const output = verification.output.slice(-OUTPUT_TAIL).trim();
+  return [
+    "## Verification",
+    `\`\`\`sh\n${verification.script}\n\`\`\``,
+    `exit ${verification.exitCode}`,
+    `\`\`\`text\n${output}\n\`\`\``,
+  ].join("\n\n");
 }
 
-function stillFailing(verification: VerificationRun): ReviewFinding[] {
-  return verification.runs
-    .filter((run) => run.exitCode !== 0)
-    .map((run) => ({
-      severity: "minor",
-      message: t("verify.stillFailing", { command: run.command, code: run.exitCode }),
-    }));
+function stillFailing(
+  verification: VerificationRun,
+  known: Map<string, SuiteCheck>,
+): ReviewFinding[] {
+  return verification.tolerated.map((command) => ({
+    severity: "minor",
+    message: t("verify.stillFailing", { command, code: known.get(command)?.exitCode ?? 1 }),
+  }));
 }
 
 async function currentTask(ctx: CommandContext, capture: Capture): Promise<Task> {

@@ -16,6 +16,7 @@ const config: Config = {
   digest: { maxChars: 50_000 },
   commands: { test: "npm test", lint: "npm run lint" },
   gates: { regression: "task" },
+  verify: { allow: ["./scripts/check.sh"] },
   agent: { timeoutMinutes: 30 },
 };
 
@@ -37,13 +38,14 @@ describe("config store", () => {
 
   it("fills the digest, commands and gates defaults", async () => {
     const cwd = await tempDir();
-    const { digest: _, commands: __, gates: ___, agent: ____, ...rest } = config;
+    const { digest: _, commands: __, gates: ___, agent: ____, verify: _____, ...rest } = config;
     await writeRawConfig(cwd, JSON.stringify(rest));
     expect(await readConfig(cwd)).toMatchObject({
       digest: { maxChars: 100_000 },
       commands: {},
       gates: { regression: "full" },
       agent: { timeoutMinutes: 45 },
+      verify: { allow: [] },
     });
   });
 

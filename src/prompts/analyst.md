@@ -88,7 +88,7 @@ Suggested sequence, not a straitjacket.
 ## Acceptance criteria
 Checklist; every item objectively verifiable.
 ## Verification
-Exact commands (tests, lint, build, curl, scripts) in a fenced ```sh block, one command per line, run from the repo root; exit code 0 means pass. Expected results in prose below the block. Never use sudo, destructive commands (rm -rf, git reset --hard) or piped installers (curl | sh); the CLI refuses to run them.
+A fenced ```sh block that the CLI runs from the repo root as one bash script with `set -Eeuo pipefail`: it passes only when every line exits 0. A long command may continue on the next line with \, and `cd` carries over to later lines. Each block runs the project's test runner, linter or build, or a check with an expected result (`test -f`, `grep -q`, `curl -f`, `git diff --exit-code`); `echo`, `ls` or `cat` alone check nothing, and failures are never hidden with `|| true` or `set +e`. Prefer the tests for this task over the whole suite, since the CLI runs the project's lint, typecheck, build and test commands anyway. Unattended runs only execute known runners and checks (package managers, language toolchains, test runners, linters, make, read-only git, test, grep, diff, curl, jq), so do not call project scripts by path. Never use sudo, destructive commands or piped installers. Expected results in prose below the block.
 ## Risks and notes
 ## Log
 

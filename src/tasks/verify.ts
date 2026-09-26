@@ -1,8 +1,24 @@
-import { runShell, type ShellResult } from "../core/process.js";
+import { runScript } from "../core/bash.js";
+import type { ShellResult } from "../core/process.js";
+import { t } from "../i18n/index.js";
+import { logicalLines } from "./shell-words.js";
 
 export type Unsafe = { command: string; reason: string };
-export type CommandRun = { command: string } & ShellResult;
-export type VerificationRun = { passed: boolean; runs: CommandRun[] };
+export type VerificationRun = {
+  passed: boolean;
+  exitCode: number;
+  output: string;
+  script: string;
+  tolerated: string[];
+  failed?: string;
+};
+
+const HEADER = [
+  "set -Eeuo pipefail",
+  `trap 'bae_status=$?; printf "\\nbae: line %s failed with exit %s: %s\\n" "$((LINENO - 3))" "$bae_status" "$BASH_COMMAND" >&2' ERR`,
+  `bae_reuse() { printf '$ %s (%s)\\n' "$2" "$3"; return "$1"; }`,
+];
+const FAILED_LINE = /^bae: line \d+ failed with exit \d+: (.*)$/gm;
 
 const RULES: [string, (command: string) => boolean][] = [
   ["sudo", (command) => /(^|[\s;&|(`$])(sudo|doas)(\s|$)/.test(command)],
@@ -45,22 +61,60 @@ export function findUnsafe(commands: string[]): Unsafe[] {
 
 export async function runVerification(
   cwd: string,
-  commands: string[],
-  onOutput?: (chunk: string) => void,
-  known: ReadonlyMap<string, ShellResult> = new Map(),
-  excused: ReadonlySet<string> = new Set(),
+  lines: string[],
+  options: {
+    bash: string;
+    onOutput?: (chunk: string) => void;
+    known?: ReadonlyMap<string, ShellResult>;
+    excused?: ReadonlySet<string>;
+  },
 ): Promise<VerificationRun> {
-  const runs: CommandRun[] = [];
-  for (const command of commands) {
-    const reused = known.get(command);
-    if (!reused) onOutput?.(`$ ${command}\n`);
-    const result = reused ?? (await runShell(command, { cwd, onOutput }));
-    runs.push({ command, ...result });
-    if (result.exitCode !== 0 && !excused.has(command)) return { passed: false, runs };
+  const known = options.known ?? new Map<string, ShellResult>();
+  const excused = options.excused ?? new Set<string>();
+  const commands = logicalLines(lines);
+  const tolerated = commands.filter(
+    (command) => excused.has(command) && (known.get(command)?.exitCode ?? 0) !== 0,
+  );
+  const script = lines.join("\n");
+  if (commands.length > 0 && commands.every((command) => excused.has(command))) {
+    return {
+      passed: false,
+      exitCode: 1,
+      output: t("verify.onlyExcused"),
+      script,
+      tolerated,
+      ...(commands[0] ? { failed: commands[0] } : {}),
+    };
   }
-  const failed = runs.some((run) => run.exitCode !== 0);
-  const checked = runs.some((run) => !excused.has(run.command));
-  return { passed: !failed || checked, runs };
+  const body = lines.map((line, index) => {
+    const continued = (lines[index - 1] ?? "").trimEnd().endsWith("\\");
+    const result = continued ? undefined : known.get(line.trim());
+    if (!result) return line;
+    const allowed = excused.has(line.trim());
+    const code = allowed ? 0 : result.exitCode;
+    const note = allowed
+      ? `exit ${result.exitCode}, preexisting: it already failed before the task and did not get worse`
+      : `exit ${result.exitCode}, from the regression check`;
+    return `bae_reuse ${code} ${quote(line.trim())} ${quote(note)}`;
+  });
+  options.onOutput?.(`${lines.map((line) => `$ ${line}`).join("\n")}\n`);
+  const result = await runScript(options.bash, [...HEADER, ...body, ""].join("\n"), {
+    cwd,
+    onOutput: options.onOutput,
+  });
+  const failed = [...result.output.matchAll(FAILED_LINE)].at(-1)?.[1];
+  return {
+    passed: result.exitCode === 0,
+    exitCode: result.exitCode,
+    output: result.output,
+    script,
+    tolerated,
+    ...(failed ? { failed } : {}),
+  };
+}
+
+function quote(text: string): string {
+  return `'${text.replace(/'/g, "'\\''")}'`;
 }
 
 function hasRecursiveForceRm(command: string): boolean {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { FormatError } from "../core/errors.js";
+import { trivialityProblems } from "./checks.js";
 import { splitFrontmatter } from "./frontmatter.js";
+import { logicalLines } from "./shell-words.js";
 
 export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -42,6 +44,13 @@ export const SECTIONS = {
 
 export type SectionKey = keyof typeof SECTIONS;
 
+const TRIVIALITY: Record<string, string> = {
+  masks:
+    "hides failures (|| true, set +e); the block runs with set -euo pipefail and must fail when a check fails",
+  trivial:
+    "runs nothing that checks the task; use the project's test runner, a linter or a check with an expected result (test -f, grep -q, curl -f)",
+};
+
 const COMMAND_BLOCK = /```(?:sh|bash|shell|console)[^\n]*\n([\s\S]*?)```/g;
 
 export function parseTask(path: string, text: string): Task {
@@ -64,6 +73,9 @@ export function taskProblems(task: Task): string[] {
   if (!missing.includes("verification") && verificationCommands(task.body).length === 0) {
     problems.push(`${task.path}: Verification needs at least one command in a \`\`\`sh block`);
   }
+  for (const problem of trivialityProblems(verificationScript(task.body))) {
+    problems.push(`${task.path}: Verification ${TRIVIALITY[problem.reason]}: ${problem.command}`);
+  }
   return problems;
 }
 
@@ -82,12 +94,15 @@ export function sectionTexts(body: string, key: SectionKey): string[] {
   return found;
 }
 
-export function verificationCommands(body: string): string[] {
+export function verificationScript(body: string): string[] {
   const section = sectionText(body, "verification") ?? "";
   return Array.from(section.matchAll(COMMAND_BLOCK), (match) => match[1] ?? "")
-    .flatMap((block) => block.split(/\r?\n/))
-    .map((line) => line.trim().replace(/^\$\s+/, ""))
-    .filter((line) => line !== "" && !line.startsWith("#"));
+    .flatMap((block) => block.replace(/\r?\n$/, "").split(/\r?\n/))
+    .map((line) => line.replace(/^(\s*)\$\s+/, "$1"));
+}
+
+export function verificationCommands(body: string): string[] {
+  return logicalLines(verificationScript(body));
 }
 
 function readFrontmatter(path: string, text: string) {

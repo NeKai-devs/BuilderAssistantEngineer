@@ -74,6 +74,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     digest: { maxChars: 20_000 },
     commands: {},
     gates: { regression: "full" },
+    verify: { allow: [] },
     agent: { timeoutMinutes: 45 },
     ...overrides,
   };

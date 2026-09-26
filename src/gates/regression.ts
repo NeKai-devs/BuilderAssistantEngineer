@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Config } from "../config/schema.js";
-import { runShell, type ShellResult } from "../core/process.js";
+import { bashPath, runScript } from "../core/bash.js";
+import type { ShellResult } from "../core/process.js";
 import { type Counts, countsSchema, parseCounts } from "./results.js";
 
 export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
@@ -70,9 +71,12 @@ export async function runSuite(
   onOutput?: (chunk: string) => void,
 ): Promise<SuiteResult[]> {
   const results: SuiteResult[] = [];
+  const bash = await bashPath();
   for (const item of suite) {
     onOutput?.(`$ ${item.command}\n`);
-    const result = await runShell(item.command, { cwd, onOutput });
+    const result = bash
+      ? await runScript(bash, `set -o pipefail\n${item.command}\n`, { cwd, onOutput })
+      : { exitCode: -1, output: "bash was not found" };
     const counts = parseCounts(result.output);
     results.push({ ...item, ...result, ...(counts ? { counts } : {}) });
   }
