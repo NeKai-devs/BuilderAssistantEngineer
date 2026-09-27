@@ -192,12 +192,12 @@ describe("next", () => {
   });
 
   it("blocks a task with unsafe verification commands before launching the agent", async () => {
-    const cwd = await repo("rm -rf build");
+    const cwd = await repo(`rm -rf ~/build && ${PASS}`);
     const { code, calls, ui } = await runNext(cwd, ["--headless", "--yes"], [() => ""]);
     expect(code).toBe(1);
     expect(calls).toHaveLength(0);
     expect(ui.log.join("\n")).toContain(
-      "`rm -rf build` is not on the list of commands bae runs when nobody confirms them (unknown program).",
+      `\`rm -rf ~/build && ${PASS}\` is not on the list of commands bae runs when nobody confirms them (unknown program).`,
     );
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("blocked");
   });

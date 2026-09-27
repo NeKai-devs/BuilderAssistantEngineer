@@ -74,37 +74,96 @@ const KEYWORDS = new Set([
   "while",
   "until",
   "do",
+  "done",
+  "fi",
+  "esac",
   "!",
   "{",
+  "}",
   "(",
+  ")",
+  ";;",
   "time",
 ]);
+const CASE_PATTERN = /^[^()=\s]*\)$/;
+const HEREDOC = /(?<!<)<<-?(?!<)\s*(['"]?)([A-Za-z_]\w*)\1/;
 
 export function program(command: SimpleCommand): { name: string; args: string[] } {
   let index = 0;
+  const words = command.words;
   while (
-    /^[A-Za-z_]\w*=/.test(command.words[index] ?? "") ||
-    KEYWORDS.has(command.words[index] ?? "")
+    /^[A-Za-z_]\w*=/.test(words[index] ?? "") ||
+    KEYWORDS.has(words[index] ?? "") ||
+    (CASE_PATTERN.test(words[index] ?? "") && index < words.length - 1)
   ) {
     index++;
   }
-  const [first = "", ...args] = command.words.slice(index);
+  const [raw = "", ...args] = words.slice(index);
+  const first = raw.replace(/^\(+/, "");
   if (first === "env") return program({ words: args, text: command.text });
   return { name: first, args };
+}
+
+export function heredocEnd(line: string): string | undefined {
+  return HEREDOC.exec(unquoted(line))?.[2];
+}
+
+export function openQuote(text: string, start?: "'" | '"'): "'" | '"' | undefined {
+  let quote = start;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index] ?? "";
+    if (quote === "'") {
+      if (char === "'") quote = undefined;
+      continue;
+    }
+    if (char === "\\") {
+      index++;
+      continue;
+    }
+    if (quote === '"') {
+      if (char === '"') quote = undefined;
+      continue;
+    }
+    if (char === "#" && (index === 0 || /\s/.test(text[index - 1] ?? ""))) break;
+    if (char === "'" || char === '"') quote = char;
+  }
+  return quote;
+}
+
+export function unquoted(line: string): string {
+  return line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''").replace(/(^|\s)#.*$/, "$1");
 }
 
 export function logicalLines(lines: string[]): string[] {
   const joined: string[] = [];
   let pending = "";
+  let quote: "'" | '"' | undefined;
+  let heredoc: string | undefined;
   for (const raw of lines) {
-    const line = raw.replace(/\s+$/, "");
-    if (line.endsWith("\\")) {
-      pending += `${line.slice(0, -1).trim()} `;
+    if (heredoc !== undefined) {
+      if (raw.replace(/^\t+/, "").trimEnd() === heredoc) heredoc = undefined;
       continue;
     }
-    joined.push(`${pending}${line.trim()}`.trim());
+    const line = raw.replace(/\s+$/, "");
+    if (quote) {
+      pending += `\n${line}`;
+      quote = openQuote(line, quote);
+      if (quote) continue;
+    } else if (line.endsWith("\\") && !openQuote(line)) {
+      pending += `${line.slice(0, -1).trim()} `;
+      continue;
+    } else {
+      pending = `${pending}${line.trim()}`;
+      quote = openQuote(line);
+      if (quote) continue;
+    }
+    const done = pending.trim();
     pending = "";
+    if (done !== "" && !done.startsWith("#")) {
+      joined.push(done);
+      heredoc = heredocEnd(done);
+    }
   }
   if (pending.trim()) joined.push(pending.trim());
-  return joined.filter((line) => line !== "" && !line.startsWith("#"));
+  return joined;
 }

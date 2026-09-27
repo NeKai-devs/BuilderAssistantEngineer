@@ -10,12 +10,13 @@ const RUNNERS = new Set(
     "npm npx pnpm pnpx yarn bun bunx deno node tsx ts-node vitest jest mocha ava tap playwright cypress tsc vue-tsc eslint biome prettier stylelint " +
     "python python3 py pytest tox nox ruff mypy pyright flake8 black isort uv poetry pipenv hatch pdm " +
     "go gofmt golangci-lint staticcheck cargo rustc make cmake ctest ninja gradle gradlew mvn mvnw dotnet java javac kotlinc sbt " +
-    "php composer phpunit pest phpstan psalm bundle rake rspec ruby rails rubocop mix elixir swift xcodebuild flutter dart shellcheck"
+    "php composer phpunit pest phpstan psalm bundle rake rspec ruby rails rubocop mix elixir swift xcodebuild flutter dart shellcheck " +
+    "turbo nx lerna rush just bazel bazelisk moon"
   ).split(" "),
 );
 const CHECKS = new Set(["test", "[", "[[", "grep", "egrep", "fgrep", "rg", "diff", "cmp"]);
 const HELPERS = new Set(
-  "cd echo printf ls cat pwd true : export sleep head tail wc sort uniq tee mkdir touch cp which command".split(
+  "cd echo printf ls cat pwd true : export sleep head tail wc sort uniq tee mkdir touch cp which exit set".split(
     " ",
   ),
 );
@@ -32,19 +33,31 @@ const GIT_READ = new Set([
   "blame",
 ]);
 const DYNAMIC = new Set(["eval", "source", ".", "exec", "xargs", "command", "builtin", "env"]);
-const RELEASING = new Set([
-  "publish",
-  "deploy",
-  "release",
-  "upload",
-  "push",
-  "login",
-  "adduser",
-  "owner",
-  "unpublish",
-  "deprecate",
-  "yank",
-]);
+const RELEASING: Record<string, string[]> = {
+  npm: ["publish", "unpublish", "deprecate", "owner", "login", "adduser", "dist-tag"],
+  pnpm: ["publish", "login"],
+  yarn: ["publish", "npm", "login"],
+  bun: ["publish"],
+  cargo: ["publish", "yank", "owner", "login"],
+  docker: ["push", "login"],
+  podman: ["push", "login"],
+  poetry: ["publish"],
+  uv: ["publish"],
+  hatch: ["publish"],
+  pdm: ["publish"],
+  twine: ["upload"],
+  gem: ["push", "yank"],
+  dotnet: ["nuget"],
+  mvn: ["deploy", "release:perform", "release:prepare"],
+  mvnw: ["deploy", "release:perform", "release:prepare"],
+  gradle: ["publish"],
+  gradlew: ["publish"],
+  mix: ["hex.publish"],
+  dart: ["pub"],
+  flutter: ["pub"],
+};
+const WRAPPERS = new Set(["timeout", "nice", "xvfb-run", "nohup", "time"]);
+const HEADERS = new Set(["for", "case", "select", "in"]);
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd"]);
 const SCRIPT_SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
 const DOWNLOADERS = new Set(["curl", "wget"]);
@@ -91,12 +104,21 @@ export function allowlistProblems(lines: string[], allow: string[]): CheckProble
 function masksWithOperators(line: string): boolean {
   const unquoted = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
   const fallbacks = unquoted.split("||").slice(1);
-  if (fallbacks.some((fallback) => !FALLBACK_OK.test(fallback))) return true;
+  if (fallbacks.some((fallback) => !FALLBACK_OK.test(fallback) && !checksAgain(fallback))) {
+    return true;
+  }
   return /(^|[^&|])&(\s*$|\s*[;)]|\s+\S)/.test(unquoted.replace(/&&|&>|>&|\|&|\d>&\d/g, ""));
 }
 
+function checksAgain(fallback: string): boolean {
+  const [first] = parseLine(fallback.trim()).commands;
+  if (!first) return false;
+  const { name } = program(first);
+  return CHECKS.has(baseName(name));
+}
+
 function runsOrChecks(command: SimpleCommand): boolean {
-  const { name, args } = program(command);
+  const { name, args } = unwrap(program(command));
   const base = baseName(name);
   if (RUNNERS.has(base) || runsScriptFile(base, args)) return true;
   if (CHECKS.has(base)) return true;
@@ -109,11 +131,14 @@ function runsOrChecks(command: SimpleCommand): boolean {
 }
 
 function allowed(command: SimpleCommand, downloads: boolean): boolean {
-  const { name, args } = program(command);
+  if (HEADERS.has(command.words[0] ?? "")) return true;
+  const { name, args } = unwrap(program(command));
   const base = baseName(name);
+  if (name === "") return true;
   if (!downloads && runsScriptFile(base, args)) return true;
   if (DYNAMIC.has(base) || SHELLS.has(base)) return false;
-  if (args.some((arg) => RELEASING.has(arg)) && !args.includes("--dry-run")) return false;
+  if (releases(base, args)) return false;
+  if (base === "rm") return safeRemove(args);
   if (base === "git") return GIT_READ.has(args[0] ?? "");
   if (base === "curl" || base === "jq") return true;
   if (
@@ -139,6 +164,43 @@ function runsScriptFile(base: string, args: string[]): boolean {
   );
 }
 
+function unwrap(found: { name: string; args: string[] }): { name: string; args: string[] } {
+  const base = baseName(found.name);
+  if (!WRAPPERS.has(base)) return found;
+  let index = 0;
+  const args = found.args;
+  while (index < args.length && (args[index] ?? "").startsWith("-")) {
+    index += /^-(n|s|k|-signal|-kill-after|-server-args)$/.test(args[index] ?? "") ? 2 : 1;
+  }
+  if (base === "timeout") index++;
+  const [name = "", ...rest] = args.slice(index);
+  return name ? unwrap({ name, args: rest }) : { name: base, args: [] };
+}
+
+function releases(base: string, args: string[]): boolean {
+  if (args.includes("--dry-run")) return false;
+  const subcommands = RELEASING[base];
+  const first = args.find((arg) => !arg.startsWith("-"));
+  if (subcommands && first && subcommands.includes(first)) return true;
+  if (!["npx", "pnpx", "bunx"].includes(base) || !first) return false;
+  const rest = args.slice(args.indexOf(first) + 1);
+  return releases(baseName(first), rest);
+}
+
+function safeRemove(args: string[]): boolean {
+  const paths = args.filter((arg) => !arg.startsWith("-"));
+  return (
+    paths.length > 0 &&
+    paths.every(
+      (path) =>
+        !/^([/~]|[a-z]:)/i.test(path) &&
+        !path.split(/[\\/]/).includes("..") &&
+        !/^(\.|\*|\.\/?\*?)$/.test(path) &&
+        !path.includes("$"),
+    )
+  );
+}
+
 function baseName(name: string): string {
-  return name.split("/").at(-1) ?? name;
+  return (name.split("/").at(-1) ?? name).replace(/\.(cmd|exe|bat)$/i, "");
 }

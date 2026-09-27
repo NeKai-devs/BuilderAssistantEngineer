@@ -47,17 +47,53 @@ export async function runScript(
   const dir = await mkdtemp(join(tmpdir(), "bae-script-"));
   const file = join(dir, "script.sh");
   await writeFile(file, script, "utf8");
+  const group = process.platform !== "win32";
+  const limit = options.timeoutMs ?? SCRIPT_TIMEOUT_MS;
   try {
     const subprocess = execa(bash, ["--noprofile", "--norc", file], {
       cwd: options.cwd,
       all: true,
       reject: false,
-      timeout: options.timeoutMs ?? SCRIPT_TIMEOUT_MS,
+      detached: group,
+      ...(group ? {} : { timeout: limit }),
       env: { ...options.env, PWD: options.cwd },
     });
     const { onOutput } = options;
     if (onOutput) subprocess.all?.on("data", (chunk: Buffer) => onOutput(chunk.toString()));
-    const result = await subprocess;
+    let timedOut = false;
+    const stop = (signal: NodeJS.Signals) => {
+      if (group && subprocess.pid) killGroup(subprocess.pid, signal);
+    };
+    const timer = group
+      ? setTimeout(() => {
+          timedOut = true;
+          stop("SIGTERM");
+          setTimeout(() => stop("SIGKILL"), 3_000).unref();
+        }, limit)
+      : undefined;
+    subprocess.on("exit", () => stop("SIGKILL"));
+    const forward = (signal: NodeJS.Signals) => {
+      stop(signal);
+      release();
+      process.kill(process.pid, signal);
+    };
+    const release = () => {
+      process.off("SIGINT", forward);
+      process.off("SIGTERM", forward);
+    };
+    if (group) {
+      process.once("SIGINT", forward);
+      process.once("SIGTERM", forward);
+    }
+    const result = await subprocess.finally(release);
+    if (timer) clearTimeout(timer);
+    if (timedOut) {
+      return {
+        exitCode: -1,
+        output: result.all ?? "",
+        stdout: typeof result.stdout === "string" ? result.stdout : "",
+      };
+    }
     return {
       exitCode: result.exitCode ?? -1,
       output: result.all ?? result.message ?? "",
@@ -66,6 +102,12 @@ export async function runScript(
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+function killGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch {}
 }
 
 async function isFile(path: string): Promise<boolean> {

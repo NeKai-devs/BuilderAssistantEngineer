@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { gitPaths, isGitRepo } from "../core/git.js";
+import { BAE_IGNORED } from "../core/gitignore.js";
 import { asRecord, parseObject } from "../core/json.js";
 import { scanFiles } from "../digest/walk.js";
 import { t } from "../i18n/index.js";
@@ -84,6 +85,7 @@ export async function collectProtected(
   for (const path of [...new Set(candidates)].sort()) {
     const text = await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
     if (text === undefined || text.length > MAX_PROTECTED_CHARS || !tracked(path, text)) continue;
+    if (path === ".gitignore" && onlyBaeEntries(text)) continue;
     result[path] = text;
     if (!isRunnerConfig(path)) continue;
     for (const reference of setupReferences(path, text)) {
@@ -344,6 +346,14 @@ function fingerprint(text: string | undefined): string {
 
 function unix(text: string): string {
   return text.replace(/\r\n/g, "\n");
+}
+
+function onlyBaeEntries(text: string): boolean {
+  const lines = unix(text)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.every((line) => BAE_IGNORED.includes(line));
 }
 
 function tracked(path: string, text: string): boolean {

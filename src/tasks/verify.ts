@@ -1,7 +1,15 @@
 import { runScript } from "../core/bash.js";
 import type { ShellResult } from "../core/process.js";
 import { t } from "../i18n/index.js";
-import { logicalLines } from "./shell-words.js";
+import { trivialityProblems } from "./checks.js";
+import {
+  heredocEnd,
+  logicalLines,
+  openQuote,
+  parseLine,
+  program,
+  unquoted,
+} from "./shell-words.js";
 
 export type Unsafe = { command: string; reason: string };
 export type VerificationRun = {
@@ -23,7 +31,29 @@ const HEADER = [
 const FAILED_LINE = /^bae: failed with exit \d+: (.*)$/gm;
 const OPENERS = /(^|[;&|]\s*)(if|while|until|for|case|select)\b/g;
 const CLOSERS = /(^|[;&|]\s*)(fi|done|esac)\b/g;
-const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_]\w*)\1/;
+const STATEFUL = new Set([
+  "cd",
+  "pushd",
+  "popd",
+  "export",
+  "unset",
+  "set",
+  "source",
+  ".",
+  "alias",
+  "shopt",
+  "umask",
+  "trap",
+  "declare",
+  "typeset",
+  "local",
+  "readonly",
+  "eval",
+  "exec",
+  "function",
+]);
+
+type Planned = { text: string; check?: string; reusable: boolean };
 
 const RULES: [string, (command: string) => boolean][] = [
   ["sudo", (command) => /(^|[\s;&|(`$])(sudo|doas)(\s|$)/.test(command)],
@@ -82,7 +112,11 @@ export async function runVerification(
     (command) => excused.has(command) && (known.get(command)?.exitCode ?? 0) !== 0,
   );
   const script = lines.join("\n");
-  if (commands.length > 0 && commands.every((command) => excused.has(command))) {
+  const counted = commands.filter((command) => !(excused.has(command) && known.has(command)));
+  const onlyExcused =
+    counted.length < commands.length &&
+    (counted.length === 0 || trivialityProblems(counted).some((item) => item.reason === "trivial"));
+  if (onlyExcused) {
     return {
       passed: false,
       exitCode: 1,
@@ -92,19 +126,20 @@ export async function runVerification(
       ...(commands[0] ? { failed: commands[0] } : {}),
     };
   }
-  const body = lines.map((line, index) => {
-    const continued = (lines[index - 1] ?? "").trimEnd().endsWith("\\");
-    const result = continued ? undefined : known.get(line.trim());
-    if (!result) return line;
-    const allowed = excused.has(line.trim());
+  const body = planLines(lines).flatMap((line) => {
+    const command = line.text.trim();
+    const result = line.reusable && line.check === command ? known.get(command) : undefined;
+    const check = line.check === undefined ? [] : [`bae_ok $? ${quote(line.check)}`];
+    if (!result) return [line.text, ...check];
+    const allowed = excused.has(command);
     const code = allowed ? 0 : result.exitCode;
     const note = allowed
       ? `exit ${result.exitCode}, preexisting: it already failed before the task and did not get worse`
       : `exit ${result.exitCode}, from the regression check`;
-    return `bae_reuse ${code} ${quote(line.trim())} ${quote(note)}`;
+    return [`bae_reuse ${code} ${quote(command)} ${quote(note)}`, ...check];
   });
   options.onOutput?.(`${lines.map((line) => `$ ${line}`).join("\n")}\n`);
-  const result = await runScript(options.bash, [...HEADER, ...checked(body), ""].join("\n"), {
+  const result = await runScript(options.bash, [...HEADER, ...body, ""].join("\n"), {
     cwd,
     onOutput: options.onOutput,
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
@@ -120,32 +155,53 @@ export async function runVerification(
   };
 }
 
-function checked(lines: string[]): string[] {
-  const output: string[] = [];
+function planLines(lines: string[]): Planned[] {
+  const planned: Planned[] = [];
   let depth = 0;
   let heredoc: string | undefined;
+  let quote: "'" | '"' | undefined;
   let pending = "";
+  let stateful = false;
   for (const line of lines) {
-    output.push(line);
-    if (heredoc) {
-      if (line.trim() === heredoc) heredoc = undefined;
+    const entry: Planned = { text: line, reusable: false };
+    planned.push(entry);
+    if (heredoc !== undefined) {
+      if (line.replace(/^\t+/, "").trimEnd() === heredoc) heredoc = undefined;
       continue;
     }
-    heredoc = HEREDOC.exec(line)?.[2];
     const trimmed = line.trim();
-    if (trimmed === "" || trimmed.startsWith("#")) continue;
-    pending = `${pending} ${trimmed}`.trim();
-    depth += blockDelta(trimmed);
-    if (/(\\|&&|\|\||\|)$/.test(trimmed) || heredoc || depth > 0) continue;
+    const inside = quote !== undefined;
+    if (!inside && pending === "" && (trimmed === "" || trimmed.startsWith("#"))) continue;
+    entry.reusable = !inside && pending === "" && depth === 0 && !stateful;
+    pending = pending ? `${pending}${inside ? "\n" : " "}${trimmed}` : trimmed;
+    quote = openQuote(line, quote);
+    if (quote) continue;
+    if (!inside) {
+      depth += blockDelta(trimmed);
+      heredoc = heredocEnd(trimmed);
+      stateful ||= changesState(trimmed);
+    }
+    if (/(\\|&&|\|\||\|)$/.test(unquoted(trimmed).trimEnd()) || heredoc || depth > 0) continue;
     depth = Math.max(depth, 0);
-    output.push(`bae_ok $? ${quote(pending)}`);
+    entry.check = pending;
     pending = "";
   }
-  return output;
+  return planned;
+}
+
+function changesState(line: string): boolean {
+  return parseLine(line).commands.some((command) => {
+    const { name } = program(command);
+    return (
+      STATEFUL.has(name) ||
+      /^[A-Za-z_]\w*\s*\(\s*\)/.test(command.text) ||
+      (command.words.length > 0 && command.words.every((word) => /^[A-Za-z_]\w*=/.test(word)))
+    );
+  });
 }
 
 function blockDelta(line: string): number {
-  const code = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  const code = unquoted(line);
   const opens = [...code.matchAll(OPENERS)].length + (/\{\s*$/.test(code) ? 1 : 0);
   const closes = [...code.matchAll(CLOSERS)].length + (/^\s*\}/.test(code) ? 1 : 0);
   return opens - closes;
