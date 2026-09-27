@@ -5,7 +5,14 @@ import type { Counts } from "./results.js";
 import { type Direct, directRunner, type Sources, testRunners } from "./runners.js";
 
 export type Report = { counts: Counts; failing: string[]; source: ReportSource };
-export type ReportSource = "vitest-json" | "jest-json" | "pytest-junit" | "go-json" | "dotnet-trx";
+export const REPORT_SOURCES = [
+  "vitest-json",
+  "jest-json",
+  "pytest-junit",
+  "go-json",
+  "dotnet-trx",
+] as const;
+export type ReportSource = (typeof REPORT_SOURCES)[number];
 export type Probe = {
   command: string;
   env: Record<string, string>;

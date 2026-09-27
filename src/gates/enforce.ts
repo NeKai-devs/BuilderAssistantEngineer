@@ -18,7 +18,7 @@ import {
 } from "./contract.js";
 import { type Acceptance, accept, findingId } from "./findings.js";
 import { runnerHint } from "./results.js";
-import { expandCommand } from "./runners.js";
+import { expandCommand, TEST_RUNNERS } from "./runners.js";
 
 export type Enforced = { blocked: boolean; report: string; notes: ReviewFinding[] };
 
@@ -36,8 +36,12 @@ const MESSAGES: Record<ContractKind, MessageKey> = {
   toolchain: "contract.toolchain",
   shadow: "contract.shadow",
 };
-const SCOPED = new Set<ContractKind>(["gitignore", "scripts", "runner"]);
 const RUNNER_KEYS = ["jest", "mocha", "ava", "vitest"];
+const RISKY_SETTINGS = [
+  /^\s*(script-shell|shell|node-options|ignore-scripts|yarnPath|preload)\s*[=:]/m,
+  /^\s*\[test\]/m,
+  /^\s*plugins\s*:/m,
+];
 
 export async function enforceContract(
   ctx: CommandContext,
@@ -57,7 +61,7 @@ export async function enforceContract(
     changes.map(async (change) => {
       const listed = acceptable(change, scope);
       const finding = contractFinding(change);
-      if (!listed || !SCOPED.has(change.kind)) {
+      if (!listed) {
         return settled(change, accept(acceptance, finding, listed));
       }
       const after = await readTextIfExists(join(ctx.cwd, ...change.path.split("/")));
@@ -107,7 +111,13 @@ function weakening(
   before: string,
   after: string | undefined,
 ): string | undefined {
-  if (kind === "gitignore") return undefined;
+  if (kind === "toolchain") {
+    const keys = RISKY_SETTINGS.filter(
+      (pattern) => pattern.test(after ?? "") && !pattern.test(before),
+    );
+    return keys.length > 0 ? t("contract.weakerToolchain") : undefined;
+  }
+  if (kind !== "scripts" && kind !== "runner") return undefined;
   const added = (text: string, previous: string) =>
     exclusionKeys(text).filter((key) => !exclusionKeys(previous).includes(key));
   if (kind === "runner") {
@@ -123,7 +133,11 @@ function weakening(
     if (typeof current[name] !== "string") return [`scripts.${name}`];
     const tools = (map: Record<string, unknown>) =>
       runnerHint(expandCommand(`npm run ${name}`, { scripts: map }));
-    const lost = tools(scripts).filter((tool) => !tools(current).includes(tool));
+    const now = tools(current);
+    const tests = now.some((tool) => TEST_RUNNERS.has(tool));
+    const lost = tools(scripts).filter(
+      (tool) => !now.includes(tool) && !(tests && TEST_RUNNERS.has(tool)),
+    );
     return lost.length > 0 ? [`scripts.${name} (${lost.join(", ")})`] : [];
   });
   const keys = RUNNER_KEYS.filter((key) => key in old).flatMap((key) =>

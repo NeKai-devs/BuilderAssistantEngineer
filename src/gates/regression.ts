@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Config } from "../config/schema.js";
 import { bashPath, runScript } from "../core/bash.js";
 import type { ShellResult } from "../core/process.js";
-import { goText, probeFor } from "./reports.js";
+import { goText, probeFor, REPORT_SOURCES } from "./reports.js";
 import {
   type Counts,
   countsSchema,
@@ -237,7 +237,12 @@ export function checkRegressions(
 
 function unread(result: SuiteResult, before: CommandBaseline | undefined): boolean {
   if (!result.counts) return true;
-  return Boolean(before?.counts && before.source !== result.source);
+  if (!before?.counts || before.source === result.source) return false;
+  return !(isReport(before.source) && isReport(result.source));
+}
+
+function isReport(source: string | undefined): boolean {
+  return (REPORT_SOURCES as readonly (string | undefined)[]).includes(source);
 }
 
 export function blocking(verdict: Verdict): boolean {

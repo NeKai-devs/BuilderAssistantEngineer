@@ -44,6 +44,10 @@ describe("bypass 34: a task may change the check files its Scope lists, but not 
     expect(run.calls[1]?.prompt).toContain(
       "package.json: Changed scripts.lint, which the checks run.",
     );
+    expect(run.calls[1]?.prompt).toContain(
+      `- \`${TEST_CMD}\` (test): exit 0; 2 passed, 0 failed, 0 skipped; passed`,
+    );
+    expect(run.calls[1]?.prompt).toContain("exit 0 (every line exited 0)");
   });
 
   it("restores a listed script that stops running the tool it ran", async () => {
@@ -58,6 +62,15 @@ describe("bypass 34: a task may change the check files its Scope lists, but not 
     expect(await read(cwd, "package.json")).toBe(PACKAGE("eslint ."));
   });
 
+  it("lets a listed test script move to another test runner the gate reads", async () => {
+    const cwd = await toolingRepo();
+    const scripts = { test: "node jest.js", lint: "eslint ." };
+    const move = agent(cwd, { "package.json": `${JSON.stringify({ scripts }, null, 2)}\n` });
+    const run = await next(cwd, ["--yes"], [move, REVIEW_PASS]);
+    expect(run.log).not.toContain("It stops running what these scripts ran");
+    expect(run.code).toBe(0);
+  });
+
   it("restores a listed runner config that starts leaving tests out", async () => {
     const cwd = await toolingRepo();
     const exclude = "export default { test: { exclude: ['tests/b.test.js'] } };\n";
@@ -69,5 +82,47 @@ describe("bypass 34: a task may change the check files its Scope lists, but not 
     expect(run.code).toBe(1);
     expect(run.log).toContain("It adds settings that leave tests out (test exclude).");
     expect(await read(cwd, "vitest.config.ts")).toBe("export default { test: {} };\n");
+  });
+
+  it("keeps a listed memory file change and restores a new test hook the Scope does not allow", async () => {
+    const cwd = await bypassRepo({
+      task: { scope: "- `src/`\n- `CLAUDE.md`" },
+      files: {
+        ...SUITE_FILES(),
+        "CLAUDE.md": "@AGENTS.md\n",
+        "package.json": PACKAGE("eslint ."),
+      },
+      config: { commands: { test: TEST_CMD } },
+    });
+    const hook = `${JSON.stringify({ scripts: { pretest: "node tools/swap.js", test: TEST_CMD, lint: "eslint ." } }, null, 2)}\n`;
+    const work = agent(cwd, {
+      "CLAUDE.md": "@AGENTS.md\n\nRun the tests first.\n",
+      "package.json": hook,
+    });
+    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    expect(run.code).toBe(1);
+    expect(run.log).toContain(
+      "package.json: Changed scripts.pretest, which the checks run. Restored.",
+    );
+    expect(await read(cwd, "CLAUDE.md")).toContain("Run the tests first.");
+    expect(await read(cwd, "package.json")).toBe(PACKAGE("eslint ."));
+  });
+
+  it("does not judge build output the build writes again as the task's own code", async () => {
+    const cwd = await bypassRepo({
+      task: { scope: "- `src/`" },
+      files: {
+        "src/feature.js": "// eslint-disable-next-line no-console\nconsole.log(1);\n",
+        "build.js":
+          'require("fs").mkdirSync("dist",{recursive:true});require("fs").copyFileSync("src/feature.js","dist/feature.js");\n',
+      },
+      config: { commands: { build: "node build.js" } },
+    });
+    const work = agent(cwd, {
+      "src/feature.js": "// eslint-disable-next-line no-console\nconsole.log(2);\n",
+    });
+    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    expect(run.log).not.toContain("dist/feature.js");
+    expect(run.code).toBe(0);
   });
 });

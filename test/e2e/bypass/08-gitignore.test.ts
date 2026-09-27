@@ -48,14 +48,14 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(run.log).toContain("The task's Scope lists this file, so the change stays");
   });
 
-  it("needs the Scope and an accepted finding for other files that decide how checks run", async () => {
+  it("needs an accepted finding for a listed tool setting that changes how the checks start", async () => {
     const cwd = await bypassRepo({
       files: { ".npmrc": "fund=false\n" },
       task: { scope: "- `src/feature.ts`\n- `.npmrc`" },
     });
     const edit = agent(cwd, {
       "src/feature.ts": "export const f = 1;\n",
-      ".npmrc": "fund=false\naudit=false\n",
+      ".npmrc": "fund=false\nscript-shell=./shell.sh\n",
     });
     const first = await next(cwd, ["--yes"], [edit]);
     expect(first.code).toBe(1);
@@ -63,7 +63,7 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(id).not.toBe("");
     const second = await next(cwd, ["--yes", "--accept-finding", id], [edit, REVIEW_PASS]);
     expect(second.code).toBe(0);
-    expect(await read(cwd, ".npmrc")).toContain("audit=false");
+    expect(await read(cwd, ".npmrc")).toContain("script-shell");
     expect(second.log).toContain(`(${id}) .npmrc: Changed a package manager or tool setting`);
   });
 });

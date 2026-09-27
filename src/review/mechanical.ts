@@ -1,5 +1,5 @@
 import { isTestFile } from "../digest/baseline.js";
-import { isLockfile } from "../digest/files.js";
+import { isBuildOutput, isLockfile } from "../digest/files.js";
 import { type Acceptance, accept, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import type { Task } from "../tasks/schema.js";
@@ -22,15 +22,27 @@ export function mechanicalReview(
   acceptance: Acceptance = newAcceptance(),
   facts: MechanicalFacts = { testsGrew: false },
 ): MechanicalReview {
+  const own = sourceChanges(changes);
   const findings = [
     ...secretFindings(changes, facts.secrets ?? { allow: [] }).map((finding) =>
       accept(acceptance, finding, true),
     ),
-    ...staticIntegrity(task, changes, acceptance),
-    ...testFindings(task, changes, facts),
-    ...scopeFindings(task, changes),
+    ...staticIntegrity(task, own, acceptance),
+    ...testFindings(task, own, facts),
+    ...scopeFindings(task, own),
   ];
   return { passed: !findings.some((finding) => finding.severity === "blocker"), findings };
+}
+
+function sourceChanges(changes: TaskChanges): TaskChanges {
+  const keep = (path: string) => !isBuildOutput(path);
+  return {
+    files: changes.files.filter(keep),
+    added: changes.added.filter((item) => keep(item.path)),
+    removed: changes.removed.filter((item) => keep(item.path)),
+    deleted: changes.deleted.filter(keep),
+    untracked: changes.untracked.filter(keep),
+  };
 }
 
 function testFindings(task: Task, changes: TaskChanges, facts: MechanicalFacts): ReviewFinding[] {

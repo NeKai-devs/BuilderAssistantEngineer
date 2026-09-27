@@ -352,4 +352,8 @@ export const es: Messages = {
     "El Scope de la tarea lista este archivo, así que el cambio se queda: los chequeos corren con él y el revisor lo ve.",
   "contract.weakerScripts": "Deja de correr lo que corrían estos scripts: {{scripts}}.",
   "contract.weakerRunner": "Añade ajustes que dejan tests fuera ({{keys}}).",
+  "contract.weakerToolchain":
+    "Añade un ajuste que cambia cómo arranca el gestor de paquetes o el runner de tests.",
+  "review.noEvidence":
+    "(ninguna: esta revisión no se corrió justo después de los chequeos de next)",
 };

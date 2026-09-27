@@ -41,6 +41,7 @@ export async function reviewTask(
   notes: ReviewFinding[] = [],
   acceptance: Acceptance = newAcceptance(),
   facts: MechanicalFacts = { testsGrew: false },
+  evidence = "",
 ): Promise<ReviewResult> {
   const task = capturedTask(capture);
   const view = await taskChanges(ctx.cwd, capture);
@@ -75,6 +76,7 @@ export async function reviewTask(
     task: withoutLog(capture.task),
     diff: diff.text,
     checks: formatFindings([...mechanical.findings, ...notes]) || "(none)",
+    evidence: evidence || t("review.noEvidence"),
     output_language: LANGUAGE_NAMES[capture.config.lang],
   });
   if (ctx.flags.dryRun) {

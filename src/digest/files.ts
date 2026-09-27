@@ -134,6 +134,35 @@ export function isBinaryPath(path: string): boolean {
   return BINARY_EXTENSIONS.has(extensionOf(path));
 }
 
+const BUILD_DIRS = new Set([
+  "dist",
+  "build",
+  "out",
+  "target",
+  "coverage",
+  "node_modules",
+  "vendor",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".gradle",
+]);
+
+export function isBuildOutput(path: string): boolean {
+  const parts = path.split("/");
+  return (
+    parts.slice(0, -1).some((part) => BUILD_DIRS.has(part)) ||
+    /\.(pyc|tsbuildinfo)$|\.min\.(js|css|mjs)$|\.(js|css|mjs)\.map$/i.test(path)
+  );
+}
+
 export function isLockfile(path: string): boolean {
   return LOCKFILES.has(baseName(path));
 }

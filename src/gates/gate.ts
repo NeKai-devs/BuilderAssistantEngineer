@@ -180,10 +180,14 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     ctx.prompter.success(t("handoff.passed"));
   }
   const notes = [...stillFailing(verification, known), ...contract.notes];
-  const review = await safeReview(ctx, capture, notes, acceptance, {
-    testsGrew: testsGrew(checksRun),
-    secrets: capture.config.secrets,
-  });
+  const review = await safeReview(
+    ctx,
+    capture,
+    notes,
+    acceptance,
+    { testsGrew: testsGrew(checksRun), secrets: capture.config.secrets },
+    evidence(checksRun, verification),
+  );
   if (review.reason) ctx.prompter.warn(review.reason);
   const findings = formatFindings(review.findings);
   if (findings) ctx.prompter.note(findings, t("review.findings"));
@@ -244,9 +248,10 @@ async function safeReview(
   notes: ReviewFinding[],
   acceptance: Acceptance,
   facts: MechanicalFacts,
+  proof: string,
 ): Promise<ReviewResult | { status: "error"; findings: ReviewFinding[]; reason: string }> {
   try {
-    return await reviewTask(ctx, capture, notes, acceptance, facts);
+    return await reviewTask(ctx, capture, notes, acceptance, facts, proof);
   } catch (error) {
     if (!(error instanceof UserError)) throw error;
     return { status: "error", findings: [], reason: t("review.error", { details: error.message }) };
@@ -299,6 +304,25 @@ function acceptedReport(acceptance: Acceptance): string {
 function skippedReport(skips: string[]): string {
   if (skips.length === 0) return "";
   return `## ${t("skip.title")}\n\n${skips.map((skip) => `- ${skip}`).join("\n")}`;
+}
+
+function evidence(checks: SuiteCheck[], verification: VerificationRun): string {
+  const suite = checks.map((check) => {
+    const counts = check.counts ? `; ${formatCounts(check.counts)}` : "";
+    return `- \`${check.command}\` (${check.key}): exit ${check.exitCode}${counts}; ${check.verdict}`;
+  });
+  const excused = verification.tolerated.map(
+    (command) => `- \`${command}\`: already failed before the task`,
+  );
+  return [
+    suite.length > 0 ? `Project commands:\n${suite.join("\n")}` : "",
+    `Verification block, run as one bash script with set -Eeuo pipefail, exit ${verification.exitCode}${verification.passed ? " (every line exited 0)" : ""}:\n\`\`\`sh\n${verification.script}\n\`\`\``,
+    excused.length > 0
+      ? `Lines excused because they already failed before the task:\n${excused.join("\n")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function verificationReport(verification: VerificationRun): string {

@@ -248,10 +248,15 @@ function packageChanges(before: string, after: string): string[] {
   if (!current) return ["package.json"];
   const scripts = asRecord(previous.scripts);
   const now = asRecord(current.scripts);
+  const hooks = Object.keys(now).filter(
+    (key) =>
+      !(key in scripts) && /^(pre|post)./.test(key) && key.replace(/^(pre|post)/, "") in scripts,
+  );
   return [
     ...Object.keys(scripts)
       .filter((key) => now[key] !== scripts[key])
       .map((key) => `scripts.${key}`),
+    ...hooks.map((key) => `scripts.${key}`),
     ...PACKAGE_KEYS.filter(
       (key) => key in previous && JSON.stringify(current[key]) !== JSON.stringify(previous[key]),
     ),
@@ -264,7 +269,11 @@ function restorePackage(before: string, after: string): string {
   if (!current) return before;
   const restored: Record<string, unknown> = { ...current };
   if (previous.scripts !== undefined) {
-    restored.scripts = { ...asRecord(current.scripts), ...asRecord(previous.scripts) };
+    const scripts = asRecord(previous.scripts);
+    const kept = Object.entries(asRecord(current.scripts)).filter(
+      ([key]) => !(/^(pre|post)./.test(key) && key.replace(/^(pre|post)/, "") in scripts),
+    );
+    restored.scripts = { ...Object.fromEntries(kept), ...scripts };
   }
   for (const key of PACKAGE_KEYS.filter((name) => name in previous)) restored[key] = previous[key];
   const indent = /\n([ \t]+)"/.exec(after)?.[1] ?? "  ";

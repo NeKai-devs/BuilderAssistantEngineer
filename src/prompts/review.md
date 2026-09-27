@@ -24,6 +24,12 @@ The CLI already checked secrets, required tests and the files changed against th
 {{checks}}
 </checks>
 
+After the agent finished, the CLI itself ran the project's commands and the task's Verification block on the tree you are reviewing. These results come from the CLI, not from the agent. Treat them as the evidence that those commands pass or fail, and do not fail the task only because you could not run them yourself:
+
+<evidence>
+{{evidence}}
+</evidence>
+
 Write the findings in {{output_language}}. Respond with JSON only:
 {"verdict": "pass" | "fail", "findings": [{"severity": "blocker" | "major" | "minor", "file": "optional path", "message": "what is wrong and how to fix it"}]}
 
