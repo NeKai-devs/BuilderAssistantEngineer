@@ -86,6 +86,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
     expect(mechanicalReview(task({ tests: "required" }), untested).findings).toEqual([
       {
         severity: "blocker",
+        id: expect.stringMatching(/^integrity-[0-9a-f]{8}$/),
         message:
           "The task requires tests (tests: required), but it neither runs more tests than before nor adds assertions to a test file.",
       },

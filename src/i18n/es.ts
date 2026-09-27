@@ -356,4 +356,5 @@ export const es: Messages = {
     "Añade un ajuste que cambia cómo arranca el gestor de paquetes o el runner de tests.",
   "review.noEvidence":
     "(ninguna: esta revisión no se corrió justo después de los chequeos de next)",
+  "integrity.scoped": "El Scope de la tarea lista este archivo, así que lo juzga el revisor.",
 };

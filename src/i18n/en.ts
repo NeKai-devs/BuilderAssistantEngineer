@@ -344,6 +344,7 @@ export const en = {
   "contract.weakerToolchain":
     "It adds a setting that changes how the package manager or the test runner starts.",
   "review.noEvidence": "(none: this review was not run right after next's checks)",
+  "integrity.scoped": "The task's Scope lists this file, so the reviewer judges it instead.",
 } as const;
 
 export type MessageKey = keyof typeof en;

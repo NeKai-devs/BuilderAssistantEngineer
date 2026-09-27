@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { skipMarkers } from "../../../src/review/tests.js";
+import { markerCounts } from "../../../src/review/tests.js";
 import { trivialityProblems } from "../../../src/tasks/checks.js";
 
 describe("bypass 26: masking and skip markers are recognized in their other forms", () => {
@@ -26,6 +26,6 @@ describe("bypass 26: masking and skip markers are recognized in their other form
     ["pytestmark = pytest.mark.skip(reason='later')"],
     ["//go:build ignore"],
   ])("flags `%s` in a test file", (text) => {
-    expect(skipMarkers({ path: "test/a.test.ts", text })).not.toEqual([]);
+    expect(markerCounts(text).size).toBeGreaterThan(0);
   });
 });

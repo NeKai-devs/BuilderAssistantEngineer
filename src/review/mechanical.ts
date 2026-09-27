@@ -1,20 +1,20 @@
 import { isTestFile } from "../digest/baseline.js";
 import { isBuildOutput, isLockfile } from "../digest/files.js";
-import { type Acceptance, accept, newAcceptance } from "../gates/findings.js";
+import { type Acceptance, accept, findingId, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import type { Task } from "../tasks/schema.js";
-import type { TaskChanges } from "./changes.js";
+import type { AddedText, TaskChanges } from "./changes.js";
 import { staticIntegrity } from "./integrity.js";
 import type { ReviewFinding } from "./parse.js";
 import { inScope, scopePaths } from "./scope.js";
 import { type SecretOptions, secretFindings } from "./secrets.js";
-import { addsAssertions, assertionCount } from "./tests.js";
+import { assertionCount, isTestChange } from "./tests.js";
 
 export type MechanicalReview = { passed: boolean; findings: ReviewFinding[] };
 
 const ALWAYS_IN_SCOPE = new Set([".gitignore"]);
 
-export type MechanicalFacts = { testsGrew: boolean; secrets?: SecretOptions };
+export type MechanicalFacts = { testsGrew: boolean; counted?: boolean; secrets?: SecretOptions };
 
 export function mechanicalReview(
   task: Task,
@@ -28,7 +28,7 @@ export function mechanicalReview(
       accept(acceptance, finding, true),
     ),
     ...staticIntegrity(task, own, acceptance),
-    ...testFindings(task, own, facts),
+    ...testFindings(task, own, facts).map((finding) => accept(acceptance, finding, true)),
     ...scopeFindings(task, own),
   ];
   return { passed: !findings.some((finding) => finding.severity === "blocker"), findings };
@@ -46,8 +46,15 @@ function sourceChanges(changes: TaskChanges): TaskChanges {
 }
 
 function testFindings(task: Task, changes: TaskChanges, facts: MechanicalFacts): ReviewFinding[] {
-  if (task.meta.tests !== "required" || facts.testsGrew || addsNetAssertions(changes)) return [];
-  return [{ severity: "blocker", message: t("mechanical.noTests") }];
+  if (task.meta.tests !== "required" || facts.testsGrew) return [];
+  if (netAssertions(changes, facts.counted ?? false) > 0) return [];
+  return [
+    {
+      severity: "blocker",
+      id: findingId("integrity", task.path, "tests-required"),
+      message: t("mechanical.noTests"),
+    },
+  ];
 }
 
 function scopeFindings(task: Task, changes: TaskChanges): ReviewFinding[] {
@@ -66,9 +73,10 @@ function scopeFindings(task: Task, changes: TaskChanges): ReviewFinding[] {
   ];
 }
 
-function addsNetAssertions(changes: TaskChanges): boolean {
-  const removed = new Map(changes.removed.map((item) => [item.path, assertionCount(item.text)]));
-  return changes.added.some(
-    (item) => addsAssertions(item) && assertionCount(item.text) > (removed.get(item.path) ?? 0),
-  );
+function netAssertions(changes: TaskChanges, counted: boolean): number {
+  const fresh = new Set(changes.untracked);
+  const total = (items: AddedText[]) =>
+    items.filter(isTestChange).reduce((sum, item) => sum + assertionCount(item.text), 0);
+  const added = changes.added.filter((item) => !(counted && fresh.has(item.path)));
+  return total(added) - total(changes.removed);
 }

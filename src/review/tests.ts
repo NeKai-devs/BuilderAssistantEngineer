@@ -3,7 +3,7 @@ import type { AddedText } from "./changes.js";
 
 const RUST_TEST = /#\[(?:tokio::)?test\]|#\[cfg\(test\)\]/;
 const ASSERTION =
-  /\bexpect\s*[({]|\bassert(?:_eq|_ne)?!\s*\(|\bassert\w*\s*[(]|^\s*assert\s|\.should\b|\bshould\s*[.(]|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail)\b|\brequire\.\w+\(|\bXCTAssert\w*\(|\bAssert\.\w+\(|\bassertThat\(|\bself\.assert\w*\(|\$this->assert\w*\(|\bthrow\b/;
+  /\bexpect\s*[({]|\bExpect\s*\(|\bassert\w*!\s*\(|\bassert\w*\s*[(]|\bassert\.\w+\s*\(|^\s*assert\s|\b(?:assert|refute)_\w+\b|\brefute\w*\s*[(\s]|\.should\b|\bshould\s*[.(]|\bshouldBe\b|\.Should\(\)|\bt\.(?:Error|Errorf|Fatal|Fatalf|Fail)\b|\bt\.(?:is|not|equal|deepEqual|true|false|truthy|falsy|ok|notOk|same|match|throws)\s*\(|\brequire\.\w+\(|\bXCTAssert\w*\(|#(?:expect|require)\s*\(|\bAssert\.\w+\(|\bassertThat\(|\bself\.assert\w*\(|\$this->assert\w*\(|\bthrow\b/;
 const COMMENT = /^\s*(\/\/|#(?!\[)|\*|\/\*)/;
 const DECLARATIONS = [
   /\b(?:it|test|specify)(?:\.\w+)*\s*\(\s*(['"`])(.+?)\1/g,
@@ -14,6 +14,9 @@ const DECLARATIONS = [
   /^\s*test\s+(["'])(.+?)\1\s+do\b/gm,
   /\bt\.Run\(\s*(["'`])(.+?)\1/g,
   /\bfunction\s+()(test\w+)\s*\(/g,
+  /@(?:Test|ParameterizedTest|RepeatedTest)\b(?:\([^)]*\))?(?:\s*@[\w.]+(?:\([^)]*\))?)*\s*(?:(?:public|protected|private|internal|open|override|suspend|static|final)\s+)*(?:void|fun)\s+()`?([\w ]+?)`?\s*\(/g,
+  /\[(?:Fact|Theory|Test|TestMethod|TestCase)\b[^\]]*\](?:\s*\[[^\]]*\])*\s*(?:(?:public|private|internal|protected|static|async)\s+)*(?:void|Task)\s+()(\w+)\s*\(/g,
+  /#\[(?:tokio::)?test\](?:\s*#\[[^\]]*\])*\s*(?:pub\s+)?(?:async\s+)?fn\s+()(\w+)\s*\(/g,
 ];
 const ANNOTATED =
   /#\[(?:tokio::)?test\]|@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b|\[(?:Fact|Theory|Test|TestMethod|TestCase)\b/g;
@@ -21,19 +24,22 @@ const SKIP_MARKERS: [string, RegExp][] = [
   [".skip", /\b(?:it|test|describe|context|suite)(?:\.\w+)*\.(?:skip|skipIf|runIf)\b/],
   [".only", /\b(?:it|test|describe|context|suite)(?:\.\w+)*\.only\b/],
   [".todo", /\b(?:it|test)(?:\.\w+)*\.todo\b/],
-  ["pytestmark", /\bpytestmark\s*=.*pytest\.mark\.(?:skip|skipif|xfail)\b/],
+  ["pytestmark", /\bpytestmark\s*=.*pytest\.mark\.(?:skip|skipif)\b/],
+  ["@pytest.mark.xfail", /\bpytestmark\s*=.*pytest\.mark\.xfail\b|@pytest\.mark\.xfail\b/],
   ["go:build ignore", /^\/\/\s*(?:go:build|\+build)\s+ignore\b/m],
   ["expected failure", /\b(?:it|test)(?:\.\w+)*\.(?:fails|failing)\b|\btest\.fail\s*\(/],
   ["@unittest.expectedFailure", /@unittest\.expectedFailure\b|@expectedFailure\b/],
-  ["#[should_panic]", /#\[should_panic\b/],
   ["pytest.xfail", /\bpytest\.xfail\s*\(/],
-  ["focused test", /\bf(?:it|describe)\s*\(/],
+  ["focused test", /(?:^|[^.\w$])f(?:it|describe)\s*\(/m],
   ["x-prefixed spec", /^\s*x(?:it|describe|context|specify)\s+["']/m],
   ["rspec skip", /^\s*(?:skip|pending)(?:\s+["']|\s*$|\s+do\b)/m],
-  ["node:test skip", /\bskip\s*:\s*true\b|\bt\.(?:skip|todo)\s*\(/],
+  [
+    "node:test skip",
+    /\b(?:it|test|describe|suite)\s*\([^\n]*\bskip\s*:\s*true\b|\bt\.(?:skip|todo)\s*\(/,
+  ],
   ["x-prefixed test", /\bx(?:it|describe|test|context)\s*\(/],
   ["test.fixme", /\btest\.fixme\b/],
-  ["@pytest.mark.skip", /@pytest\.mark\.(?:skip|skipif|xfail)\b/],
+  ["@pytest.mark.skip", /@pytest\.mark\.(?:skip|skipif)\b/],
   ["pytest.skip", /\bpytest\.skip\s*\(/],
   ["@unittest.skip", /@unittest\.skip\w*/],
   ["t.Skip", /\bt\.Skip(?:f|Now)?\s*\(/],
@@ -58,24 +64,50 @@ const EXCLUSIONS: [string, RegExp][] = [
   ["test exclude", /\btest\s*:\s*\{[^}]*\b(?:exclude|include)\b/],
 ];
 
-const SUPPRESSIONS: [string, RegExp][] = [
-  ["@ts-ignore", /@ts-(?:ignore|expect-error|nocheck)\b/],
-  ["eslint-disable", /eslint-disable(?:-next-line|-line)?\b/],
-  ["biome-ignore", /biome-ignore\b/],
-  ["type: ignore", /#\s*type:\s*ignore\b/],
-  ["noqa", /#\s*noqa\b/],
-  ["pylint: disable", /pylint:\s*disable\b/],
-  ["nolint", /\/\/\s*nolint\b/],
-  ["#[allow]", /#!?\[allow\(/],
-  ["@SuppressWarnings", /@SuppressWarnings\b|@Suppress\(/],
-  ["rubocop:disable", /rubocop:disable\b/],
-  ["phpstan-ignore", /@phpstan-ignore|@psalm-suppress/],
+const SUPPRESSIONS: [string, RegExp, RegExp | undefined][] = [
+  ["@ts-ignore", /@ts-(?:ignore|expect-error|nocheck)\b/, undefined],
+  [
+    "eslint-disable",
+    /eslint-disable(?:-next-line|-line)?\b/,
+    /eslint-disable(?:-next-line|-line)?\s+[@\w/-]/,
+  ],
+  ["biome-ignore", /biome-ignore\b/, /biome-ignore\S*\s+\S/],
+  ["type: ignore", /#\s*type:\s*ignore\b/, /#\s*type:\s*ignore\[/],
+  ["noqa", /#\s*noqa\b/i, /#\s*noqa:\s*[A-Z]/i],
+  ["pylint: disable", /pylint:\s*disable\b/, /pylint:\s*disable=(?!all\b)[\w-]/],
+  ["nolint", /\/\/\s*nolint\b/, /\/\/\s*nolint:\w/],
+  ["#[allow]", /#!?\[allow\(/, /#!?\[allow\(/],
+  [
+    "@SuppressWarnings",
+    /@SuppressWarnings\b|@Suppress\(/,
+    /@SuppressWarnings\(\s*["{]|@Suppress\(\s*"/,
+  ],
+  ["rubocop:disable", /rubocop:disable\b/, /rubocop:disable\s+(?!all\b)[A-Z]/],
+  [
+    "phpstan-ignore",
+    /@phpstan-ignore|@psalm-suppress/,
+    /@phpstan-ignore(?:-next-line|-line)?\s+[\w.]+|@psalm-suppress\s+\w/,
+  ],
 ];
+const DIRECTIVES = new Set(["go:build ignore"]);
+export const EXPECTED_FAILURES = new Set([
+  "expected failure",
+  "@unittest.expectedFailure",
+  "pytest.xfail",
+  "@pytest.mark.xfail",
+]);
 const EXPECTED_OUTPUT =
   /(^|\/)__snapshots__\/|\.snap$|(^|\/)testdata\/|\.golden$|(^|\/)__fixtures__\/.*\.expected/;
 
-export function suppressions(item: AddedText): string[] {
-  return SUPPRESSIONS.filter(([, pattern]) => pattern.test(item.text)).map(([name]) => name);
+export type Suppressed = { name: string; specific: boolean };
+
+export function suppressionLines(text: string): Suppressed[] {
+  return text.split("\n").flatMap((line) =>
+    SUPPRESSIONS.filter(([, pattern]) => pattern.test(line)).map(([name, , specific]) => ({
+      name,
+      specific: specific?.test(line) ?? false,
+    })),
+  );
 }
 
 export function isExpectedOutput(path: string): boolean {
@@ -109,9 +141,16 @@ function code(text: string): string[] {
   return text.split("\n").filter((line) => !COMMENT.test(line));
 }
 
-export function skipMarkers(item: AddedText): string[] {
-  if (!isTestChange(item) && !item.path.endsWith(".rs")) return [];
-  return SKIP_MARKERS.filter(([, pattern]) => pattern.test(item.text)).map(([name]) => name);
+export function markerCounts(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  const kept = new Set(code(text));
+  for (const line of text.split("\n")) {
+    for (const [name, pattern] of SKIP_MARKERS) {
+      if (!kept.has(line) && !DIRECTIVES.has(name)) continue;
+      if (pattern.test(line)) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  }
+  return counts;
 }
 
 export function isRunnerConfig(path: string): boolean {

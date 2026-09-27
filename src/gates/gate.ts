@@ -4,7 +4,7 @@ import { bashPath } from "../core/bash.js";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
 import { t } from "../i18n/index.js";
-import { countIntegrity, testsGrew } from "../review/integrity.js";
+import { countIntegrity, hasComparableCounts, testsGrew } from "../review/integrity.js";
 import type { MechanicalFacts } from "../review/mechanical.js";
 import type { ReviewFinding } from "../review/parse.js";
 import { capturedTask, formatFindings, type ReviewResult, reviewTask } from "../review/run.js";
@@ -185,7 +185,11 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     capture,
     notes,
     acceptance,
-    { testsGrew: testsGrew(checksRun), secrets: capture.config.secrets },
+    {
+      testsGrew: testsGrew(checksRun),
+      counted: hasComparableCounts(checksRun),
+      secrets: capture.config.secrets,
+    },
     evidence(checksRun, verification),
   );
   if (review.reason) ctx.prompter.warn(review.reason);

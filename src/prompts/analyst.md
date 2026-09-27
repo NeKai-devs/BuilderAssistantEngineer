@@ -82,13 +82,13 @@ What exists when this is done and why it matters.
 ## Context
 What to read first (paths), relevant conventions, related ADRs, gotchas.
 ## Scope
-In: the files expected to change, one backticked path per line, with files to create marked (new); tests may go anywhere. Out: what must not change. The CLI flags changes outside In.
+In: the files expected to change, one backticked path per line, with files to create marked (new); tests may go anywhere. List every existing test file the task rewrites, and every config, script or ignore file it changes: only files listed here may be reorganized or reconfigured without a person accepting it. Out: what must not change. The CLI flags changes outside In.
 ## Steps
 Suggested sequence, not a straitjacket.
 ## Acceptance criteria
-Checklist; every item objectively verifiable.
+Checklist; every item objectively verifiable from the repository or the Verification block, never from output the agent must paste into the Log, since agents may not be allowed to run commands.
 ## Verification
-A fenced ```sh block that the CLI runs from the repo root as one bash script with `set -Eeuo pipefail`: it passes only when every line exits 0. A long command may continue on the next line with \, and `cd` carries over to later lines. Each block runs the project's test runner, linter or build, or a check with an expected result (`test -f`, `grep -q`, `curl -f`, `git diff --exit-code`); `echo`, `ls` or `cat` alone check nothing, and failures are never hidden with `|| true` or `set +e`. Prefer the tests for this task over the whole suite, since the CLI runs the project's lint, typecheck, build and test commands anyway. Unattended runs only execute known runners and checks (package managers, language toolchains, test runners, linters, make, read-only git, test, grep, diff, curl, jq), so do not call project scripts by path. Never use sudo, destructive commands or piped installers. Expected results in prose below the block.
+A fenced ```sh block that the CLI runs from the repo root as one bash script with `set -Eeuo pipefail`: it passes only when every line exits 0. A long command may continue on the next line with \, and `cd` carries over to later lines. Each block runs the project's test runner, linter or build, or a check with an expected result (`test -f`, `grep -q`, `curl -f`, `git diff --exit-code`); `echo`, `ls` or `cat` alone check nothing, and failures are never hidden with `|| true` or `set +e`. Prefer the tests for this task over the whole suite, since the CLI runs the project's lint, typecheck, build and test commands anyway. Unattended runs only execute known runners and checks (package managers, language toolchains, test runners, linters, make, read-only git, test, grep, diff, curl, jq), so run project scripts with `sh script.sh` or `node script.js`, not by path, and avoid `$( )`, `eval` and background jobs. Never use sudo, destructive commands or piped installers. Expected results in prose below the block.
 ## Risks and notes
 ## Log
 
