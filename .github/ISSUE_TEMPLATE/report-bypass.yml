@@ -1,0 +1,66 @@
+name: Report a bypass
+description: The gates let broken work end done, or blocked correct work.
+title: "bypass: "
+labels: ["gates"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the gates. Read [docs/limits.md](https://github.com/NeKai-devs/BuilderAssistantEngineer/blob/main/docs/limits.md) first: it lists the known limits, and a report of one of them is still welcome if you have a case that makes it worse.
+        Do not paste real credentials or private code. A small repository or an end-to-end test like the ones in `test/e2e/bypass` is the best reproduction.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Bypass: a task ended done although its checks would fail
+        - False block: the gates stopped correct work
+    validations:
+      required: true
+  - type: dropdown
+    id: gate
+    attributes:
+      label: Gate
+      options:
+        - Contract
+        - Regression and test counts
+        - Test integrity
+        - Verification
+        - Mechanical review (secrets, Scope)
+        - Reviewer
+        - Evidence (plan citations)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What the agent did
+      description: The change, the commands it ran, and the task (Scope, Verification, tests policy).
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected and actual
+      description: What the gates should have done, what they did, and the relevant part of the gate report.
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How it happened
+      options:
+        - A mistake or a shortcut by the agent in the repository
+        - Code written on purpose to defeat the checks
+        - Access outside the repository (tools, dependencies, the state directory)
+        - Not applicable (false block)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and environment
+      description: "`bae --version`, the backend, the OS and the test runner."
+    validations:
+      required: true
