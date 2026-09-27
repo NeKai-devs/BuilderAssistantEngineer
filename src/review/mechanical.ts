@@ -14,7 +14,12 @@ export type MechanicalReview = { passed: boolean; findings: ReviewFinding[] };
 
 const ALWAYS_IN_SCOPE = new Set([".gitignore"]);
 
-export type MechanicalFacts = { testsGrew: boolean; counted?: boolean; secrets?: SecretOptions };
+export type MechanicalFacts = {
+  testsGrew: boolean;
+  counted?: boolean;
+  secrets?: SecretOptions;
+  history?: AddedText[];
+};
 
 export function mechanicalReview(
   task: Task,
@@ -24,7 +29,7 @@ export function mechanicalReview(
 ): MechanicalReview {
   const own = sourceChanges(changes);
   const findings = [
-    ...secretFindings(changes, facts.secrets ?? { allow: [] }).map((finding) =>
+    ...secretFindings(changes, facts.secrets ?? { allow: [] }, facts.history).map((finding) =>
       accept(acceptance, finding, true),
     ),
     ...staticIntegrity(task, own, acceptance),

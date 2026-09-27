@@ -49,6 +49,19 @@ describe("findUnverified", () => {
     expect(await unverified(files)).toEqual([]);
   });
 
+  it("checks a line cited in a file the plan itself writes against that file", async () => {
+    const files = {
+      "docs/plan/02-architecture.md": "# Architecture\n\nLine three.\n",
+      "docs/plan/tasks/T-001-setup-baseline.md": taskWithContext(
+        "T-001",
+        "Read `docs/plan/02-architecture.md:3` and `docs/plan/02-architecture.md:9`.",
+      ),
+    };
+    expect(await unverified(files)).toEqual([
+      expect.stringContaining("docs/plan/02-architecture.md:9"),
+    ]);
+  });
+
   it("only checks architecture, ADRs and task Context, and skips tokens that are not paths", async () => {
     const noise = [
       "`application/json`, `app.main`, `Node.js`, `npm test`, `z.object()`,",

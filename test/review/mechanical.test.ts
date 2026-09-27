@@ -65,7 +65,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
     const key = fake("AKIA", "ABCDEFGHIJKLMNOP");
     const changes = await changedRepo({
       "src/config.js": `export const key = "${key}";\n`,
-      "src/keys.js": `export const token = "${fake("gh", "p_", "a".repeat(36))}";\n`,
+      "src/keys.js": `export const token = "${fake("gh", "p_", "Q7r8M3n4A1b2C3d4E5f6G7h8I9j0K1l2W5o6")}";\n`,
     });
     const result = mechanicalReview(task(), changes);
     expect(result.passed).toBe(false);
@@ -76,7 +76,7 @@ describe("mechanicalReview on the with-secrets fixture", () => {
       ],
       [
         "src/keys.js",
-        "Adds what looks like a credential (GitHub token, hardcoded password or key); read it from the environment instead.",
+        "Adds what looks like a credential (GitHub token, hardcoded password or key, long random string); read it from the environment instead.",
       ],
     ]);
   });

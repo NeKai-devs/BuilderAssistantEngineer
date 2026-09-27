@@ -35,5 +35,13 @@ export function parseReview(text: string): ReviewReply {
   }
   const result = reviewSchema.safeParse(data);
   if (!result.success) throw new FormatError(z.prettifyError(result.error));
+  const object = text.slice(start, end + 1);
+  if ((object.match(/"verdict"\s*:/g) ?? []).length > 1) {
+    throw new FormatError("more than one verdict");
+  }
+  const outside = `${text.slice(0, start)} ${text.slice(end + 1)}`;
+  if (result.data.verdict === "pass" && /\bfail/i.test(outside)) {
+    throw new FormatError("the text around the JSON contradicts its verdict");
+  }
   return result.data;
 }

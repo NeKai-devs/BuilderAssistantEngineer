@@ -34,8 +34,9 @@ export type ChangeView =
 const MAX_NEW_FILE_BYTES = 1_000_000;
 const MAX_SUSPICIOUS_LINES = 5_000;
 const MAX_LINE_CHARS = 2_000;
+const WINDOW_CHARS = 400;
 const SUSPICIOUS =
-  /AKIA|gh[pousr]_|github_pat_|glpat-|eyJ|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|PRIVATE KEY|passw|secret|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@|["'`][A-Za-z0-9+/_-]{40,}/i;
+  /AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|eyJ|xox[abprs]-|\bsk-|[rs]k_live_|AIza|npm_|hooks\.slack\.com|PRIVATE KEY|passw|pwd|secret|credential|access[_-]?key|private[_-]?key|api[_-]?key|token|:\/\/[^\s:@/]+:[^\s@/]+@|["'`][A-Za-z0-9+/_-]{40,}/gi;
 export const GATE_EXCLUDED = [BAE_DIR, TASKS_DIR];
 
 export async function taskChanges(cwd: string, capture: Capture): Promise<ChangeView> {
@@ -129,11 +130,43 @@ async function newFileText(cwd: string, path: string): Promise<string> {
   return (await readTextIfExists(target)) ?? "";
 }
 
+function suspiciousParts(line: string): string[] {
+  const starts = [...line.matchAll(SUSPICIOUS)].map((match) => match.index ?? 0);
+  if (starts.length === 0) return [];
+  if (line.length <= MAX_LINE_CHARS) return [line];
+  return starts.map((start) => line.slice(Math.max(0, start - WINDOW_CHARS), start + WINDOW_CHARS));
+}
+
+export async function committedText(cwd: string, ref: string): Promise<AddedText[] | undefined> {
+  if (ref === EMPTY_TREE) return [];
+  const log = await git(cwd, [
+    "log",
+    ...DIFF_FLAGS,
+    "-p",
+    "-U0",
+    "--format=%x00commit %H%n%B%x00",
+    `${ref}..HEAD`,
+    "--",
+    ".",
+    ...GATE_EXCLUDED.map(excluded),
+  ]);
+  if (log === undefined) return undefined;
+  const found: AddedText[] = [];
+  for (const chunk of log.split("\0commit ").slice(1)) {
+    const [head = "", patch = ""] = chunk.split("\0");
+    const hash = head.split("\n")[0] ?? "";
+    const message = head.split("\n").slice(1).join("\n").trim();
+    if (message) found.push({ path: `(commit ${hash.slice(0, 8)})`, text: message });
+    found.push(...diffLines(patch).added);
+  }
+  return found;
+}
+
 async function suspiciousLines(target: string): Promise<string> {
   const kept: string[] = [];
   const lines = createInterface({ input: createReadStream(target, "utf8"), crlfDelay: Infinity });
   for await (const line of lines) {
-    if (SUSPICIOUS.test(line)) kept.push(line.slice(0, MAX_LINE_CHARS));
+    kept.push(...suspiciousParts(line));
     if (kept.length >= MAX_SUSPICIOUS_LINES) break;
   }
   lines.close();

@@ -98,6 +98,10 @@ export async function findUnverified(cwd: string, plan: PlanEvidence): Promise<U
 export async function checkCitations(cwd: string, plan: PlanEvidence): Promise<EvidenceCheck> {
   const repo = await indexRepo(cwd);
   const planned = plannedPaths(plan.files);
+  const written = new Map([
+    ...plan.files.map((file) => [file.path, file.content] as const),
+    ...plan.tasks.map((task) => [task.path, task.text] as const),
+  ]);
   const roots = new Set([...repo.roots, ...[...planned].map((path) => path.split("/")[0] ?? "")]);
   const unverified: Unverified[] = [];
   const seen = new Set<string>();
@@ -106,7 +110,7 @@ export async function checkCitations(cwd: string, plan: PlanEvidence): Promise<E
       const key = `${source}|${citation.path}|${citation.line ?? ""}|${citation.endLine ?? ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const problem = await verify(cwd, citation, repo, planned);
+      const problem = await verify(cwd, citation, repo, planned, written);
       if (problem) unverified.push(problem);
     }
   }
@@ -200,8 +204,17 @@ async function verify(
   citation: Citation,
   repo: RepoIndex,
   planned: Set<string>,
+  written: Map<string, string>,
 ): Promise<Unverified | undefined> {
   const bare = !citation.path.includes("/");
+  const own = written.get(citation.path);
+  if (citation.line !== undefined && own !== undefined) {
+    const lines = own.split(/\r?\n/).length - (own.endsWith("\n") ? 1 : 0);
+    const last = citation.endLine ?? citation.line;
+    return citation.line >= 1 && last >= citation.line && last <= lines
+      ? undefined
+      : { ...citation, lines };
+  }
   if (citation.line !== undefined) return verifyLines(cwd, citation, repo, bare);
   const path = await existing(cwd, citation.path);
   if (path || (bare && repo.names.has(citation.path))) return undefined;

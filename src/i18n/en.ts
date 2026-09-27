@@ -345,6 +345,10 @@ export const en = {
     "It adds a setting that changes how the package manager or the test runner starts.",
   "review.noEvidence": "(none: this review was not run right after next's checks)",
   "integrity.scoped": "The task's Scope lists this file, so the reviewer judges it instead.",
+  "mechanical.secretHistory":
+    "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
+  "mechanical.secretFileHistory":
+    "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -357,4 +357,8 @@ export const es: Messages = {
   "review.noEvidence":
     "(ninguna: esta revisión no se corrió justo después de los chequeos de next)",
   "integrity.scoped": "El Scope de la tarea lista este archivo, así que lo juzga el revisor.",
+  "mechanical.secretHistory":
+    "Un commit hecho durante la tarea añade algo que parece una credencial ({{kind}}). Se queda en el historial de git aunque el archivo ya no lo tenga, así que reescribe esos commits.",
+  "mechanical.secretFileHistory":
+    "Un commit hecho durante la tarea añade un archivo de secretos. Se queda en el historial de git aunque el archivo ya no exista, así que reescribe esos commits.",
 };

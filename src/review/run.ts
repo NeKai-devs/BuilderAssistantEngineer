@@ -11,7 +11,7 @@ import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import { logLines } from "../tasks/handoff.js";
 import { parseTask, type Task } from "../tasks/schema.js";
-import { type AddedText, taskChanges } from "./changes.js";
+import { type AddedText, committedText, taskChanges } from "./changes.js";
 import { reviewDiff } from "./diff.js";
 import { type MechanicalFacts, mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
@@ -53,7 +53,12 @@ export async function reviewTask(
   }
   const log = await currentLog(ctx.cwd, capture);
   const scanned = log ? { ...view.changes, added: [...view.changes.added, log] } : view.changes;
-  const mechanical = mechanicalReview(task, scanned, acceptance, facts);
+  const history = await committedText(ctx.cwd, view.ref);
+  if (!history) {
+    const reason = t("review.gitError");
+    return { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
+  }
+  const mechanical = mechanicalReview(task, scanned, acceptance, { ...facts, history });
   if (mechanical.passed && view.changes.files.length === 0) {
     return { status: "pass", findings: mechanical.findings, reason: t("review.noChanges") };
   }
@@ -88,7 +93,11 @@ export async function reviewTask(
     runWithFormatRetry({
       backend,
       prompt,
-      options: { cwd: ctx.cwd, access: "read" },
+      options: {
+        cwd: ctx.cwd,
+        access: "read",
+        timeoutMs: capture.config.agent.timeoutMinutes * 60_000,
+      },
       parse: parseReview,
       format: REVIEW_FORMAT,
       fixPrompt: capturedPrompt(capture, "fix-format"),
