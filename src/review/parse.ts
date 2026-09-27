@@ -10,6 +10,7 @@ const reviewSchema = z.object({
         id: z.string().optional(),
         file: z.string().optional(),
         message: z.string().min(1),
+        justify: z.boolean().optional(),
       }),
     )
     .default([]),

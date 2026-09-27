@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Counts } from "./results.js";
-import { type Direct, directRunner, type Sources, testRunners } from "./runners.js";
+import { type Direct, directRunner, expandCommand, type Sources, testRunners } from "./runners.js";
 
 export type Report = { counts: Counts; failing: string[]; source: ReportSource; units: string[] };
 export const REPORT_SOURCES = [
@@ -11,6 +11,7 @@ export const REPORT_SOURCES = [
   "pytest-junit",
   "go-json",
   "dotnet-trx",
+  "node-junit",
 ] as const;
 export type ReportSource = (typeof REPORT_SOURCES)[number];
 export type Probe = {
@@ -48,6 +49,14 @@ export async function probeFor(
   const runners = testRunners(command, sources);
   if (runners.length > 0 && runners.every((name) => name === "pytest")) {
     return pytestProbe(command);
+  }
+  const text = expandCommand(command, sources);
+  if (
+    runners.length > 0 &&
+    runners.every((name) => name === "node") &&
+    !/--test-reporter/.test(text)
+  ) {
+    return nodeProbe(cwd, command);
   }
   return undefined;
 }
@@ -111,6 +120,20 @@ function extraArgs(runner: Direct["runner"], dir: string, file: string): string[
   return undefined;
 }
 
+async function nodeProbe(cwd: string, command: string): Promise<Probe> {
+  const dir = await mkdtemp(join(tmpdir(), "bae-report-"));
+  const file = slashed(join(dir, "junit.xml"));
+  const existing = process.env.NODE_OPTIONS ?? "";
+  const reporters = `--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination="${file}"`;
+  const roots = await rootsOf(cwd);
+  return {
+    command,
+    env: { NODE_OPTIONS: `${existing} ${reporters}`.trim() },
+    collect: async () => junitReport(await readText(file), "node-junit", roots),
+    dispose: () => rm(dir, { recursive: true, force: true }),
+  };
+}
+
 async function pytestProbe(command: string): Promise<Probe> {
   const dir = await mkdtemp(join(tmpdir(), "bae-report-"));
   const file = slashed(join(dir, "junit.xml"));
@@ -156,19 +179,36 @@ export function jestReport(
   return report(tally, source);
 }
 
-export function junitReport(text: string | undefined): Report | undefined {
+export function junitReport(
+  text: string | undefined,
+  source: "pytest-junit" | "node-junit" = "pytest-junit",
+  roots: string[] = [],
+): Report | undefined {
   if (!text || !/<testsuites?\b/.test(text)) return undefined;
   const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [], units: [] };
   for (const { attributes, body } of elements(text, "testcase")) {
     const name = [attributes.classname, attributes.name].filter(Boolean).join("::");
-    tally.units.push(attributes.file ?? attributes.classname ?? "");
-    if (/<(failure|error)\b/.test(body)) {
+    const file = attributes.file ? relativeTo(attributes.file, roots) : undefined;
+    tally.units.push(
+      source === "node-junit" ? (file ?? "") : (attributes.file ?? attributes.classname ?? ""),
+    );
+    const title = attributes.name ?? "";
+    const silent =
+      source === "node-junit" &&
+      /\.[cm]?[jt]sx?$/.test(title) &&
+      (/[\\/]/.test(title) || slashed(attributes.file ?? "").endsWith(`/${title}`));
+    if (silent) {
+      const path = relativeTo(attributes.name ?? "", roots);
+      tally.units.push(path);
+      tally.failed++;
+      tally.failing.push(path);
+    } else if (/<(failure|error)\b/.test(body)) {
       tally.failed++;
       tally.failing.push(name);
     } else if (/<skipped\b/.test(body)) tally.skipped++;
     else tally.passed++;
   }
-  return report(tally, "pytest-junit");
+  return report(tally, source);
 }
 
 export function goReport(stdout: string): Report | undefined {

@@ -94,4 +94,24 @@ describe("bypass 38: the regression check reads what ran, and lets untouched fai
     expect(bad.code).toBe(1);
     expect(bad.log).toContain("Regression:");
   });
+
+  it("blocks a node test file that stops early while the task adds new tests", async () => {
+    const test = (name: string, body: string) =>
+      `const test = require("node:test");\nconst assert = require("node:assert");\nconst c = require("../src/calc.js");\ntest("${name}", () => { ${body} });\n`;
+    const cwd = await bypassRepo({
+      task: { scope: "- `src/`\n- `test/`" },
+      files: {
+        "src/calc.js": "exports.add = (a, b) => a + b;\nexports.sub = (a, b) => a - b;\n",
+        "test/calc.test.js": `${test("adds", "assert.strictEqual(c.add(1, 1), 2);")}test("subtracts", () => assert.strictEqual(c.sub(2, 1), 1));\n`,
+      },
+      config: { commands: { test: "node --test" } },
+    });
+    const work = agent(cwd, {
+      "src/calc.js": "exports.add = (a, b) => a + b;\nexports.sub = () => process.exit(0);\n",
+      "test/more.test.js": `${test("one", "assert.ok(true);")}test("two", () => assert.ok(true));\n`,
+    });
+    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    expect(run.code).toBe(1);
+    expect(run.log).toContain("Regression:");
+  });
 });

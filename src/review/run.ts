@@ -105,11 +105,37 @@ export async function reviewTask(
     }),
   );
   const blocked = reply.findings.some((finding) => finding.severity === "blocker");
+  const unjustified = mechanical.findings.filter(
+    (finding) =>
+      finding.justify && !reply.findings.some((answer) => sameFile(answer.file, finding.file)),
+  );
+  const missing: ReviewFinding[] =
+    reply.verdict === "pass" && unjustified.length > 0
+      ? [
+          {
+            severity: "blocker",
+            message: t("review.unjustified", {
+              files: [...new Set(unjustified.map((finding) => finding.file ?? ""))].join(", "),
+            }),
+          },
+        ]
+      : [];
   return {
-    status: reply.verdict === "pass" && !blocked ? "pass" : "fail",
-    findings: [...mechanical.findings, ...reply.findings],
+    status: reply.verdict === "pass" && !blocked && missing.length === 0 ? "pass" : "fail",
+    findings: [...mechanical.findings, ...reply.findings, ...missing],
     stage: "reviewer",
+    ...(missing[0] ? { reason: missing[0].message } : {}),
   };
+}
+
+function sameFile(answer: string | undefined, file: string | undefined): boolean {
+  if (!answer || !file) return false;
+  const clean = (path: string) =>
+    path
+      .replace(/\\/g, "/")
+      .replace(/^\.\//, "")
+      .replace(/:\d+.*$/, "");
+  return clean(answer) === clean(file);
 }
 
 async function currentLog(cwd: string, capture: Capture): Promise<AddedText | undefined> {

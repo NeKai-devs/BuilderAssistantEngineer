@@ -49,6 +49,12 @@ describe("runner reports", () => {
     });
   });
 
+  it("reads node --test JUnit, counting a file that stopped before reporting as a failure", async () => {
+    const report = junitReport(await fixture("node-junit.xml"), "node-junit", ["/repo"]);
+    expect(report?.counts).toEqual({ passed: 1, failed: 2, skipped: 1 });
+    expect(report?.failing).toContain("test/calc.test.js");
+  });
+
   it("reads go test -json, ignoring results printed by the tests themselves", async () => {
     const report = goReport(await fixture("go.jsonl"));
     expect(report?.counts).toEqual({ passed: 3, failed: 4, skipped: 1 });
@@ -118,6 +124,15 @@ describe("probeFor", () => {
     expect(pytest?.command).toBe("make test");
     expect(pytest?.env.PYTEST_ADDOPTS).toMatch(/--junitxml="\S+junit\.xml"$/);
     await Promise.all([dotnet, pytest].map((probe) => probe?.dispose()));
+  });
+
+  it("asks node --test for a JUnit report through NODE_OPTIONS, behind npm too", async () => {
+    const probe = await probeFor("/repo", "npm test", sources({ test: "node --test test/" }));
+    expect(probe?.command).toBe("npm test");
+    expect(probe?.env.NODE_OPTIONS).toMatch(
+      /--test-reporter=junit --test-reporter-destination="\S+junit\.xml"$/,
+    );
+    await probe?.dispose();
   });
 
   it("leaves commands it cannot extend safely to the text summary", async () => {

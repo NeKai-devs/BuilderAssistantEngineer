@@ -45,7 +45,10 @@ export function staticIntegrity(
     ...changes.added.flatMap((item) => suppressionFindings(item, before.get(item.path) ?? "")),
     ...changes.files.filter(isExpectedOutput).map((file) => {
       const finding = blocker(file, t("integrity.expectedOutput"), "expected-output");
-      return scoped(listed(file) || changes.untracked.includes(file), finding);
+      if (listed(file)) return scoped(true, finding);
+      return changes.untracked.includes(file)
+        ? { ...finding, severity: "major" as const }
+        : finding;
     }),
     ...changes.untracked.filter(isRunnerConfig).flatMap((path) => {
       const keys = exclusionKeys(texts.get(path) ?? "");
@@ -126,21 +129,17 @@ function lostAssertions(changes: TaskChanges, listed: (file: string) => boolean)
     new Map(items.filter(isTestChange).map((item) => [item.path, assertionCount(item.text)]));
   const removed = tally(changes.removed);
   const added = tally(changes.added);
-  const sum = (counts: Map<string, number>) => [...counts.values()].reduce((a, b) => a + b, 0);
-  if (sum(added) >= sum(removed)) return [];
-  const losing = [...removed.entries()].filter(
-    ([path, count]) => count > (added.get(path) ?? 0) && !changes.deleted.includes(path),
-  );
-  const authorized = losing.every(([path]) => listed(path));
-  return losing.map(([path, count]) => {
-    const lost = count - (added.get(path) ?? 0);
-    const finding = blocker(
-      path,
-      t("integrity.lostAssertions", { count: lost }),
-      `assertions:${lost}`,
-    );
-    return scoped(authorized, finding);
-  });
+  return [...removed.entries()]
+    .filter(([path, count]) => count > (added.get(path) ?? 0))
+    .map(([path, count]) => {
+      const lost = count - (added.get(path) ?? 0);
+      const finding = blocker(
+        path,
+        t("integrity.lostAssertions", { count: lost }),
+        `assertions:${lost}`,
+      );
+      return scoped(listed(path), finding);
+    });
 }
 
 function addedMarkers(added: string, removed: string): string[] {
@@ -176,7 +175,12 @@ function suppressionFindings(item: AddedText, removed: string): ReviewFinding[] 
 
 function scoped(authorized: boolean, finding: ReviewFinding): ReviewFinding {
   if (!authorized) return finding;
-  return { ...finding, severity: "major", message: `${finding.message} ${t("integrity.scoped")}` };
+  return {
+    ...finding,
+    severity: "major",
+    justify: true,
+    message: `${finding.message} ${t("integrity.scoped")}`,
+  };
 }
 
 export function hasComparableCounts(checks: SuiteCheck[]): boolean {

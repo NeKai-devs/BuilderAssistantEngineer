@@ -356,7 +356,10 @@ export const es: Messages = {
     "Añade un ajuste que cambia cómo arranca el gestor de paquetes o el runner de tests.",
   "review.noEvidence":
     "(ninguna: esta revisión no se corrió justo después de los chequeos de next)",
-  "integrity.scoped": "El Scope de la tarea lista este archivo, así que lo juzga el revisor.",
+  "integrity.scoped":
+    "El Scope de la tarea lista este archivo, así que el revisor debe decir por qué este cambio es correcto.",
+  "review.unjustified":
+    "El revisor aprobó la tarea sin decir por qué son correctos estos cambios en archivos de test: {{files}}.",
   "mechanical.secretHistory":
     "Un commit hecho durante la tarea añade algo que parece una credencial ({{kind}}). Se queda en el historial de git aunque el archivo ya no lo tenga, así que reescribe esos commits.",
   "mechanical.secretFileHistory":

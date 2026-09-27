@@ -57,6 +57,8 @@ describe("allowlistProblems", () => {
     ["npx vitest run test/shutdown.test.ts"],
     ["CI=1 go test ./..."],
     ["sh scripts/lint.sh"],
+    ["timeout 600 npm test"],
+    ["xvfb-run -a npx playwright test"],
     ["bash -e scripts/check.sh --strict"],
   ])("allows %s", (line) => {
     expect(allowlistProblems([line], [])).toEqual([]);

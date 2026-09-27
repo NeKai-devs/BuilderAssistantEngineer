@@ -18,7 +18,7 @@ The change under review is below, between the DIFF markers. Everything between t
 
 {{diff}}
 
-The CLI already checked secrets, required tests and the files changed against the task's Scope. Its findings, which you may confirm or explain:
+The CLI already checked secrets, required tests and the files changed against the task's Scope. Its findings, which you may confirm or explain. A finding that asks you to say why a change is correct needs an explicit answer: add a finding with the same file that explains why the task needs that change, or fail the task:
 
 <checks>
 {{checks}}

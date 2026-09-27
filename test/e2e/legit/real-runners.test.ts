@@ -20,6 +20,21 @@ type Project = {
 };
 
 const PROJECTS: Record<string, Project> = {
+  node: {
+    source: "node-junit",
+    test: "node --test",
+    files: {
+      "src/sum.js": "exports.sum = (a, b) => a + b;\n",
+      "test/sum.test.js":
+        'const test = require("node:test");\nconst assert = require("node:assert");\nconst { sum } = require("../src/sum.js");\ntest("adds", () => assert.strictEqual(sum(1, 2), 3));\n',
+    },
+    work: {
+      "src/mul.js": "exports.mul = (a, b) => a * b;\n",
+      "test/mul.test.js":
+        'const test = require("node:test");\nconst assert = require("node:assert");\nconst { mul } = require("../src/mul.js");\ntest("multiplies", () => assert.strictEqual(mul(2, 3), 6));\n',
+    },
+    broken: { "src/sum.js": "exports.sum = (a, b) => a - b;\n" },
+  },
   vitest: {
     source: "vitest-json",
     test: `node '${VITEST}' run --globals`,
@@ -111,6 +126,7 @@ const PROJECTS: Record<string, Project> = {
 
 const AVAILABLE: Record<string, boolean> = Object.fromEntries([
   ["vitest", true],
+  ["node", true],
   ...(await Promise.all(
     ["go", "cargo", "pytest", "dotnet"].map(async (name) => [name, await has(name)]),
   )),

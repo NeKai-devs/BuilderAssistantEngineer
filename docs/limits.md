@@ -17,7 +17,7 @@ To report a new case, including correct work that the gates stopped, use the [Re
 - **Code written to deceive the checks.** The checks run the project's tests, which the agent may have written. Some examples of code that can defeat them on purpose:
   - a test that rewrites itself or another file while the suite runs, then puts it back, so the reviewer only sees the final tree;
   - a new `conftest.py` hook that rewrites test outcomes before pytest writes its report;
-  - a test that prints framing lines or summaries for a runner that bae reads from text.
+  - a test that prints summaries for a runner that bae reads from its printed output.
 - **Agent permissions.** Claude Code ignores the permissions in a project's `.claude/settings.json` when a headless session runs in a folder you have not trusted. The agent can then edit files but cannot install dependencies or run tests. Tasks that need `npm install` fail at the gates. This is correct: the work is incomplete.
 
 ## Contract
@@ -30,9 +30,8 @@ To report a new case, including correct work that the gates stopped, use the [Re
 
 ## Regression and test counts
 
-- **Runners read from their printed summary** are mocha, `node --test`, bun, deno, unittest, rspec, minitest, phpunit, maven and playwright. For these runners:
+- **Runners read from their printed summary** are mocha, bun, deno, unittest, rspec, minitest, phpunit, maven and playwright. For these runners:
   - only the last summary counts;
-  - a `node --test` file that exits early while the task adds new tests can keep the total the same;
   - a failure swapped for another is not noticed for tests nested in `describe`, or for runners without failing names (bun, deno, minitest, maven). (medium)
 - **A command that runs the runner several times** (`vitest run a && vitest run b`, or a Makefile with two pytest lines) is read from its last run only. (medium)
 - **Commands next cannot read**: tox, gotestsum, `npm test --workspaces`, `cargo nextest`, `go test` without `-v` behind `make`, and vitest with its own `--outputFile`. For these, `next` stops before the agent. Point `commands.test` at the runner itself, or use `--allow-skip`. (medium)
@@ -59,7 +58,7 @@ To report a new case, including correct work that the gates stopped, use the [Re
 
 ## Test integrity
 
-- Deleting a failing test and adding back a hollow test with the same name is left to the reviewer. So is rewriting a test to expect the broken value. (medium)
+- Rewriting a test in place to expect the broken value, with the same number of assertion lines, is left to the reviewer. (medium)
 - Some markers, test file names, assertion styles, snapshot formats and suppression comments are not recognized:
   - markers such as `describe.todo`, `ctx.skip()`, `pending()`, TestNG `enabled = false`, `Assert.Ignore`, `XCTSkip` and `@tag :skip`;
   - Deno `_test.ts` files under `src/`, `androidTest/`, and `*.Tests` projects;

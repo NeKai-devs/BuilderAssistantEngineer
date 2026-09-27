@@ -25,7 +25,7 @@ describe("bypass 35: Verification runs what the plan wrote, where it wrote it", 
     ],
     [
       "wrappers and cleanup",
-      'timeout 60 node -e "process.exit(0)"\nrm -f tmp.txt\nset -x\ntest -f src/feature.ts || exit 1',
+      'nice -n 5 node -e "process.exit(0)"\nrm -f tmp.txt\nset -x\ntest -f src/feature.ts || exit 1',
     ],
     ["a shell script of the repository", "sh scripts/check.sh"],
   ])("runs correct work unattended with %s", async (_name, command) => {

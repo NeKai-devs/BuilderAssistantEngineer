@@ -344,7 +344,10 @@ export const en = {
   "contract.weakerToolchain":
     "It adds a setting that changes how the package manager or the test runner starts.",
   "review.noEvidence": "(none: this review was not run right after next's checks)",
-  "integrity.scoped": "The task's Scope lists this file, so the reviewer judges it instead.",
+  "integrity.scoped":
+    "The task's Scope lists this file, so the reviewer must say why this change is correct.",
+  "review.unjustified":
+    "The reviewer passed the task without saying why these changes to test files are correct: {{files}}.",
   "mechanical.secretHistory":
     "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
   "mechanical.secretFileHistory":

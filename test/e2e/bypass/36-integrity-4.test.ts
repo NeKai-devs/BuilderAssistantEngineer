@@ -2,8 +2,21 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { markerCounts, testNames } from "../../../src/review/tests.js";
+import type { Step } from "../../fakes.js";
 import { agent, bypassRepo, next, REVIEW_PASS, statusOf } from "./harness.js";
 import { SUITE_FILES, TEST_CMD } from "./suite-fixture.js";
+
+const justified =
+  (...files: string[]): Step =>
+  () =>
+    JSON.stringify({
+      verdict: "pass",
+      findings: files.map((file) => ({
+        severity: "minor",
+        file,
+        message: "The task asks for it.",
+      })),
+    });
 
 const suiteRepo = (scope: string, tests: "optional" | "required" = "optional") =>
   bypassRepo({
@@ -19,11 +32,37 @@ describe("bypass 36: test integrity tells a refactor from a shortcut", () => {
       "tests/a.test.js":
         'it("adds", () => assertEqual(1 + 1, 2));\nit("subtracts", () => assertEqual(2 - 1, 1));\n',
     });
-    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    const run = await next(cwd, ["--yes"], [work, justified("tests/a.test.js")]);
     expect(run.log).toContain("Removes tests that are not added back: a.");
-    expect(run.log).toContain("so the reviewer judges it instead");
+    expect(run.log).toContain("the reviewer must say why this change is correct");
     expect(run.code).toBe(0);
     expect(await statusOf(cwd)).toBe("done");
+  });
+
+  it("fails the review when the reviewer passes a scoped test change without saying why", async () => {
+    const cwd = await suiteRepo("- `src/`\n- `tests/a.test.js`");
+    const work = agent(cwd, { "tests/a.test.js": 'it("adds", () => assertEqual(1 + 1, 2));\n' });
+    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    expect(run.code).toBe(1);
+    expect(run.log).toContain(
+      "without saying why these changes to test files are correct: tests/a.test.js",
+    );
+  });
+
+  it("blocks emptying a failing test and adding it back hollow under the same name", async () => {
+    const cwd = await suiteRepo("- `src/`");
+    const hollow = agent(
+      cwd,
+      {
+        "src/feature.js": "module.exports = { value: 2 };\n",
+        "tests/c.test.js": 'it("b", () => assertEqual(1, 1));\n',
+      },
+      () => rm(join(cwd, "tests", "b.test.js")),
+    );
+    const run = await next(cwd, ["--yes"], [hollow, REVIEW_PASS]);
+    expect(run.code).toBe(1);
+    expect(run.log).toContain("tests/b.test.js: Removes 1 assertion line(s)");
+    expect(run.log).toContain("[blocker]");
   });
 
   it("still blocks removing a test from a file the Scope does not list", async () => {
@@ -35,9 +74,9 @@ describe("bypass 36: test integrity tells a refactor from a shortcut", () => {
     expect(run.log).toContain("Removes tests that are not added back: a.");
   });
 
-  it("does not count moved assertions or re-indented markers as losses or new markers", async () => {
+  it("does not count re-indented markers as new, and asks why assertions moved out of a file", async () => {
     const cwd = await bypassRepo({
-      task: { scope: "- `src/`" },
+      task: { scope: "- `src/`\n- `tests/a.test.js`" },
       files: {
         "tests/a.test.js":
           'it.skip("slow", () => {});\nit("a", () => {\n  expect(1).toBe(1);\n});\n',
@@ -48,9 +87,9 @@ describe("bypass 36: test integrity tells a refactor from a shortcut", () => {
         'describe("group", () => {\n  it.skip("slow", () => {});\n  it("a", () => check(1));\n});\n',
       "tests/helpers.js": "global.check = (n) => expect(n).toBe(1);\n",
     });
-    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    const run = await next(cwd, ["--yes"], [work, justified("tests/a.test.js")]);
     expect(run.log).not.toContain("Adds a marker");
-    expect(run.log).not.toContain("assertion line");
+    expect(run.log).toContain("tests/a.test.js: Removes 1 assertion line(s)");
     expect(run.code).toBe(0);
   });
 
@@ -95,7 +134,7 @@ describe("bypass 36: test integrity tells a refactor from a shortcut", () => {
   it("lets the count of tests go down only when the Scope marks the test file as removed", async () => {
     const planned = await suiteRepo("- `src/`\n- `tests/b.test.js` (delete)");
     const drop = agent(planned, {}, () => rm(join(planned, "tests", "b.test.js")));
-    const run = await next(planned, ["--yes"], [drop, REVIEW_PASS]);
+    const run = await next(planned, ["--yes"], [drop, justified("tests/b.test.js")]);
     expect(run.log).toContain("marks test files it removes");
     expect(run.code).toBe(0);
     const unplanned = await suiteRepo("- `src/`\n- `tests/b.test.js`");
