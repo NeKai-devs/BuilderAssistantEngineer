@@ -60,7 +60,11 @@ export function staticIntegrity(
   );
 }
 
-export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): ReviewFinding[] {
+export function countIntegrity(
+  checks: SuiteCheck[],
+  acceptance: Acceptance,
+  planned = false,
+): ReviewFinding[] {
   const findings = comparable(checks).flatMap(({ check, now, before }) => {
     const vars = { command: check.command, now: describe(now), before: describe(before) };
     return [
@@ -72,7 +76,15 @@ export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): Re
         : []),
     ];
   });
-  return findings.map((finding) => accept(acceptance, finding, true));
+  return findings.map((finding) =>
+    planned
+      ? {
+          ...finding,
+          severity: "major" as const,
+          message: `${finding.message} ${t("integrity.planned")}`,
+        }
+      : accept(acceptance, finding, true),
+  );
 }
 
 export function testsGrew(checks: SuiteCheck[]): boolean {

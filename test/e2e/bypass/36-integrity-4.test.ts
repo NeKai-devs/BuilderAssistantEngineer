@@ -91,4 +91,17 @@ describe("bypass 36: test integrity tells a refactor from a shortcut", () => {
       ),
     ).toEqual(["addsNumbers", "Multiplies", "divides"]);
   });
+
+  it("lets the count of tests go down only when the Scope marks the test file as removed", async () => {
+    const planned = await suiteRepo("- `src/`\n- `tests/b.test.js` (delete)");
+    const drop = agent(planned, {}, () => rm(join(planned, "tests", "b.test.js")));
+    const run = await next(planned, ["--yes"], [drop, REVIEW_PASS]);
+    expect(run.log).toContain("marks test files it removes");
+    expect(run.code).toBe(0);
+    const unplanned = await suiteRepo("- `src/`\n- `tests/b.test.js`");
+    const quiet = agent(unplanned, {}, () => rm(join(unplanned, "tests", "b.test.js")));
+    const blocked = await next(unplanned, ["--yes"], [quiet, REVIEW_PASS]);
+    expect(blocked.code).toBe(1);
+    expect(blocked.log).toContain("runs fewer tests than before the task");
+  });
 });

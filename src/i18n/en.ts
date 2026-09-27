@@ -351,6 +351,8 @@ export const en = {
     "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
   "regression.noTestsYet":
     "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
+  "integrity.planned":
+    "The task's Scope marks test files it removes, so the reviewer judges it instead.",
 } as const;
 
 export type MessageKey = keyof typeof en;

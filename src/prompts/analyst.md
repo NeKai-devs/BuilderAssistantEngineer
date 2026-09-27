@@ -82,7 +82,7 @@ What exists when this is done and why it matters.
 ## Context
 What to read first (paths), relevant conventions, related ADRs, gotchas.
 ## Scope
-In: the files expected to change, one backticked path per line, with files to create marked (new); tests may go anywhere. List every existing test file the task rewrites, and every config, script or ignore file it changes: only files listed here may be reorganized or reconfigured without a person accepting it. Out: what must not change. The CLI flags changes outside In.
+In: the files expected to change, one backticked path per line, with files to create marked (new); tests may go anywhere. List every existing test file the task rewrites, and every config, script or ignore file it changes: only files listed here may be reorganized or reconfigured without a person accepting it. Mark a test file the task deletes, or removes tests from, with (delete): the test count may only go down when the plan says so. Out: what must not change. The CLI flags changes outside In.
 ## Steps
 Suggested sequence, not a straitjacket.
 ## Acceptance criteria

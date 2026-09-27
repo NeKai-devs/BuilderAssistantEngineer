@@ -1,10 +1,12 @@
 import { sectionText, type Task } from "../tasks/schema.js";
 
-const OUT_MARKER = /^\W*(out|fuera)\b/i;
+const OUT_MARKER =
+  /^\W*(out|fuera|excluded|excluido|not in scope|do not (?:change|touch|edit)|don't (?:change|touch|edit)|no (?:cambiar|tocar|modificar))\b/i;
 const CODE_SPAN = /`([^`\n]+)`/g;
 const LIST_PATH =
   /^\s*[-*+]\s+([\w@.[\]()*?/-]+\/[\w@.[\]()*?/-]*|[\w@-]+\.[A-Za-z]\w*)(?=\s|$|[,;:])/;
 const NEW_MARK = /\s*\((?:new|nuevo|nueva)\)$/i;
+const REDUCTION_MARK = /\s*\((?:delete|deleted|remove|removed|remove tests|borrar|eliminar)\)$/i;
 
 export function scopePaths(task: Task): string[] {
   const scope = sectionText(task.body, "scope") ?? "";
@@ -18,6 +20,17 @@ export function scopePaths(task: Task): string[] {
   return [...new Set(paths.map(normalize).filter((path): path is string => path !== undefined))];
 }
 
+export function reductionPaths(task: Task): string[] {
+  const scope = sectionText(task.body, "scope") ?? "";
+  return [
+    ...scope.matchAll(
+      /`([^`\n]+)`\s*\((?:delete|deleted|remove|removed|remove tests|borrar|eliminar)\)|`([^`\n]+?)\s*\((?:delete|deleted|remove|removed|remove tests|borrar|eliminar)\)`/gi,
+    ),
+  ]
+    .map((match) => normalize(match[1] ?? match[2] ?? ""))
+    .filter((path): path is string => path !== undefined);
+}
+
 export function inScope(file: string, patterns: string[]): boolean {
   return patterns.some((pattern) => {
     if (/[*?]/.test(pattern)) return globToRegExp(pattern).test(file);
@@ -27,8 +40,11 @@ export function inScope(file: string, patterns: string[]): boolean {
 }
 
 function normalize(raw: string): string | undefined {
-  const path = raw.trim().replace(NEW_MARK, "").replace(/^\.\//, "");
+  const path = raw.trim().replace(NEW_MARK, "").replace(REDUCTION_MARK, "").replace(/^\.\//, "");
   if (path === "" || /\s|:\/\//.test(path)) return undefined;
+  if (/[*?]/.test(path) && globToRegExp(path).test("a") && globToRegExp(path).test("x/y/z.q")) {
+    return undefined;
+  }
   return path.includes("/") || /\.[A-Za-z]\w*$/.test(path) ? path : undefined;
 }
 

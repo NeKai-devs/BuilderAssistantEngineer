@@ -3,11 +3,13 @@ import type { CommandContext } from "../commands/context.js";
 import { bashPath } from "../core/bash.js";
 import { UserError } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
+import { isTestFile } from "../digest/baseline.js";
 import { t } from "../i18n/index.js";
 import { countIntegrity, hasComparableCounts, testsGrew } from "../review/integrity.js";
 import type { MechanicalFacts } from "../review/mechanical.js";
 import type { ReviewFinding } from "../review/parse.js";
 import { capturedTask, formatFindings, type ReviewResult, reviewTask } from "../review/run.js";
+import { reductionPaths } from "../review/scope.js";
 import type { GateStage } from "../tasks/attempts.js";
 import { allowlistProblems, type CheckProblem, trivialityProblems } from "../tasks/checks.js";
 import { logLines, MAX_LOG_LINES } from "../tasks/handoff.js";
@@ -136,7 +138,8 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
     };
   }
   const checksRun = regression?.checks ?? [];
-  const integrity = countIntegrity(checksRun, acceptance);
+  const planned = reductionPaths(capturedTask(capture)).some((path) => isTestFile(path));
+  const integrity = countIntegrity(checksRun, acceptance, planned);
   if (integrity.length > 0) {
     const list = formatFindings(integrity);
     ctx.prompter.note(list, t("integrity.title"));
