@@ -68,7 +68,7 @@ describe("bypass 22: the repository's git settings cannot hide the change", () =
 
   it("shows the reviewer a committed file whose name needs quoting", async () => {
     const cwd = await base();
-    const name = 'src/we"ird.ts';
+    const name = "src/wëird tab\u00e9.ts";
     const work = agent(cwd, {}, async () => {
       await writeFile(join(cwd, ...name.split("/")), "export const marker = 'QUOTED_MARKER';\n");
       execSync(`git add -A && git ${IDENTITY} commit -qm work`, { cwd });

@@ -97,10 +97,10 @@ describe("probeFor", () => {
   it("asks vitest and jest for a JSON report, through npm scripts too", async () => {
     const direct = await probeFor("/repo", "npx vitest run", sources());
     expect(direct?.command).toMatch(
-      /^npx vitest run --reporter=default --reporter=json --outputFile\.json=\S+report\.json$/,
+      /^npx vitest run --reporter=default --reporter=json '?--outputFile\.json=\S+report\.json'?$/,
     );
     const npm = await probeFor("/repo", "npm test", sources({ test: "jest --ci" }));
-    expect(npm?.command).toMatch(/^npm test -- --json --outputFile=\S+report\.json$/);
+    expect(npm?.command).toMatch(/^npm test -- --json '?--outputFile=\S+report\.json'?$/);
     const pnpm = await probeFor("/repo", "pnpm test", sources({ test: "vitest run" }));
     expect(pnpm?.command).toMatch(/^pnpm test --reporter=default/);
     await Promise.all([direct, npm, pnpm].map((probe) => probe?.dispose()));
@@ -111,7 +111,7 @@ describe("probeFor", () => {
       "go test -v ./... -json",
     );
     const dotnet = await probeFor("/repo", "dotnet test", sources());
-    expect(dotnet?.command).toMatch(/^dotnet test --logger trx --results-directory \S+$/);
+    expect(dotnet?.command).toMatch(/^dotnet test --logger trx --results-directory '?\S+'?$/);
     const pytest = await probeFor("/repo", "make test", sources({}, "test:\n\tpytest -q\n"));
     expect(pytest?.command).toBe("make test");
     expect(pytest?.env.PYTEST_ADDOPTS).toMatch(/--junitxml="\S+junit\.xml"$/);

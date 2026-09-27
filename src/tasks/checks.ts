@@ -46,6 +46,8 @@ const RELEASING = new Set([
   "yank",
 ]);
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd"]);
+const SCRIPT_SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+const DOWNLOADERS = new Set(["curl", "wget"]);
 const MASKING =
   /\bset\s+\+[A-Za-z]*e[A-Za-z]*\b|\bset\s+\+o\s+(?:errexit|pipefail)\b|\btrap\s+-?\s*['"]?\s*['"]?\s+ERR\b/;
 const FALLBACK_OK =
@@ -72,8 +74,12 @@ export function allowlistProblems(lines: string[], allow: string[]): CheckProble
     if (parsed.substitution || /[<>]\(/.test(line)) {
       return [{ command: line, reason: "dynamic" as const }];
     }
+    const downloads = parsed.commands.some((command) =>
+      DOWNLOADERS.has(baseName(program(command).name)),
+    );
     const bad = parsed.commands.find(
-      (command) => !allow.some((prefix) => command.text.startsWith(prefix)) && !allowed(command),
+      (command) =>
+        !allow.some((prefix) => command.text.startsWith(prefix)) && !allowed(command, downloads),
     );
     if (!bad) return [];
     const { name } = program(bad);
@@ -92,7 +98,7 @@ function masksWithOperators(line: string): boolean {
 function runsOrChecks(command: SimpleCommand): boolean {
   const { name, args } = program(command);
   const base = baseName(name);
-  if (RUNNERS.has(base)) return true;
+  if (RUNNERS.has(base) || runsScriptFile(base, args)) return true;
   if (CHECKS.has(base)) return true;
   if (base === "curl")
     return args.some((arg) => /^(-[a-zA-Z]*f[a-zA-Z]*|--fail(-with-body)?)$/.test(arg));
@@ -102,9 +108,10 @@ function runsOrChecks(command: SimpleCommand): boolean {
   return false;
 }
 
-function allowed(command: SimpleCommand): boolean {
+function allowed(command: SimpleCommand, downloads: boolean): boolean {
   const { name, args } = program(command);
   const base = baseName(name);
+  if (!downloads && runsScriptFile(base, args)) return true;
   if (DYNAMIC.has(base) || SHELLS.has(base)) return false;
   if (args.some((arg) => RELEASING.has(arg)) && !args.includes("--dry-run")) return false;
   if (base === "git") return GIT_READ.has(args[0] ?? "");
@@ -118,6 +125,18 @@ function allowed(command: SimpleCommand): boolean {
     return false;
   }
   return RUNNERS.has(base) || CHECKS.has(base) || HELPERS.has(base);
+}
+
+function runsScriptFile(base: string, args: string[]): boolean {
+  if (!SCRIPT_SHELLS.has(base)) return false;
+  const script = args.find((arg) => !arg.startsWith("-"));
+  const flags = args.slice(0, script ? args.indexOf(script) : args.length);
+  if (!script || flags.some((flag) => /^-[a-zA-Z]*[cis]/.test(flag) || flag.startsWith("--"))) {
+    return false;
+  }
+  return (
+    !script.startsWith("/") && !script.split(/[\\/]/).includes("..") && !/^[a-z]:/i.test(script)
+  );
 }
 
 function baseName(name: string): string {

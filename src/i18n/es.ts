@@ -348,4 +348,8 @@ export const es: Messages = {
   "regression.noCounts":
     "`{{command}}` no da una línea base usable: pasa, pero no dice cuántos tests corrieron, así que la tarea no podría compararse con ella.",
   "regression.unreadSkipped": "`{{command}}` no dijo cuántos tests corrieron",
+  "contract.scoped":
+    "El Scope de la tarea lista este archivo, así que el cambio se queda: los chequeos corren con él y el revisor lo ve.",
+  "contract.weakerScripts": "Deja de correr lo que corrían estos scripts: {{scripts}}.",
+  "contract.weakerRunner": "Añade ajustes que dejan tests fuera ({{keys}}).",
 };

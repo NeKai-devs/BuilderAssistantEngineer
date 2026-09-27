@@ -33,7 +33,7 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(run.calls).toHaveLength(1);
   });
 
-  it("allows the change when the Scope lists the .gitignore and the user accepts the finding", async () => {
+  it("keeps the change when the Scope lists the .gitignore", async () => {
     const cwd = await bypassRepo({
       files: { ".gitignore": "node_modules/\n" },
       task: { scope: "- `src/feature.ts`\n- `.gitignore`" },
@@ -42,15 +42,28 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
       "src/feature.ts": "export const f = 1;\n",
       ".gitignore": "node_modules/\ncoverage/\n",
     });
+    const run = await next(cwd, ["--yes"], [edit, REVIEW_PASS]);
+    expect(run.code).toBe(0);
+    expect(await read(cwd, ".gitignore")).toContain("coverage/");
+    expect(run.log).toContain("The task's Scope lists this file, so the change stays");
+  });
+
+  it("needs the Scope and an accepted finding for other files that decide how checks run", async () => {
+    const cwd = await bypassRepo({
+      files: { ".npmrc": "fund=false\n" },
+      task: { scope: "- `src/feature.ts`\n- `.npmrc`" },
+    });
+    const edit = agent(cwd, {
+      "src/feature.ts": "export const f = 1;\n",
+      ".npmrc": "fund=false\naudit=false\n",
+    });
     const first = await next(cwd, ["--yes"], [edit]);
     expect(first.code).toBe(1);
-    const id = /\((contract-[0-9a-f]{8})\) \.gitignore/.exec(first.log)?.[1] ?? "";
+    const id = /\((contract-[0-9a-f]{8})\) \.npmrc/.exec(first.log)?.[1] ?? "";
     expect(id).not.toBe("");
     const second = await next(cwd, ["--yes", "--accept-finding", id], [edit, REVIEW_PASS]);
     expect(second.code).toBe(0);
-    expect(await read(cwd, ".gitignore")).toContain("coverage/");
-    expect(second.log).toContain(
-      `(${id}) .gitignore: Changed an ignore file, which decides what the review sees. Accepted with --accept-finding.`,
-    );
+    expect(await read(cwd, ".npmrc")).toContain("audit=false");
+    expect(second.log).toContain(`(${id}) .npmrc: Changed a package manager or tool setting`);
   });
 });

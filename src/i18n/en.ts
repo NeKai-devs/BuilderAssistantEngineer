@@ -337,6 +337,10 @@ export const en = {
   "regression.noCounts":
     "`{{command}}` gives no usable baseline: it passes but does not say how many tests ran, so the task could not be compared with it.",
   "regression.unreadSkipped": "`{{command}}` did not say how many tests ran",
+  "contract.scoped":
+    "The task's Scope lists this file, so the change stays: the checks run with it and the reviewer sees it.",
+  "contract.weakerScripts": "It stops running what these scripts ran: {{scripts}}.",
+  "contract.weakerRunner": "It adds settings that leave tests out ({{keys}}).",
 } as const;
 
 export type MessageKey = keyof typeof en;

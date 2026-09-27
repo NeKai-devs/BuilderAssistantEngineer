@@ -1,9 +1,13 @@
+import { join } from "node:path";
 import type { CommandContext } from "../commands/context.js";
+import { readTextIfExists } from "../core/fs.js";
 import { flaggedFiles, git } from "../core/git.js";
+import { asRecord, parseObject } from "../core/json.js";
 import { type MessageKey, t } from "../i18n/index.js";
 import type { ReviewFinding } from "../review/parse.js";
 import { capturedTask, formatFindings } from "../review/run.js";
 import { inScope, scopePaths } from "../review/scope.js";
+import { exclusionKeys } from "../review/tests.js";
 import type { Capture } from "./capture.js";
 import {
   type ContractChange,
@@ -13,8 +17,10 @@ import {
   restoreContract,
 } from "./contract.js";
 import { type Acceptance, accept, findingId } from "./findings.js";
+import { runnerHint } from "./results.js";
+import { expandCommand } from "./runners.js";
 
-export type Enforced = { blocked: boolean; report: string };
+export type Enforced = { blocked: boolean; report: string; notes: ReviewFinding[] };
 
 const MESSAGES: Record<ContractKind, MessageKey> = {
   task: "contract.task",
@@ -30,6 +36,8 @@ const MESSAGES: Record<ContractKind, MessageKey> = {
   toolchain: "contract.toolchain",
   shadow: "contract.shadow",
 };
+const SCOPED = new Set<ContractKind>(["gitignore", "scripts", "runner"]);
+const RUNNER_KEYS = ["jest", "mocha", "ava", "vitest"];
 
 export async function enforceContract(
   ctx: CommandContext,
@@ -43,10 +51,29 @@ export async function enforceContract(
     taskPath: capture.path,
   });
   const flags = await newIndexFlags(ctx.cwd, capture);
-  if (changes.length === 0 && flags.length === 0) return { blocked: false, report: "" };
+  if (changes.length === 0 && flags.length === 0) return { blocked: false, report: "", notes: [] };
   const scope = scopePaths(capturedTask(capture));
-  const findings = changes.map((change) =>
-    settled(change, accept(acceptance, contractFinding(change), acceptable(change, scope))),
+  const findings = await Promise.all(
+    changes.map(async (change) => {
+      const listed = acceptable(change, scope);
+      const finding = contractFinding(change);
+      if (!listed || !SCOPED.has(change.kind)) {
+        return settled(change, accept(acceptance, finding, listed));
+      }
+      const after = await readTextIfExists(join(ctx.cwd, ...change.path.split("/")));
+      const weaker = weakening(change.kind, capture.protected[change.path] ?? "", after);
+      if (!weaker) {
+        return {
+          ...finding,
+          severity: "major" as const,
+          message: `${finding.message} ${t("contract.scoped")}`,
+        };
+      }
+      return settled(
+        change,
+        accept(acceptance, { ...finding, message: `${finding.message} ${weaker}` }, true),
+      );
+    }),
   );
   const restore = changes.filter((_, index) => findings[index]?.severity === "blocker");
   await restoreContract(ctx.cwd, restore);
@@ -68,7 +95,42 @@ export async function enforceContract(
   const list = formatFindings(findings);
   if (blocked) ctx.prompter.warn(t("contract.failed"));
   ctx.prompter.note(list, t("contract.title"));
-  return { blocked, report: `## ${t("contract.title")}\n\n${list}` };
+  return {
+    blocked,
+    report: `## ${t("contract.title")}\n\n${list}`,
+    notes: findings.filter((finding) => finding.severity === "major"),
+  };
+}
+
+function weakening(
+  kind: ContractKind,
+  before: string,
+  after: string | undefined,
+): string | undefined {
+  if (kind === "gitignore") return undefined;
+  const added = (text: string, previous: string) =>
+    exclusionKeys(text).filter((key) => !exclusionKeys(previous).includes(key));
+  if (kind === "runner") {
+    const keys = added(after ?? "", before);
+    return keys.length > 0 ? t("contract.weakerRunner", { keys: keys.join(", ") }) : undefined;
+  }
+  const old = parseObject(before) ?? {};
+  const now = parseObject(after ?? "") ?? {};
+  const scripts = asRecord(old.scripts);
+  const current = asRecord(now.scripts);
+  const dropped = Object.keys(scripts).flatMap((name) => {
+    if (typeof scripts[name] !== "string") return [];
+    if (typeof current[name] !== "string") return [`scripts.${name}`];
+    const tools = (map: Record<string, unknown>) =>
+      runnerHint(expandCommand(`npm run ${name}`, { scripts: map }));
+    const lost = tools(scripts).filter((tool) => !tools(current).includes(tool));
+    return lost.length > 0 ? [`scripts.${name} (${lost.join(", ")})`] : [];
+  });
+  const keys = RUNNER_KEYS.filter((key) => key in old).flatMap((key) =>
+    added(JSON.stringify(now[key] ?? ""), JSON.stringify(old[key])),
+  );
+  if (dropped.length > 0) return t("contract.weakerScripts", { scripts: dropped.join(", ") });
+  return keys.length > 0 ? t("contract.weakerRunner", { keys: keys.join(", ") }) : undefined;
 }
 
 async function newIndexFlags(cwd: string, capture: Capture): Promise<string[]> {

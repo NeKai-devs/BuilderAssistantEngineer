@@ -56,6 +56,8 @@ describe("allowlistProblems", () => {
     ["git diff --stat"],
     ["npx vitest run test/shutdown.test.ts"],
     ["CI=1 go test ./..."],
+    ["sh scripts/lint.sh"],
+    ["bash -e scripts/check.sh --strict"],
   ])("allows %s", (line) => {
     expect(allowlistProblems([line], [])).toEqual([]);
   });
@@ -70,6 +72,9 @@ describe("allowlistProblems", () => {
     ["sudo make check", "notAllowed"],
     ["npm test $(cat args)", "dynamic"],
     ["./scripts/check.sh", "notAllowed"],
+    ["bash -lc 'make test'", "dynamic"],
+    ["sh ../outside.sh", "dynamic"],
+    ["sh", "dynamic"],
   ])("rejects %s when nobody confirms", (line, reason) => {
     expect(allowlistProblems([line], []).map((problem) => problem.reason)).toEqual([reason]);
   });
