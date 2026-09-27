@@ -1,0 +1,92 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="a0429be6-c828-4e34-b4c7-8cd39e4bb9d6" name="@host 2026-09-27 09:04:48" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-27T09:04:48.0418860-06:00" queuing="2026-09-27T09:04:48.0418861-06:00" start="2026-09-27T09:04:47.2987652-06:00" finish="2026-09-27T09:04:48.0626891-06:00" />
+  <TestSettings name="default" id="aeba250f-bb11-42b1-92dd-cca1f1abb38a">
+    <Deployment runDeploymentRoot="_host_2026-09-27_09_04_48" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="63120f1b-fbd9-4c1f-b198-436ae3c4edc3" testId="93ce4e12-618a-3f31-530e-1cfdcec64fda" testName="A.Tests.UnitTest1.Fails" computerName="host" duration="00:00:00.0002796" startTime="2026-09-27T09:04:47.9214654-06:00" endTime="2026-09-27T09:04:47.9214654-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="63120f1b-fbd9-4c1f-b198-436ae3c4edc3">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 1
+Actual:   2</Message>
+          <StackTrace>   at A.Tests.UnitTest1.Fails() in /repo/dn/A.Tests/UnitTest1.cs:line 9
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d82d0d18-87d3-4083-a09d-9a64e3ad1d89" testId="3a380d18-05aa-9f27-8fef-21bcae047c1f" testName="A.Tests.UnitTest1.Param(n: 2)" computerName="host" duration="00:00:00.0047161" startTime="2026-09-27T09:04:47.9179547-06:00" endTime="2026-09-27T09:04:47.9179775-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d82d0d18-87d3-4083-a09d-9a64e3ad1d89">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 1
+Actual:   2</Message>
+          <StackTrace>   at A.Tests.UnitTest1.Param(Int32 n) in /repo/dn/A.Tests/UnitTest1.cs:line 17
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="225d84bb-b815-4b1e-a770-4f7fed6ba52f" testId="9fbd8fe7-0180-b391-ec52-6b4a674d0255" testName="A.Tests.UnitTest1.Param(n: 1)" computerName="host" duration="00:00:00.0011569" startTime="2026-09-27T09:04:47.9209546-06:00" endTime="2026-09-27T09:04:47.9209547-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="225d84bb-b815-4b1e-a770-4f7fed6ba52f" />
+    <UnitTestResult executionId="59d278f3-9a21-4b82-be7d-0f032a97ec6c" testId="abb3f779-4f8e-7ab8-2599-0ca28ba9458a" testName="A.Tests.UnitTest1.Skipped" computerName="host" duration="00:00:00.0010000" startTime="2026-09-27T09:04:47.9222241-06:00" endTime="2026-09-27T09:04:47.9222241-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="59d278f3-9a21-4b82-be7d-0f032a97ec6c">
+      <Output>
+        <ErrorInfo>
+          <Message>later</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9f1cc15b-3671-4661-b520-35e5d09c22f3" testId="5c42f955-2509-931b-8209-f6f4ef9104c1" testName="A.Tests.UnitTest1.Passes" computerName="host" duration="00:00:00.0000756" startTime="2026-09-27T09:04:47.9222926-06:00" endTime="2026-09-27T09:04:47.9222926-06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9f1cc15b-3671-4661-b520-35e5d09c22f3" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="A.Tests.UnitTest1.Param(n: 1)" storage="/tmp/claude-1000/-home-jg-documents-personalrepos-builderassistantengineer/6c8e8632-ddca-4b2e-9bc3-a066ff77aec6/scratchpad/samples/dn/a.tests/bin/debug/net8.0/a.tests.dll" id="9fbd8fe7-0180-b391-ec52-6b4a674d0255">
+      <Execution id="225d84bb-b815-4b1e-a770-4f7fed6ba52f" />
+      <TestMethod codeBase="/repo/dn/A.Tests/bin/Debug/net8.0/A.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="A.Tests.UnitTest1" name="Param" />
+    </UnitTest>
+    <UnitTest name="A.Tests.UnitTest1.Param(n: 2)" storage="/tmp/claude-1000/-home-jg-documents-personalrepos-builderassistantengineer/6c8e8632-ddca-4b2e-9bc3-a066ff77aec6/scratchpad/samples/dn/a.tests/bin/debug/net8.0/a.tests.dll" id="3a380d18-05aa-9f27-8fef-21bcae047c1f">
+      <Execution id="d82d0d18-87d3-4083-a09d-9a64e3ad1d89" />
+      <TestMethod codeBase="/repo/dn/A.Tests/bin/Debug/net8.0/A.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="A.Tests.UnitTest1" name="Param" />
+    </UnitTest>
+    <UnitTest name="A.Tests.UnitTest1.Skipped" storage="/tmp/claude-1000/-home-jg-documents-personalrepos-builderassistantengineer/6c8e8632-ddca-4b2e-9bc3-a066ff77aec6/scratchpad/samples/dn/a.tests/bin/debug/net8.0/a.tests.dll" id="abb3f779-4f8e-7ab8-2599-0ca28ba9458a">
+      <Execution id="59d278f3-9a21-4b82-be7d-0f032a97ec6c" />
+      <TestMethod codeBase="/repo/dn/A.Tests/bin/Debug/net8.0/A.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="A.Tests.UnitTest1" name="Skipped" />
+    </UnitTest>
+    <UnitTest name="A.Tests.UnitTest1.Fails" storage="/tmp/claude-1000/-home-jg-documents-personalrepos-builderassistantengineer/6c8e8632-ddca-4b2e-9bc3-a066ff77aec6/scratchpad/samples/dn/a.tests/bin/debug/net8.0/a.tests.dll" id="93ce4e12-618a-3f31-530e-1cfdcec64fda">
+      <Execution id="63120f1b-fbd9-4c1f-b198-436ae3c4edc3" />
+      <TestMethod codeBase="/repo/dn/A.Tests/bin/Debug/net8.0/A.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="A.Tests.UnitTest1" name="Fails" />
+    </UnitTest>
+    <UnitTest name="A.Tests.UnitTest1.Passes" storage="/tmp/claude-1000/-home-jg-documents-personalrepos-builderassistantengineer/6c8e8632-ddca-4b2e-9bc3-a066ff77aec6/scratchpad/samples/dn/a.tests/bin/debug/net8.0/a.tests.dll" id="5c42f955-2509-931b-8209-f6f4ef9104c1">
+      <Execution id="9f1cc15b-3671-4661-b520-35e5d09c22f3" />
+      <TestMethod codeBase="/repo/dn/A.Tests/bin/Debug/net8.0/A.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="A.Tests.UnitTest1" name="Passes" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="93ce4e12-618a-3f31-530e-1cfdcec64fda" executionId="63120f1b-fbd9-4c1f-b198-436ae3c4edc3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3a380d18-05aa-9f27-8fef-21bcae047c1f" executionId="d82d0d18-87d3-4083-a09d-9a64e3ad1d89" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9fbd8fe7-0180-b391-ec52-6b4a674d0255" executionId="225d84bb-b815-4b1e-a770-4f7fed6ba52f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="abb3f779-4f8e-7ab8-2599-0ca28ba9458a" executionId="59d278f3-9a21-4b82-be7d-0f032a97ec6c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5c42f955-2509-931b-8209-f6f4ef9104c1" executionId="9f1cc15b-3671-4661-b520-35e5d09c22f3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="5" executed="4" passed="2" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="host" outcome="Error" timestamp="2026-09-27T09:04:47.9156133-06:00">
+        <Text>[xUnit.net 00:00:00.16]     A.Tests.UnitTest1.Param(n: 2) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="host" outcome="Error" timestamp="2026-09-27T09:04:47.9217141-06:00">
+        <Text>[xUnit.net 00:00:00.17]     A.Tests.UnitTest1.Fails [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="host" outcome="Warning" timestamp="2026-09-27T09:04:47.9222565-06:00">
+        <Text>[xUnit.net 00:00:00.17]     A.Tests.UnitTest1.Skipped [SKIP]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

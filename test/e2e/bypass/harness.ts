@@ -4,6 +4,7 @@ import { main } from "../../../src/cli.js";
 import type { Config } from "../../../src/config/schema.js";
 import { writeConfig } from "../../../src/config/store.js";
 import { splitFrontmatter } from "../../../src/tasks/frontmatter.js";
+import { FAKE_FILES, vitest } from "../../fake-vitest.js";
 import { fakePrompter, type Step, scriptedBackend } from "../../fakes.js";
 import { gitCommitAll, runFile, tempDir, writeFiles } from "../../helpers.js";
 import { type TaskOptions, taskFile } from "../../plan-sample.js";
@@ -17,8 +18,7 @@ export const fake = (...parts: string[]) => parts.join("");
 export const FAIL = 'node -e "process.exit(1)"';
 export const LESSON: Step = () =>
   '{"root_cause": "It kept failing.", "rule": "Run the checks before finishing."}';
-export const COUNTED = (file: string, total = 10) =>
-  `node -e "const f=require('fs').existsSync('${file}')?5:1; console.log('Tests  '+f+' failed | '+(${total}-f)+' passed (${total})'); process.exit(1)"`;
+export const COUNTED = (file: string, total = 10) => vitest(`--total=${total}`, `--worse=${file}`);
 
 export type RepoOptions = {
   task?: TaskOptions;
@@ -35,6 +35,7 @@ export async function bypassRepo(options: RepoOptions = {}): Promise<string> {
       "---\nname: reviewer\ndescription: Strict\n---\nReject shortcuts.",
     [TASK]: taskFile("T-001", { command: PASS, scope: "- `src/feature.ts`", ...options.task }),
     "docs/plan/tasks/T-002-second.md": taskFile("T-002", { dependsOn: ["T-001"] }),
+    ...FAKE_FILES,
     ...options.files,
   });
   await writeConfig(cwd, {

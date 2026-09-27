@@ -36,7 +36,7 @@ const PARSERS = {
 
 const HINTS: [RegExp, RunnerName[]][] = [
   [/\bvitest\b/, ["vitest"]],
-  [/\bjest\b/, ["jest"]],
+  [/\bjest\b|\b(react-scripts|craco)\s+test\b/, ["jest"]],
   [/\bmocha\b/, ["mocha"]],
   [/\bnode\b[^|;&]*--test\b/, ["node"]],
   [/\b(pytest|py\.test)\b/, ["pytest"]],
@@ -184,7 +184,8 @@ function pytest(text: string): Found | undefined {
   );
 }
 
-function cargo(text: string): Found | undefined {
+function cargo(output: string): Found | undefined {
+  const text = output.replace(/^---- .+ std(?:out|err) ----$[\s\S]*?^failures:$/gm, "");
   const matches = all(
     text,
     /^test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored/m,

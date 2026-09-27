@@ -4,16 +4,18 @@ import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig } from "../../src/config/store.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
+import { FAKE_FILES, vitest } from "../fake-vitest.js";
 import { fakePrompter, type Step, scriptedBackend } from "../fakes.js";
 import { gitCommitAll, runFile, tempDir, writeFiles } from "../helpers.js";
 import { taskFile } from "../plan-sample.js";
 
 const PASS = 'node -e "process.exit(0)"';
 const FAIL = 'node -e "process.exit(1)"';
-const RED = `node -e "console.log('Tests  1 failed | 2 passed (3)'); process.exit(1)"`;
+const RED = vitest("--total=3", "--fails=1");
+const TESTS_PASS = vitest();
+const TESTS_FAIL = vitest("--total=1", "--fails=1");
+const TESTS_BREAK = (file: string) => vitest(`--breaks=${file}`);
 const NEEDS_FILE = `node -e "process.exit(require('fs').existsSync('done.txt') ? 0 : 1)"`;
-const BREAKS_WITH = (file: string) =>
-  `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
 const REVIEW_PASS = () => '{"verdict": "pass", "findings": []}';
 async function addLog(cwd: string, note = "Added the feature file; no traps.") {
   const path = join(cwd, "docs/plan/tasks/T-001-first.md");
@@ -41,6 +43,7 @@ async function repo(command: string, options: RepoOptions = {}) {
     "AGENTS.md": "# Rules\n",
     "docs/plan/tasks/T-001-first.md": taskFile("T-001", { command }),
     "docs/plan/tasks/T-002-second.md": taskFile("T-002", { dependsOn: ["T-001"] }),
+    ...FAKE_FILES,
   });
   await writeConfig(cwd, {
     version: 1,
@@ -258,7 +261,8 @@ describe("next regression gate", () => {
         [RED]: {
           exitCode: 1,
           counts: { passed: 2, failed: 1, skipped: 0 },
-          source: "vitest",
+          failing: ["tests/fake.test.js > t0"],
+          source: "vitest-json",
         },
       },
     });
@@ -289,7 +293,7 @@ describe("next regression gate", () => {
   });
 
   it("keeps the task in progress when it turns a passing command red", async () => {
-    const test = BREAKS_WITH("broken.txt");
+    const test = TESTS_BREAK("broken.txt");
     const cwd = await repo(PASS, { commands: { test } });
     const { code, ui, calls } = await runNext(cwd, ["--yes"], [writesFile(cwd, "broken.txt")]);
     expect(code).toBe(1);
@@ -302,7 +306,7 @@ describe("next regression gate", () => {
   });
 
   it("retries headless runs with the regression output until the command is green again", async () => {
-    const test = BREAKS_WITH("broken.txt");
+    const test = TESTS_BREAK("broken.txt");
     const cwd = await repo(PASS, { commands: { test } });
     const fixes: Step = async () => {
       await rm(join(cwd, "broken.txt"));
@@ -320,10 +324,10 @@ describe("next regression gate", () => {
   });
 
   it("runs the suite only after the task in task mode, so any red command blocks", async () => {
-    const cwd = await repo(PASS, { commands: { test: FAIL }, regression: "task" });
+    const cwd = await repo(PASS, { commands: { test: TESTS_FAIL }, regression: "task" });
     const { code, ui } = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(code).toBe(1);
-    expect(ui.log).toContain(`warn: Regression: \`${FAIL}\` exits with 1 after the task.`);
+    expect(ui.log).toContain(`warn: Regression: \`${TESTS_FAIL}\` exits with 1 after the task.`);
     expect((await capture(cwd)).baseline).toBeUndefined();
   });
 
@@ -332,22 +336,22 @@ describe("next regression gate", () => {
     const first = await runNext(off, ["--yes"], [writesFile(off, "a.txt"), REVIEW_PASS]);
     expect(first.code).toBe(0);
     expect(first.printed).not.toContain(`$ ${FAIL}`);
-    const same = await repo(PASS, { commands: { test: PASS } });
+    const same = await repo(TESTS_PASS, { commands: { test: TESTS_PASS } });
     const second = await runNext(same, ["--yes"], [writesFile(same, "a.txt"), REVIEW_PASS]);
     expect(second.code).toBe(0);
-    expect(second.printed).toContain(`$ ${PASS} (exit 0, from the regression check)`);
-    expect(second.printed.split(`$ ${PASS}\n`)).toHaveLength(4);
+    expect(second.printed).toContain(`$ ${TESTS_PASS} (exit 0, from the regression check)`);
+    expect(second.printed.split(`$ ${TESTS_PASS}\n`)).toHaveLength(4);
   });
 
   it("keeps the first baseline when a task is started again, and captures a late one with a warning", async () => {
-    const test = BREAKS_WITH("broken.txt");
+    const test = TESTS_BREAK("broken.txt");
     const cwd = await repo(PASS, { commands: { test } });
     const first = await runNext(cwd, ["--yes"], [writesFile(cwd, "broken.txt")]);
     expect(first.code).toBe(1);
     const again = await runNext(cwd, ["--yes"], [writesFile(cwd, "a.txt")]);
     expect(again.code).toBe(1);
     expect(again.ui.log).toContain(`warn: Regression: \`${test}\` exits with 1 after the task.`);
-    const late = await repo(PASS, { commands: { test: PASS } });
+    const late = await repo(PASS, { commands: { test: TESTS_PASS } });
     await writeFiles(late, {
       "docs/plan/tasks/T-001-first.md": taskFile("T-001", { status: "in_progress", command: PASS }),
     });
@@ -385,7 +389,7 @@ describe("next regression gate", () => {
   });
 
   it("stops when the user declines the baseline, unless --allow-skip turns the check off", async () => {
-    const cwd = await repo(PASS, { commands: { test: FAIL } });
+    const cwd = await repo(PASS, { commands: { test: TESTS_FAIL } });
     const stopped = await runNext(cwd, [], [], [false]);
     expect(stopped.code).toBe(1);
     expect(stopped.calls).toHaveLength(0);
@@ -489,7 +493,7 @@ describe("next mechanical review", () => {
 
 describe("next handoff note", () => {
   it("opens the prompt with the plan state, the commands and the last three notes", async () => {
-    const cwd = await repo(PASS, { commands: { test: PASS } });
+    const cwd = await repo(PASS, { commands: { test: TESTS_PASS } });
     const done = (id: string, deps: string[]) =>
       taskFile(id, { status: "done", dependsOn: deps, log: `Note from ${id}.` });
     await writeFiles(cwd, {
@@ -506,7 +510,7 @@ describe("next handoff note", () => {
     expect(prompt).toContain(
       "## Where the plan stands\n\n- Done: 4 of 7 tasks. You are on T-005 (phase 1).\n- Blocked, do not work on them: T-007 Do T-007\n- Up next after this task: T-006 Do T-006",
     );
-    expect(prompt).toContain(`## Project commands\n\n- test: \`${PASS}\``);
+    expect(prompt).toContain(`## Project commands\n\n- test: \`${TESTS_PASS}\``);
     expect(prompt).toContain("### T-004 Do T-004\n\nNote from T-004.");
     expect(prompt).toContain("### T-002 Do T-002\n\nNote from T-002.");
     expect(prompt).not.toContain("Note from T-001.");

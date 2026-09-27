@@ -1,0 +1,80 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 3,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 4,
+  "numPassedTests": 1,
+  "numFailedTests": 1,
+  "numPendingTests": 1,
+  "numTodoTests": 1,
+  "startTime": 1790521382397,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "fullName": "group passes",
+          "status": "passed",
+          "title": "passes",
+          "duration": 2.2259770000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "fullName": "group fails",
+          "status": "failed",
+          "title": "fails",
+          "duration": 7.574470999999988,
+          "failureMessages": [
+            "AssertionError: expected 1 to be 2 // Object.is equality"
+          ],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "fullName": "group skipped",
+          "status": "skipped",
+          "title": "skipped",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "fullName": "group todo",
+          "status": "todo",
+          "title": "todo",
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1790521382570,
+      "endTime": 1790521382579.5745,
+      "status": "failed",
+      "message": "",
+      "name": "/repo/test/a.test.js"
+    },
+    {
+      "assertionResults": [],
+      "startTime": 1790521382397,
+      "endTime": 1790521382397,
+      "status": "failed",
+      "message": "Cannot find module './does-not-exist.js' imported from /repo/x",
+      "name": "/repo/test/broken.test.js"
+    }
+  ]
+}

@@ -112,14 +112,19 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   let guard = await guardState(ctx.cwd);
   const regression =
     suite.length > 0
-      ? await regressionStage(
-          ctx,
-          suite,
-          baseline,
+      ? await regressionStage(ctx, suite, baseline, {
           fix,
-          capture.config.gates.timeoutMinutes * 60_000,
-        )
+          allowSkip: run.allowSkip,
+          timeout: capture.config.gates.timeoutMinutes * 60_000,
+        })
       : undefined;
+  if (run.allowSkip) {
+    for (const item of regression?.unread ?? []) {
+      const what = t("regression.unreadSkipped", { command: item.command });
+      skips.push(`regression: ${what}`);
+      ctx.prompter.warn(t("skip.used", { what }));
+    }
+  }
   const sections = [contract.report, regression?.report];
   const afterSuite = await recheck();
   if (afterSuite)
@@ -251,10 +256,10 @@ async function regressionStage(
   ctx: CommandContext,
   suite: SuiteCommand[],
   baseline: SuiteBaseline | undefined,
-  fix: boolean,
-  timeout: number,
+  options: { fix: boolean; allowSkip: boolean; timeout: number },
 ): Promise<RegressionCheck> {
-  const check = checkRegressions(await runSuite(ctx.cwd, suite, ctx.print, timeout), baseline, fix);
+  const results = await runSuite(ctx.cwd, suite, ctx.print, options.timeout);
+  const check = checkRegressions(results, baseline, options.fix, options.allowSkip);
   for (const item of check.regressions) ctx.prompter.warn(regressionMessage(item));
   for (const item of check.preexisting) {
     ctx.prompter.info(t("regression.stillFailing", { command: item.command, code: item.exitCode }));
@@ -266,6 +271,9 @@ async function regressionStage(
 function regressionMessage(check: SuiteCheck): string {
   const vars = { command: check.command, code: check.exitCode };
   if (check.verdict === "mustPass") return t("regression.mustPass", vars);
+  if (check.verdict === "unknown") {
+    return t(check.unrecognized ? "regression.unknownRunner" : "regression.unknown", vars);
+  }
   if (check.verdict === "uncomparable") return t("regression.uncomparable", vars);
   if (check.verdict === "regression" && check.before && check.before.exitCode !== 0) {
     return t("regression.worse", {

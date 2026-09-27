@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { agent, bypassRepo, COUNTED, FAIL, next, REVIEW_PASS, statusOf } from "./harness.js";
+import { vitest } from "../../fake-vitest.js";
+import { agent, bypassRepo, COUNTED, next, REVIEW_PASS, statusOf } from "./harness.js";
 
 describe("bypass 04: a suite that was already red still catches new failures", () => {
   it("blocks when the task makes more tests fail, even though the exit code is the same", async () => {
@@ -23,11 +24,12 @@ describe("bypass 04: a suite that was already red still catches new failures", (
   });
 
   it("stops before the agent when a red command has no counts to compare", async () => {
-    const cwd = await bypassRepo({ config: { commands: { test: FAIL } } });
+    const test = vitest("--crash");
+    const cwd = await bypassRepo({ config: { commands: { test } } });
     const run = await next(cwd, ["--yes"], []);
     expect(run.code).toBe(1);
     expect(run.calls).toHaveLength(0);
-    expect(run.log).toContain(`\`${FAIL}\` gives no usable baseline (exit 1)`);
+    expect(run.log).toContain(`\`${test}\` gives no usable baseline (exit 1)`);
     expect(await statusOf(cwd)).toBe("pending");
   });
 });

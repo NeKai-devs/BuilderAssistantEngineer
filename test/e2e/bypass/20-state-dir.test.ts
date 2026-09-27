@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { agent, bypassRepo, next, REVIEW_PASS, statusOf } from "./harness.js";
-
-const RUNNER = `const f = require("./src/feature.js");
-const ok = f.value === 1;
-console.log("      Tests  " + (ok ? "" : "1 failed | ") + (ok ? 2 : 1) + " passed (2)");
-process.exit(ok ? 0 : 1);
-`;
+import { SUITE_FILES, TEST_CMD } from "./suite-fixture.js";
 
 const EVIL = `const fs = require("fs"), path = require("path"), os = require("os");
 const home = process.env.BAE_HOME || path.join(os.homedir(), ".bae");
@@ -26,8 +21,8 @@ describe("bypass 20: code run by the checks cannot rewrite bae's own state", () 
   it("restores the capture that the suite rewrote and keeps the regression check on", async () => {
     const cwd = await bypassRepo({
       task: { scope: "- `src/`" },
-      files: { "run-tests.js": RUNNER, "src/feature.js": "module.exports = { value: 1 };\n" },
-      config: { commands: { test: "node run-tests.js" } },
+      files: SUITE_FILES(),
+      config: { commands: { test: TEST_CMD } },
     });
     const first = await next(cwd, ["--yes"], [agent(cwd, { "src/feature.js": EVIL })]);
     expect(first.code).toBe(1);

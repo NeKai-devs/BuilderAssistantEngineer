@@ -318,8 +318,6 @@ export const en = {
   "contract.shadow": "Added a file that would run instead of the project's own tool.",
   "contract.indexFlags":
     "Marked files as unchanged in the git index (assume-unchanged or skip-worktree), which hides them from the review: {{files}}. The flags were cleared.",
-  "integrity.noCounts":
-    "`{{command}}` no longer reports how many tests ran, although it did before the task.",
   "integrity.removedTests": "Removes tests that are not added back: {{tests}}.",
   "integrity.lostAssertions":
     "Removes {{count}} assertion line(s) from a test file without adding them back.",
@@ -332,6 +330,13 @@ export const en = {
     "Changes a snapshot or expected-output file, which decides what the tests accept.",
   "regression.baselineTampered":
     "Running the project's commands for the baseline changed files the checks depend on ({{files}}); they were restored and nothing was launched.",
+  "regression.unknown":
+    "`{{command}}` exits with {{code}}, but bae could not read how many tests ran, so it cannot tell whether they passed.",
+  "regression.unknownRunner":
+    "bae does not recognize the test runner behind `{{command}}`, so it cannot tell whether the tests pass. Set commands.test in .bae/config.json to the runner itself, for example `npx vitest run`, `npx jest`, `pytest`, `go test -v ./...`, `cargo test` or `dotnet test`.",
+  "regression.noCounts":
+    "`{{command}}` gives no usable baseline: it passes but does not say how many tests ran, so the task could not be compared with it.",
+  "regression.unreadSkipped": "`{{command}}` did not say how many tests ran",
 } as const;
 
 export type MessageKey = keyof typeof en;

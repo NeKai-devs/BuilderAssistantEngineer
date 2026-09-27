@@ -1,18 +1,23 @@
-import { join } from "node:path";
 import { z } from "zod";
 import type { Config } from "../config/schema.js";
 import { bashPath, runScript } from "../core/bash.js";
-import { readTextIfExists } from "../core/fs.js";
-import { asRecord, parseObject } from "../core/json.js";
 import type { ShellResult } from "../core/process.js";
-import { expandScripts } from "./protected-files.js";
-import { type Counts, countsSchema, parseFailing, parseSummary, runnerHint } from "./results.js";
+import { goText, probeFor } from "./reports.js";
+import {
+  type Counts,
+  countsSchema,
+  parseFailing,
+  parseSummary,
+  type RunnerName,
+  runnerHint,
+} from "./results.js";
+import { expandCommand, readSources, type Sources, testRunners } from "./runners.js";
 
 export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
 export type SuiteCommand = { key: SuiteKey; command: string };
 export type SuiteResult = SuiteCommand &
-  ShellResult & { counts?: Counts; failing?: string[]; source?: string };
+  ShellResult & { counts?: Counts; failing?: string[]; source?: string; unrecognized?: boolean };
 
 export const commandBaselineSchema = z.object({
   exitCode: z.number(),
@@ -35,13 +40,15 @@ export type Verdict =
   | "unfinished"
   | "noBaseline"
   | "uncomparable"
-  | "mustPass";
+  | "mustPass"
+  | "unknown";
 export type SuiteCheck = SuiteResult & { verdict: Verdict; before?: CommandBaseline };
 export type RegressionCheck = {
   passed: boolean;
   checks: SuiteCheck[];
   regressions: SuiteCheck[];
   preexisting: SuiteCheck[];
+  unread: SuiteCheck[];
   report: string;
 };
 
@@ -52,6 +59,7 @@ const BLOCKING = new Set<Verdict>([
   "noBaseline",
   "uncomparable",
   "mustPass",
+  "unknown",
 ]);
 const VERDICTS: Record<Verdict, string> = {
   passed: "passed",
@@ -62,6 +70,7 @@ const VERDICTS: Record<Verdict, string> = {
   uncomparable:
     "blocks: it already failed before the task and its output has no counts to compare, so only green passes",
   mustPass: "blocks: the task is tests: fix, so the test suite must end green",
+  unknown: "blocks: bae could not read how many tests ran, so it cannot tell whether they passed",
 };
 
 export function suiteCommands(config: Config): SuiteCommand[] {
@@ -80,30 +89,76 @@ export async function runSuite(
 ): Promise<SuiteResult[]> {
   const results: SuiteResult[] = [];
   const bash = await bashPath();
-  const scripts = asRecord(
-    parseObject((await readTextIfExists(join(cwd, "package.json"))) ?? "")?.scripts,
-  );
+  const sources = await readSources(cwd);
   for (const item of suite) {
     onOutput?.(`$ ${item.command}\n`);
-    const result = bash
-      ? await runScript(bash, `set -o pipefail\nexport CI=true\n${item.command}\n`, {
-          cwd,
-          onOutput,
-          ...(timeoutMs ? { timeoutMs } : {}),
-        })
-      : { exitCode: -1, output: "bash was not found" };
-    const hint = runnerHint(expandScripts(item.command, scripts));
-    const summary = parseSummary(result.output, hint);
-    const counts = summary?.counts;
-    const failing = parseFailing(result.output, hint);
-    results.push({
-      ...item,
-      ...result,
-      ...(counts ? { counts, source: summary?.source } : {}),
-      ...(failing ? { failing } : {}),
-    });
+    results.push(
+      bash
+        ? await runOne(bash, { cwd, item, sources, timeoutMs }, onOutput)
+        : { ...item, exitCode: -1, output: "bash was not found" },
+    );
   }
   return results;
+}
+
+async function runOne(
+  bash: string,
+  run: { cwd: string; item: SuiteCommand; sources: Sources; timeoutMs?: number | undefined },
+  onOutput?: (chunk: string) => void,
+): Promise<SuiteResult> {
+  const { cwd, item, sources } = run;
+  const test = item.key === "test";
+  const hint = test
+    ? testRunners(item.command, sources)
+    : runnerHint(expandCommand(item.command, sources));
+  const probe = test && hint.length > 0 ? await probeFor(cwd, item.command, sources) : undefined;
+  try {
+    const view = probe?.view?.();
+    const shown =
+      onOutput && view
+        ? (chunk: string) => {
+            const text = view.push(chunk);
+            if (text) onOutput(text);
+          }
+        : onOutput;
+    const result = await runScript(
+      bash,
+      `set -o pipefail\nexport CI=true\n${probe?.command ?? item.command}\n`,
+      {
+        cwd,
+        ...(shown ? { onOutput: shown } : {}),
+        ...(probe ? { env: probe.env } : {}),
+        ...(run.timeoutMs ? { timeoutMs: run.timeoutMs } : {}),
+      },
+    );
+    const rest = view?.end();
+    if (rest) onOutput?.(rest);
+    const output = view ? goText(result.output) : result.output;
+    const read = (await probe?.collect(result.stdout)) ?? textRead(output, hint, test);
+    return {
+      ...item,
+      exitCode: result.exitCode,
+      output,
+      ...read,
+      ...(test && hint.length === 0 ? { unrecognized: true } : {}),
+    };
+  } finally {
+    await probe?.dispose();
+  }
+}
+
+function textRead(
+  output: string,
+  hint: RunnerName[],
+  test: boolean,
+): { counts?: Counts; failing?: string[]; source?: string } {
+  if (test && hint.length === 0) return {};
+  const summary = parseSummary(output, hint);
+  const failing = parseFailing(output, hint);
+  return {
+    ...(summary ? { counts: summary.counts, source: summary.source } : {}),
+    ...(failing ? { failing } : {}),
+  };
 }
 
 export function baselineFrom(results: SuiteResult[], excluded: string[] = []): SuiteBaseline {
@@ -125,11 +180,12 @@ export function baselineFrom(results: SuiteResult[], excluded: string[] = []): S
 }
 
 export function unusableBaseline(results: SuiteResult[], fix: boolean): SuiteResult[] {
-  return results.filter(
-    (result) =>
-      result.exitCode === -1 ||
-      (result.exitCode !== 0 && !result.counts && !(fix && result.key === "test")),
-  );
+  return results.filter((result) => {
+    if (result.exitCode === -1 || (result.key === "test" && result.unrecognized)) return true;
+    if (result.counts) return false;
+    if (result.key === "test") return !(fix && result.exitCode !== 0);
+    return result.exitCode !== 0;
+  });
 }
 
 export function verdictOf(
@@ -139,6 +195,7 @@ export function verdictOf(
 ): Verdict {
   if (result.exitCode === -1) return "unfinished";
   const red = result.exitCode !== 0 || (result.counts?.failed ?? 0) > 0;
+  if (result.key === "test" && !red && unread(result, before)) return "unknown";
   if (fix && result.key === "test") return red ? "mustPass" : "passed";
   if (!before) return red ? "noBaseline" : "passed";
   const wasRed = before.exitCode !== 0 || (before.counts?.failed ?? 0) > 0;
@@ -158,19 +215,29 @@ export function checkRegressions(
   results: SuiteResult[],
   baseline: SuiteBaseline | undefined,
   fix: boolean,
+  allowUnread = false,
 ): RegressionCheck {
   const checks = results.map((result) => {
     const before = baseline?.commands[result.command];
     return { ...result, verdict: verdictOf(result, before, fix), ...(before ? { before } : {}) };
   });
-  const regressions = checks.filter((check) => BLOCKING.has(check.verdict));
+  const unread = checks.filter((check) => check.verdict === "unknown");
+  const regressions = checks.filter(
+    (check) => BLOCKING.has(check.verdict) && !(allowUnread && check.verdict === "unknown"),
+  );
   return {
     passed: regressions.length === 0,
     checks,
     regressions,
     preexisting: checks.filter((check) => check.verdict === "preexisting"),
+    unread,
     report: ["## Regression check", ...checks.map(describe)].join("\n\n"),
   };
+}
+
+function unread(result: SuiteResult, before: CommandBaseline | undefined): boolean {
+  if (!result.counts) return true;
+  return Boolean(before?.counts && before.source !== result.source);
 }
 
 export function blocking(verdict: Verdict): boolean {

@@ -14,10 +14,23 @@ const result = (
   ...(counts ? { counts: { passed: counts[0], failed: counts[1], skipped: counts[2] } } : {}),
 });
 
+const green = { exitCode: 0, counts: { passed: 3, failed: 0, skipped: 0 }, source: "vitest-json" };
+
 describe("verdictOf", () => {
   it("keeps a green command green", () => {
-    expect(verdictOf(result(0), { exitCode: 0 }, false)).toBe("passed");
+    expect(verdictOf({ ...result(0, [3, 0, 0]), source: "vitest-json" }, green, false)).toBe(
+      "passed",
+    );
+    expect(verdictOf(result(0, [0, 0, 0], "lint"), { exitCode: 0 }, false)).toBe("passed");
+    expect(verdictOf(result(0, undefined, "lint"), { exitCode: 0 }, false)).toBe("passed");
     expect(verdictOf(result(1), { exitCode: 0 }, false)).toBe("regression");
+  });
+
+  it("never passes a test command whose counts could not be read", () => {
+    expect(verdictOf(result(0), green, false)).toBe("unknown");
+    expect(verdictOf(result(0), undefined, false)).toBe("unknown");
+    expect(verdictOf(result(0), undefined, true)).toBe("unknown");
+    expect(verdictOf({ ...result(0, [3, 0, 0]), source: "vitest" }, green, false)).toBe("unknown");
   });
 
   it("compares a red command by its counts, not by its exit code", () => {
@@ -33,7 +46,7 @@ describe("verdictOf", () => {
     expect(verdictOf(result(1), undefined, false)).toBe("noBaseline");
     const red = { exitCode: 1, counts: { passed: 1, failed: 1, skipped: 0 } };
     expect(verdictOf(result(1, [1, 1, 0]), red, true)).toBe("mustPass");
-    expect(verdictOf(result(0), red, true)).toBe("passed");
+    expect(verdictOf(result(0, [2, 0, 0]), red, true)).toBe("passed");
     expect(
       verdictOf(
         result(1, [0, 3, 0], "lint"),
@@ -46,9 +59,18 @@ describe("verdictOf", () => {
 
 describe("unusableBaseline", () => {
   it("flags commands that did not finish or fail without counts, except the suite a fix task repairs", () => {
-    const results = [result(-1), result(1), result(1, [1, 1, 0]), result(0)];
+    const results = [result(-1), result(1), result(1, [1, 1, 0]), result(0, [1, 0, 0])];
     expect(unusableBaseline(results, false)).toEqual([results[0], results[1]]);
     expect(unusableBaseline([result(1)], true)).toEqual([]);
+  });
+
+  it("flags a test command that passes without counts or whose runner is not recognized", () => {
+    const quiet = result(0);
+    const unknown = { ...result(1), unrecognized: true };
+    expect(unusableBaseline([quiet, unknown, result(0, undefined, "lint")], true)).toEqual([
+      quiet,
+      unknown,
+    ]);
   });
 });
 

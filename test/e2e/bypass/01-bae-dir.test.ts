@@ -2,22 +2,13 @@ import { execSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { markActive, prepareCapture, saveCapture } from "../../../src/gates/capture.js";
 import { parseTask } from "../../../src/tasks/schema.js";
+import { vitest } from "../../fake-vitest.js";
 import { testConfig, writeFiles } from "../../helpers.js";
-import {
-  agent,
-  BREAKS_WITH,
-  bypassRepo,
-  fake,
-  next,
-  REVIEW_PASS,
-  read,
-  statusOf,
-  TASK,
-} from "./harness.js";
+import { agent, bypassRepo, fake, next, REVIEW_PASS, read, statusOf, TASK } from "./harness.js";
 
 describe("bypass 01: the gate never reads state the agent can write in .bae/", () => {
   it("keeps the regression check on when the agent writes a skipped baseline in .bae/runs", async () => {
-    const test = BREAKS_WITH("broken.txt");
+    const test = vitest("--breaks=broken.txt");
     const cwd = await bypassRepo({ config: { commands: { test } } });
     const cheat = agent(cwd, {
       "src/feature.ts": "export const f = 1;\n",
@@ -72,7 +63,7 @@ describe("bypass 01: the gate never reads state the agent can write in .bae/", (
   });
 
   it("restores the config when the agent turns the regression gate off", async () => {
-    const cwd = await bypassRepo({ config: { commands: { test: BREAKS_WITH("broken.txt") } } });
+    const cwd = await bypassRepo({ config: { commands: { test: vitest("--breaks=broken.txt") } } });
     const original = await read(cwd, ".bae/config.json");
     const cheat = agent(cwd, {
       "src/feature.ts": "export const f = 1;\n",

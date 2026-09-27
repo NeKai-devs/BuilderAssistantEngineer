@@ -265,24 +265,6 @@ export function executedBy(commands: string[], scripts: Record<string, unknown>)
   return { files: [...files], modules: [...modules], make };
 }
 
-export function expandScripts(command: string, scripts: Record<string, unknown>): string {
-  const seen = new Set<string>();
-  const pending = [command];
-  const texts: string[] = [];
-  while (pending.length > 0) {
-    const current = pending.shift() ?? "";
-    if (seen.has(current)) continue;
-    seen.add(current);
-    texts.push(current);
-    for (const simple of parseLine(current).commands) {
-      const { name, args } = program(simple);
-      const script = npmScript(name, args);
-      if (script && typeof scripts[script] === "string") pending.push(scripts[script] as string);
-    }
-  }
-  return texts.join("\n");
-}
-
 export function shadowCandidates(executed: Executed): string[] {
   return [
     ...(executed.make ? MAKEFILES : []),
@@ -310,8 +292,12 @@ function isToolchain(path: string): boolean {
   return TOOLCHAIN_NAMES.has(baseName(path)) || TOOLCHAIN_DIRS.some((dir) => path.startsWith(dir));
 }
 
-function npmScript(name: string, args: string[]): string | undefined {
-  return scriptsInvoked(name, args, {}).find((script) => !/^(pre|post)/.test(script));
+export function mainScript(
+  name: string,
+  args: string[],
+  scripts: Record<string, unknown>,
+): string | undefined {
+  return scriptsInvoked(name, args, scripts).find((script) => !/^(pre|post)/.test(script));
 }
 
 function scriptsInvoked(name: string, args: string[], scripts: Record<string, unknown>): string[] {
@@ -324,14 +310,14 @@ function scriptsInvoked(name: string, args: string[], scripts: Record<string, un
   return script ? [`pre${script}`, script, `post${script}`] : [];
 }
 
-function execTarget(name: string, args: string[]): string[] | undefined {
+export function execTarget(name: string, args: string[]): string[] | undefined {
   if (EXEC_WRAPPERS.has(name)) return positional(args, false);
   if (!PACKAGE_MANAGERS.has(name)) return undefined;
   const rest = positional(args, false);
   return rest[0] === "exec" || rest[0] === "dlx" ? rest.slice(1) : undefined;
 }
 
-function positional(args: string[], dropValues = true): string[] {
+export function positional(args: string[], dropValues = true): string[] {
   const rest: string[] = [];
   for (let index = 0; index < args.length; index++) {
     const arg = args[index] ?? "";

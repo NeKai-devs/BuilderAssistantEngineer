@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { agent, bypassRepo, next, REVIEW_PASS, read } from "./harness.js";
 import { SUITE_FILES, TEST_CMD } from "./suite-fixture.js";
 
-const CHECK_BROKEN = "node -e \"process.exit(require('fs').existsSync('broken.txt') ? 1 : 0)\"";
+const CHECK_BROKEN = "node vitest.js run --breaks=broken.txt";
 
 describe("bypass 25: files the runner loads, or that would replace it, are protected", () => {
   it("restores a tsconfig.json exclude that hides a type error", async () => {

@@ -329,8 +329,6 @@ export const es: Messages = {
   "contract.shadow": "Añadió un archivo que se ejecutaría en lugar de la herramienta del proyecto.",
   "contract.indexFlags":
     "Marcó archivos como sin cambios en el índice de git (assume-unchanged o skip-worktree), lo que los oculta de la revisión: {{files}}. Se quitaron las marcas.",
-  "integrity.noCounts":
-    "`{{command}}` ya no informa cuántos tests corrieron, aunque antes de la tarea sí lo hacía.",
   "integrity.removedTests": "Quita tests que no vuelven a añadirse: {{tests}}.",
   "integrity.lostAssertions":
     "Quita {{count}} línea(s) de aserción de un archivo de test sin volver a añadirlas.",
@@ -343,4 +341,11 @@ export const es: Messages = {
     "Cambia un snapshot o un archivo de salida esperada, que decide qué aceptan los tests.",
   "regression.baselineTampered":
     "Correr los comandos del proyecto para la línea base cambió archivos de los que dependen los chequeos ({{files}}); se restauraron y no se lanzó nada.",
+  "regression.unknown":
+    "`{{command}}` termina con {{code}}, pero bae no pudo leer cuántos tests corrieron, así que no puede saber si pasaron.",
+  "regression.unknownRunner":
+    "bae no reconoce el runner de tests detrás de `{{command}}`, así que no puede saber si los tests pasan. Pon en commands.test de .bae/config.json el runner mismo, por ejemplo `npx vitest run`, `npx jest`, `pytest`, `go test -v ./...`, `cargo test` o `dotnet test`.",
+  "regression.noCounts":
+    "`{{command}}` no da una línea base usable: pasa, pero no dice cuántos tests corrieron, así que la tarea no podría compararse con ella.",
+  "regression.unreadSkipped": "`{{command}}` no dijo cuántos tests corrieron",
 };

@@ -22,9 +22,11 @@ import {
   baselineFrom,
   runSuite,
   type SuiteBaseline,
+  type SuiteResult,
   suiteCommands,
   unusableBaseline,
 } from "../gates/regression.js";
+import { readSources, testRunners } from "../gates/runners.js";
 import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
 import { capturedTask } from "../review/run.js";
@@ -96,10 +98,15 @@ export async function start(
   if (reuse?.base && reuse.base !== (await headCommit(ctx.cwd))) {
     ctx.prompter.warn(t("capture.headMoved", { id: task.meta.id }));
   }
+  const excluded = new Set(reuse?.baseline?.excluded ?? []);
+  const unrecognized = (await unrecognizedTests(ctx.cwd, config)).filter(
+    (command) => !excluded.has(command),
+  );
+  for (const command of unrecognized) allow(t("regression.unknownRunner", { command }));
   let baseline = reuse?.baseline;
   if (config.gates.regression === "full" && baseline === undefined) {
     if (reuse) allow(t("regression.lateStop", { id: task.meta.id }));
-    baseline = await recordBaseline(ctx, config, task, options, skips);
+    baseline = await recordBaseline(ctx, config, task, { ...options, unrecognized }, skips);
   }
   const started = await setTaskStatus(ctx.cwd, task, "in_progress");
   const capture = await prepareCapture(ctx.cwd, config, started);
@@ -109,15 +116,24 @@ export async function start(
   return capture;
 }
 
+async function unrecognizedTests(cwd: string, config: Config): Promise<string[]> {
+  const sources = await readSources(cwd);
+  return suiteCommands(config)
+    .filter((item) => item.key === "test" && testRunners(item.command, sources).length === 0)
+    .map((item) => item.command);
+}
+
 async function recordBaseline(
   ctx: CommandContext,
   config: Config,
   task: Task,
-  options: StartOptions,
+  options: StartOptions & { unrecognized: string[] },
   skips: string[],
 ): Promise<SuiteBaseline> {
-  const suite = suiteCommands(config);
-  if (suite.length === 0) return baselineFrom([]);
+  const suite = suiteCommands(config).filter(
+    (item) => !options.unrecognized.includes(item.command),
+  );
+  if (suite.length === 0) return baselineFrom([], options.unrecognized);
   ctx.prompter.note(
     suite.map((item) => `$ ${item.command}`).join("\n"),
     t("regression.baselineTitle"),
@@ -152,18 +168,18 @@ async function recordBaseline(
     );
   }
   const unusable = unusableBaseline(results, task.meta.tests === "fix");
-  for (const result of unusable) {
-    allowOrStop(
-      ctx,
-      options,
-      skips,
-      t("regression.unusable", { command: result.command, code: result.exitCode }),
-    );
-  }
-  return baselineFrom(
-    results,
-    unusable.map((result) => result.command),
-  );
+  for (const result of unusable) allowOrStop(ctx, options, skips, unusableMessage(result));
+  return baselineFrom(results, [
+    ...options.unrecognized,
+    ...unusable.map((result) => result.command),
+  ]);
+}
+
+function unusableMessage(result: SuiteResult): string {
+  const vars = { command: result.command, code: result.exitCode };
+  if (result.unrecognized) return t("regression.unknownRunner", vars);
+  if (result.key === "test" && result.exitCode === 0) return t("regression.noCounts", vars);
+  return t("regression.unusable", vars);
 }
 
 function allowOrStop(

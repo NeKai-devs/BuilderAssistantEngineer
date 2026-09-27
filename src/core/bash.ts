@@ -32,11 +32,18 @@ export async function findBash(
   return found && !WSL_BASH.test(found) ? found : undefined;
 }
 
+export type ScriptOptions = {
+  cwd: string;
+  onOutput?: (chunk: string) => void;
+  timeoutMs?: number;
+  env?: Record<string, string>;
+};
+
 export async function runScript(
   bash: string,
   script: string,
-  options: { cwd: string; onOutput?: (chunk: string) => void; timeoutMs?: number },
-): Promise<ShellResult> {
+  options: ScriptOptions,
+): Promise<ShellResult & { stdout: string }> {
   const dir = await mkdtemp(join(tmpdir(), "bae-script-"));
   const file = join(dir, "script.sh");
   await writeFile(file, script, "utf8");
@@ -46,12 +53,16 @@ export async function runScript(
       all: true,
       reject: false,
       timeout: options.timeoutMs ?? SCRIPT_TIMEOUT_MS,
-      env: { PWD: options.cwd },
+      env: { ...options.env, PWD: options.cwd },
     });
     const { onOutput } = options;
     if (onOutput) subprocess.all?.on("data", (chunk: Buffer) => onOutput(chunk.toString()));
     const result = await subprocess;
-    return { exitCode: result.exitCode ?? -1, output: result.all ?? result.message ?? "" };
+    return {
+      exitCode: result.exitCode ?? -1,
+      output: result.all ?? result.message ?? "",
+      stdout: typeof result.stdout === "string" ? result.stdout : "",
+    };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

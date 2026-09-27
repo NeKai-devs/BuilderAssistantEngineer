@@ -59,11 +59,6 @@ export function staticIntegrity(
 }
 
 export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): ReviewFinding[] {
-  const vanished = checks
-    .filter((check) => check.key === "test" && check.before?.counts && !check.counts)
-    .map((check) =>
-      counted(check, "vanished", t("integrity.noCounts", { command: check.command })),
-    );
   const findings = comparable(checks).flatMap(({ check, now, before }) => {
     const vars = { command: check.command, now: describe(now), before: describe(before) };
     return [
@@ -75,7 +70,7 @@ export function countIntegrity(checks: SuiteCheck[], acceptance: Acceptance): Re
         : []),
     ];
   });
-  return [...vanished, ...findings].map((finding) => accept(acceptance, finding, true));
+  return findings.map((finding) => accept(acceptance, finding, true));
 }
 
 export function testsGrew(checks: SuiteCheck[]): boolean {
