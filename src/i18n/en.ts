@@ -349,6 +349,8 @@ export const en = {
     "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
   "mechanical.secretFileHistory":
     "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
+  "regression.noTestsYet":
+    "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
 } as const;
 
 export type MessageKey = keyof typeof en;

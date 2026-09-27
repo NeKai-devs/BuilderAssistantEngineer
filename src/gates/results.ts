@@ -82,7 +82,7 @@ const FAILING: Partial<Record<RunnerName, RegExp[]>> = {
   pytest: [/^(?:FAILED|ERROR) (\S+::\S+|\S+\.py)/gm],
   go: [/^\s*--- FAIL: (\S+)/gm, /^FAIL\s+(\S+)\s+(?:\[.*\]|[\d.]+s)/gm, /^panic: .*/gm],
   cargo: [/^test (\S+) \.\.\. FAILED$/gm, /^error: test failed, to rerun pass (.+)$/gm],
-  rspec: [/^rspec (\S+)/gm],
+  rspec: [/^rspec \S+ # (.+)$/gm],
   unittest: [/^(?:FAIL|ERROR): (\S+ \(.+\))$/gm],
   node: [/^not ok \d+ - (.+)$/gm],
   mocha: [/^\s+\d+\) (.+):$/gm],
@@ -185,7 +185,7 @@ function pytest(text: string): Found | undefined {
 }
 
 function cargo(output: string): Found | undefined {
-  const text = output.replace(/^---- .+ std(?:out|err) ----$[\s\S]*?^failures:$/gm, "");
+  const text = cargoText(output);
   const matches = all(
     text,
     /^test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored/m,
@@ -200,7 +200,51 @@ function cargo(output: string): Found | undefined {
       ),
     counts(),
   );
-  return at(matches.at(-1), sum);
+  return at(matches.at(-1), { ...sum, failed: sum.failed + cargoCutShort(text) });
+}
+
+function cargoText(output: string): string {
+  return output.replace(/^---- .+ std(?:out|err) ----$[\s\S]*?^failures:$/gm, "");
+}
+
+function cargoCutShort(text: string): number {
+  let missing = 0;
+  let open: number | undefined;
+  for (const line of text.split("\n")) {
+    const running = /^running (\d+) tests?$/.exec(line);
+    if (running) {
+      if (open !== undefined) missing += Math.max(open, 1);
+      open = number(running[1]);
+    } else if (/^test result: /.test(line)) {
+      open = undefined;
+    } else if (open !== undefined && /^test \S+ \.\.\. (?:ok|FAILED|ignored)/.test(line)) {
+      open = Math.max(open - 1, 0);
+    }
+  }
+  return missing + (open === undefined ? 0 : Math.max(open, 1));
+}
+
+export function cargoUnits(output: string): string[] {
+  return [...cargoText(output).matchAll(/^\s*Running (?:unittests )?(\S+)(?: \(([^)]+)\))?/gm)].map(
+    (match) =>
+      (match[2] ?? match[1] ?? "").replace(/\\/g, "/").replace(/-[0-9a-f]{16}(\.exe)?$/, ""),
+  );
+}
+
+export function errorLines(output: string): string[] {
+  const text = stripVTControlCharacters(output).replace(/\r\n?/g, "\n");
+  const lines = text
+    .split("\n")
+    .filter((line) => /\berror\b|\S+:\d+(:\d+)?:/i.test(line))
+    .map((line) =>
+      line
+        .replace(/:\d+(:\d+)?/g, "")
+        .replace(/\(\d+,\d+\)/g, "")
+        .replace(/\b\d+(\.\d+)?m?s\b/g, "")
+        .trim(),
+    )
+    .filter(Boolean);
+  return [...new Set(lines)].sort();
 }
 
 function goTest(text: string): Found | undefined {
@@ -213,8 +257,9 @@ function goTest(text: string): Found | undefined {
 function mocha(text: string): Found | undefined {
   const passing = last(text, /^\s*(\d+) passing\b/m);
   if (!passing) return undefined;
-  const failing = last(text, /^\s*(\d+) failing\b/m);
-  const pending = last(text, /^\s*(\d+) pending\b/m);
+  const tail = text.slice(passing.index, passing.index + 300);
+  const failing = last(tail, /^\s*(\d+) failing\b/m);
+  const pending = last(tail, /^\s*(\d+) pending\b/m);
   return at(passing, counts(number(passing[1]), number(failing?.[1]), number(pending?.[1])));
 }
 

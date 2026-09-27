@@ -19,15 +19,16 @@ describe("runner reports", () => {
     const report = jestReport(await fixture("vitest.json"), ["/repo"], "vitest-json");
     expect(report).toEqual({
       counts: { passed: 1, failed: 2, skipped: 2 },
-      failing: ["test/a.test.js > group > fails", "test/broken.test.js"],
+      failing: ["group > fails", "test/broken.test.js"],
       source: "vitest-json",
+      units: ["test/a.test.js", "test/broken.test.js"],
     });
   });
 
   it("reads jest's JSON report the same way", async () => {
     const report = jestReport(await fixture("jest.json"), ["/repo"], "jest-json");
     expect(report?.counts).toEqual({ passed: 1, failed: 2, skipped: 2 });
-    expect(report?.failing).toEqual(["test/a.test.js > group > fails", "test/broken.test.js"]);
+    expect(report?.failing).toEqual(["group > fails", "test/broken.test.js"]);
   });
 
   it("reads pytest's JUnit XML, including errors, xfail and collection failures", async () => {
@@ -39,6 +40,7 @@ describe("runner reports", () => {
         "tests.test_a::test_param[2]",
       ],
       source: "pytest-junit",
+      units: ["tests.test_a", "tests.test_a.TestGroup"],
     });
     expect(junitReport(await fixture("pytest-collection.xml"))?.counts).toEqual({
       passed: 0,
@@ -108,7 +110,7 @@ describe("probeFor", () => {
 
   it("uses go test -json, dotnet's TRX logger and pytest's JUnit XML", async () => {
     expect((await probeFor("/repo", "go test -v ./...", sources()))?.command).toBe(
-      "go test -v ./... -json",
+      "go test ./... -json",
     );
     const dotnet = await probeFor("/repo", "dotnet test", sources());
     expect(dotnet?.command).toMatch(/^dotnet test --logger trx --results-directory '?\S+'?$/);

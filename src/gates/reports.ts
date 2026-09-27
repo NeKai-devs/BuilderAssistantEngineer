@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Counts } from "./results.js";
 import { type Direct, directRunner, type Sources, testRunners } from "./runners.js";
 
-export type Report = { counts: Counts; failing: string[]; source: ReportSource };
+export type Report = { counts: Counts; failing: string[]; source: ReportSource; units: string[] };
 export const REPORT_SOURCES = [
   "vitest-json",
   "jest-json",
@@ -22,7 +22,13 @@ export type Probe = {
 };
 export type LineView = { push: (chunk: string) => string; end: () => string };
 
-type Tally = { passed: number; failed: number; skipped: number; failing: string[] };
+type Tally = {
+  passed: number;
+  failed: number;
+  skipped: number;
+  failing: string[];
+  units: string[];
+};
 type Attributes = Record<string, string>;
 
 const PASSED = new Set(["passed"]);
@@ -55,8 +61,12 @@ async function argumentProbe(
   if (runner === "go") {
     if (args.includes("-args")) return undefined;
     const json = args.includes("-json") || args.includes("--json");
+    const quiet = command
+      .replace(/(^|\s)-v(=true)?(?=\s|$)/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
     return {
-      command: json ? command : extend(command, direct.suffix(["-json"])),
+      command: json ? command : extend(quiet, direct.suffix(["-json"])),
       env: {},
       collect: async (stdout) => goReport(stdout),
       view: goView,
@@ -121,9 +131,10 @@ export function jestReport(
   const data = parseJson(text);
   const files = Array.isArray(data?.testResults) ? data.testResults : undefined;
   if (!files) return undefined;
-  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [] };
+  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [], units: [] };
   for (const file of files as Record<string, unknown>[]) {
     const name = relativeTo(String(file.name ?? ""), roots);
+    tally.units.push(name);
     const cases = Array.isArray(file.assertionResults)
       ? (file.assertionResults as Record<string, unknown>[])
       : [];
@@ -134,7 +145,7 @@ export function jestReport(
       else if (FAILED.has(status)) {
         failedHere++;
         tally.failed++;
-        tally.failing.push(caseName(name, item));
+        tally.failing.push(caseName(item));
       } else tally.skipped++;
     }
     if (file.status === "failed" && failedHere === 0) {
@@ -147,9 +158,10 @@ export function jestReport(
 
 export function junitReport(text: string | undefined): Report | undefined {
   if (!text || !/<testsuites?\b/.test(text)) return undefined;
-  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [] };
+  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [], units: [] };
   for (const { attributes, body } of elements(text, "testcase")) {
     const name = [attributes.classname, attributes.name].filter(Boolean).join("::");
+    tally.units.push(attributes.file ?? attributes.classname ?? "");
     if (/<(failure|error)\b/.test(body)) {
       tally.failed++;
       tally.failing.push(name);
@@ -181,7 +193,7 @@ export function goReport(stdout: string): Report | undefined {
       results.set(key, action);
     }
   }
-  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [] };
+  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [], units: [] };
   for (const [key, action] of results) {
     if (action === "pass") tally.passed++;
     else if (action === "skip") tally.skipped++;
@@ -190,6 +202,7 @@ export function goReport(stdout: string): Report | undefined {
       tally.failing.push(key);
     }
   }
+  tally.units.push(...packages.keys());
   for (const [pkg, action] of packages) {
     const failedTests = tally.failing.some((name) => name.startsWith(`${pkg}::`));
     if (action === "fail" && !failedTests) {
@@ -202,8 +215,15 @@ export function goReport(stdout: string): Report | undefined {
 
 export function trxReport(texts: string[]): Report | undefined {
   if (texts.length === 0) return undefined;
-  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [] };
+  const tally: Tally = { passed: 0, failed: 0, skipped: 0, failing: [], units: [] };
   for (const text of texts) {
+    for (const { attributes } of elements(text, "UnitTest")) {
+      tally.units.push(
+        slashed(attributes.storage ?? "")
+          .split("/")
+          .at(-1) ?? "",
+      );
+    }
     for (const { attributes } of elements(text, "UnitTestResult")) {
       const outcome = attributes.outcome ?? "";
       if (outcome === "Passed") tally.passed++;
@@ -278,17 +298,19 @@ function decode(value: string): string {
   });
 }
 
-function caseName(file: string, item: Record<string, unknown>): string {
+function caseName(item: Record<string, unknown>): string {
   const ancestors = Array.isArray(item.ancestorTitles) ? item.ancestorTitles.map(String) : [];
-  return [file, ...ancestors, String(item.title ?? item.fullName ?? "")].join(" > ");
+  return [...ancestors, String(item.title ?? item.fullName ?? "")].join(" > ");
 }
 
 function report(tally: Tally, source: ReportSource): Report {
   const { passed, failed, skipped } = tally;
+  const unique = (items: string[]) => [...new Set(items.filter(Boolean))].sort();
   return {
     counts: { passed, failed, skipped },
-    failing: [...new Set(tally.failing)].sort(),
+    failing: unique(tally.failing),
     source,
+    units: unique(tally.units),
   };
 }
 

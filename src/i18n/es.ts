@@ -361,4 +361,6 @@ export const es: Messages = {
     "Un commit hecho durante la tarea añade algo que parece una credencial ({{kind}}). Se queda en el historial de git aunque el archivo ya no lo tenga, así que reescribe esos commits.",
   "mechanical.secretFileHistory":
     "Un commit hecho durante la tarea añade un archivo de secretos. Se queda en el historial de git aunque el archivo ya no exista, así que reescribe esos commits.",
+  "regression.noTestsYet":
+    "`{{command}}` todavía no tiene tests que correr, así que no hay línea base; después de la tarea debe pasar y decir cuántos tests corrieron.",
 };

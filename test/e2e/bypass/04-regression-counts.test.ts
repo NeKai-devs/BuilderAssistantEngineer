@@ -25,7 +25,10 @@ describe("bypass 04: a suite that was already red still catches new failures", (
 
   it("stops before the agent when a red command has no counts to compare", async () => {
     const test = vitest("--crash");
-    const cwd = await bypassRepo({ config: { commands: { test } } });
+    const cwd = await bypassRepo({
+      files: { "tests/a.test.js": 'it("a", () => {});\n' },
+      config: { commands: { test } },
+    });
     const run = await next(cwd, ["--yes"], []);
     expect(run.code).toBe(1);
     expect(run.calls).toHaveLength(0);

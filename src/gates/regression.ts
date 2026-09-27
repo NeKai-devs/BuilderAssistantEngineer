@@ -5,7 +5,9 @@ import type { ShellResult } from "../core/process.js";
 import { goText, probeFor, REPORT_SOURCES } from "./reports.js";
 import {
   type Counts,
+  cargoUnits,
   countsSchema,
+  errorLines,
   parseFailing,
   parseSummary,
   type RunnerName,
@@ -17,13 +19,23 @@ export const SUITE_KEYS = ["lint", "typecheck", "build", "test"] as const;
 export type SuiteKey = (typeof SUITE_KEYS)[number];
 export type SuiteCommand = { key: SuiteKey; command: string };
 export type SuiteResult = SuiteCommand &
-  ShellResult & { counts?: Counts; failing?: string[]; source?: string; unrecognized?: boolean };
+  ShellResult & {
+    counts?: Counts;
+    failing?: string[];
+    source?: string;
+    unrecognized?: boolean;
+    units?: string[];
+    errors?: string[];
+  };
 
 export const commandBaselineSchema = z.object({
   exitCode: z.number(),
   counts: countsSchema.optional(),
   failing: z.array(z.string()).optional(),
   source: z.string().optional(),
+  units: z.array(z.string()).optional(),
+  errors: z.array(z.string()).optional(),
+  absent: z.boolean().optional(),
 });
 export const suiteBaselineSchema = z.object({
   skipped: z.boolean().default(false),
@@ -135,11 +147,13 @@ async function runOne(
     if (rest) onOutput?.(rest);
     const output = view ? goText(result.output) : result.output;
     const read = (await probe?.collect(result.stdout)) ?? textRead(output, hint, test);
+    const errors = !test && result.exitCode !== 0 ? errorLines(output) : [];
     return {
       ...item,
       exitCode: result.exitCode,
       output,
       ...read,
+      ...(errors.length > 0 ? { errors } : {}),
       ...(test && hint.length === 0 ? { unrecognized: true } : {}),
     };
   } finally {
@@ -151,17 +165,23 @@ function textRead(
   output: string,
   hint: RunnerName[],
   test: boolean,
-): { counts?: Counts; failing?: string[]; source?: string } {
+): { counts?: Counts; failing?: string[]; source?: string; units?: string[] } {
   if (test && hint.length === 0) return {};
   const summary = parseSummary(output, hint);
   const failing = parseFailing(output, hint);
+  const units = hint.includes("cargo") ? cargoUnits(output) : [];
   return {
     ...(summary ? { counts: summary.counts, source: summary.source } : {}),
     ...(failing ? { failing } : {}),
+    ...(units.length > 0 ? { units } : {}),
   };
 }
 
-export function baselineFrom(results: SuiteResult[], excluded: string[] = []): SuiteBaseline {
+export function baselineFrom(
+  results: SuiteResult[],
+  excluded: string[] = [],
+  absent: string[] = [],
+): SuiteBaseline {
   return {
     skipped: false,
     excluded,
@@ -173,6 +193,9 @@ export function baselineFrom(results: SuiteResult[], excluded: string[] = []): S
           ...(result.counts ? { counts: result.counts } : {}),
           ...(result.failing ? { failing: result.failing } : {}),
           ...(result.source ? { source: result.source } : {}),
+          ...(result.units ? { units: result.units } : {}),
+          ...(result.errors ? { errors: result.errors } : {}),
+          ...(absent.includes(result.command) ? { absent: true } : {}),
         },
       ]),
     ),
@@ -184,7 +207,7 @@ export function unusableBaseline(results: SuiteResult[], fix: boolean): SuiteRes
     if (result.exitCode === -1 || (result.key === "test" && result.unrecognized)) return true;
     if (result.counts) return false;
     if (result.key === "test") return !(fix && result.exitCode !== 0);
-    return result.exitCode !== 0;
+    return result.exitCode !== 0 && !result.errors;
   });
 }
 
@@ -204,6 +227,13 @@ export function verdictOf(
   if (before.failing && result.failing) {
     const known = new Set(before.failing);
     if (result.failing.some((name) => !known.has(name))) return "regression";
+  }
+  if (before.units && result.units && before.units.some((unit) => !result.units?.includes(unit))) {
+    return "regression";
+  }
+  if (!before.counts && before.errors && result.errors && result.key !== "test") {
+    const known = new Set(before.errors);
+    return result.errors.some((line) => !known.has(line)) ? "regression" : "preexisting";
   }
   if (!before.counts || !result.counts || before.source !== result.source) return "uncomparable";
   const worse =

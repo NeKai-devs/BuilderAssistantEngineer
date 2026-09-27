@@ -3,8 +3,9 @@ import { saveCommands } from "../commands/shared.js";
 import type { Config } from "../config/schema.js";
 import { bashPath } from "../core/bash.js";
 import { ExitCode } from "../core/errors.js";
-import { headCommit, isGitRepo } from "../core/git.js";
+import { gitPaths, headCommit, isGitRepo } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { isTestFile } from "../digest/baseline.js";
 import {
   type Capture,
   clearActive,
@@ -99,14 +100,15 @@ export async function start(
     ctx.prompter.warn(t("capture.headMoved", { id: task.meta.id }));
   }
   const excluded = new Set(reuse?.baseline?.excluded ?? []);
-  const unrecognized = (await unrecognizedTests(ctx.cwd, config)).filter(
-    (command) => !excluded.has(command),
-  );
+  const fresh = !(await hasTestFiles(ctx.cwd));
+  const unrecognized = fresh
+    ? []
+    : (await unrecognizedTests(ctx.cwd, config)).filter((command) => !excluded.has(command));
   for (const command of unrecognized) allow(t("regression.unknownRunner", { command }));
   let baseline = reuse?.baseline;
   if (config.gates.regression === "full" && baseline === undefined) {
     if (reuse) allow(t("regression.lateStop", { id: task.meta.id }));
-    baseline = await recordBaseline(ctx, config, task, { ...options, unrecognized }, skips);
+    baseline = await recordBaseline(ctx, config, task, { ...options, unrecognized, fresh }, skips);
   }
   const started = await setTaskStatus(ctx.cwd, task, "in_progress");
   const capture = await prepareCapture(ctx.cwd, config, started);
@@ -127,7 +129,7 @@ async function recordBaseline(
   ctx: CommandContext,
   config: Config,
   task: Task,
-  options: StartOptions & { unrecognized: string[] },
+  options: StartOptions & { unrecognized: string[]; fresh: boolean },
   skips: string[],
 ): Promise<SuiteBaseline> {
   const suite = suiteCommands(config).filter(
@@ -167,12 +169,26 @@ async function recordBaseline(
       t("regression.preexisting", { command: result.command, code: result.exitCode }),
     );
   }
-  const unusable = unusableBaseline(results, task.meta.tests === "fix");
+  const found = unusableBaseline(results, task.meta.tests === "fix");
+  const absent = options.fresh
+    ? found.filter((result) => result.key === "test" && result.exitCode !== -1)
+    : [];
+  const unusable = found.filter((result) => !absent.includes(result));
+  for (const result of absent) {
+    ctx.prompter.info(t("regression.noTestsYet", { command: result.command }));
+  }
   for (const result of unusable) allowOrStop(ctx, options, skips, unusableMessage(result));
-  return baselineFrom(results, [
-    ...options.unrecognized,
-    ...unusable.map((result) => result.command),
-  ]);
+  return baselineFrom(
+    results,
+    [...options.unrecognized, ...unusable.map((result) => result.command)],
+    absent.map((result) => result.command),
+  );
+}
+
+async function hasTestFiles(cwd: string): Promise<boolean> {
+  const files =
+    (await gitPaths(cwd, ["ls-files", "--cached", "--others", "--exclude-standard"])) ?? [];
+  return files.some((path) => isTestFile(path));
 }
 
 function unusableMessage(result: SuiteResult): string {

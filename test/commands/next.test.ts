@@ -261,8 +261,9 @@ describe("next regression gate", () => {
         [RED]: {
           exitCode: 1,
           counts: { passed: 2, failed: 1, skipped: 0 },
-          failing: ["tests/fake.test.js > t0"],
+          failing: ["t0"],
           source: "vitest-json",
+          units: ["tests/fake.test.js"],
         },
       },
     });

@@ -113,11 +113,7 @@ function isExample(value: string): boolean {
     /^(?:AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|xox[abprs]-|sk-|[rs]k_live_|AIza|npm_)/,
     "",
   );
-  if (
-    /example|sample|fake|dummy|placeholder|test|your|redacted|changeme|xxxx|0000/i.test(
-      body,
-    )
-  ) {
+  if (/example|sample|fake|dummy|placeholder|test|your|redacted|changeme|xxxx|0000/i.test(body)) {
     return true;
   }
   return new Set(body).size <= 6 || /(.)\1{5,}/.test(body);
