@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process";
+import { chmod } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { commitPaths, taskMessage } from "../../src/next/commit.js";
 import { parseTask } from "../../src/tasks/schema.js";
@@ -75,6 +77,25 @@ describe("commitPaths", () => {
       expect(sh(cwd, "git status --short")).toBe("M a.md");
     },
   );
+
+  it("reports a failing hook's output without git's line-ending warnings", async () => {
+    const cwd = await tempDir();
+    await writeFiles(cwd, { "a.md": "a\n" });
+    await gitCommitAll(cwd, "base");
+    sh(cwd, "git config core.autocrlf true");
+    await writeFiles(cwd, {
+      "a.md": "b\n",
+      ".git/hooks/pre-commit": "#!/bin/sh\necho lint failed >&2\nexit 1\n",
+    });
+    await chmod(join(cwd, ".git", "hooks", "pre-commit"), 0o755);
+    expect(await commitPaths(cwd, ["a.md"], ["chore: hook (T-001)"], HOOKS)).toEqual({
+      ok: false,
+      details: "lint failed",
+    });
+    expect((await commitPaths(cwd, ["a.md"], ["chore: hook (T-001)"], { verify: false })).ok).toBe(
+      true,
+    );
+  });
 
   it("reports that nothing was committed when no path can be added", async () => {
     const cwd = await tempDir();

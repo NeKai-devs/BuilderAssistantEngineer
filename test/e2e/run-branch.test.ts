@@ -159,7 +159,7 @@ describe("next commits each finished task on a bae/ branch", () => {
     const run = await next(cwd, ["--yes"], [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS]);
     expect(run.code).toBe(0);
     expect(await statusOf(cwd)).toBe("done");
-    expect(run.log).toContain("Could not commit T-001: lint failed.");
+    expect(run.log).toMatch(/warn: Could not commit T-001: [^\n]*lint failed\./);
     expect(subjects(cwd)).toEqual(["plan"]);
     const skipped = await bypassRepo();
     await hook(skipped, "pre-commit", failing);

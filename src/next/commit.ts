@@ -10,6 +10,7 @@ const PATH_CHUNK = 100;
 const HEADER_MAX = 100;
 const COMMIT_TIMEOUT_MS = 10 * 60_000;
 const DETAIL_LINES = 20;
+const LINE_ENDINGS = /^warning: in the working copy of .*(CRLF|LF) will be replaced by/;
 
 export type Committed = { ok: true; sha: string } | { ok: false; details: string };
 export type CommitOptions = { verify: boolean };
@@ -102,7 +103,12 @@ function fit(text: string, room: number): string {
 }
 
 function tail(text: string): string {
-  return text.trim().split(/\r?\n/).slice(-DETAIL_LINES).join("\n");
+  return text
+    .trim()
+    .split(/\r?\n/)
+    .filter((line) => !LINE_ENDINGS.test(line))
+    .slice(-DETAIL_LINES)
+    .join("\n");
 }
 
 async function addable(cwd: string, paths: string[]): Promise<string[]> {
