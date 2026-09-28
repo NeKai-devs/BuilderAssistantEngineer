@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import { t } from "../i18n/index.js";
+import { branchExists, currentBranch, readRun, runCommits } from "../next/branch.js";
 import { blockedReason } from "../tasks/attempts.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import { formatDuration, type RunMetrics, readMetrics } from "../tasks/metrics.js";
@@ -36,7 +37,23 @@ export async function runStatus(ctx: CommandContext): Promise<void> {
       ),
     ),
   );
-  ctx.print(`${renderStatus(loaded, metrics, reasons)}\n`);
+  const run = await runSection(ctx.cwd);
+  ctx.print(`${[run, renderStatus(loaded, metrics, reasons)].filter(Boolean).join("\n\n")}\n`);
+}
+
+async function runSection(cwd: string): Promise<string> {
+  const run = await readRun(cwd);
+  if (!run || !(await branchExists(cwd, run.branch))) return "";
+  const current = await currentBranch(cwd);
+  if (current !== run.branch) {
+    return t("status.runElsewhere", { branch: run.branch, current: current ?? "HEAD" });
+  }
+  const commits = await runCommits(cwd, run);
+  const lines = commits.map((commit) => `  ${pc.dim(commit.sha)} ${commit.subject}`);
+  return [
+    pc.bold(t("status.run", { branch: run.branch, from: run.from })),
+    ...(lines.length > 0 ? lines : [`  ${pc.dim(t("status.noCommits"))}`]),
+  ].join("\n");
 }
 
 export function renderStatus(

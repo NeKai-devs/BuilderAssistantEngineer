@@ -1,4 +1,4 @@
-import { runCommand } from "./process.js";
+import { type CommandResult, runCommand } from "./process.js";
 
 const GIT_TIMEOUT_MS = 30_000;
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -39,6 +39,14 @@ export async function git(cwd: string, args: string[]): Promise<string | undefin
     timeoutMs: GIT_TIMEOUT_MS,
   });
   return result.exitCode === 0 ? result.stdout : undefined;
+}
+
+export async function gitRun(cwd: string, args: string[], input?: string): Promise<CommandResult> {
+  return runCommand("git", [...HARDENED, ...args], {
+    cwd,
+    timeoutMs: GIT_TIMEOUT_MS,
+    ...(input === undefined ? {} : { input }),
+  });
 }
 
 export async function gitPaths(cwd: string, args: string[]): Promise<string[] | undefined> {

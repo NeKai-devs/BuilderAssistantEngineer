@@ -26,6 +26,7 @@ import { MAX_LOG_LINES } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
 import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
+import { commitTask } from "./commit.js";
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
@@ -201,8 +202,10 @@ async function learnFromReviews(ctx: CommandContext, capture: Capture, result: G
 }
 
 async function complete(ctx: CommandContext, capture: Capture): Promise<boolean> {
-  await setTaskStatus(ctx.cwd, capturedTask(capture), "done");
+  const task = capturedTask(capture);
+  await setTaskStatus(ctx.cwd, task, "done");
   await saveCapture(ctx.cwd, { ...capture, finished: true });
+  if (!ctx.flags.dryRun) await commitTask(ctx, capture, task.meta.title);
   ctx.prompter.outro(t("next.done", { id: capture.id, command: `${CLI} next` }));
   return true;
 }

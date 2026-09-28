@@ -368,4 +368,21 @@ export const es: Messages = {
     "`{{command}}` todavía no tiene tests que correr, así que no hay línea base; después de la tarea debe pasar y decir cuántos tests corrieron.",
   "integrity.planned":
     "El Scope de la tarea marca archivos de test que elimina, así que lo juzga el revisor.",
+  "run.started":
+    "Trabajando en la rama {{branch}}, creada desde {{from}}; cada tarea terminada se commitea ahí.",
+  "run.elsewhere":
+    "Las tareas de esta run se commitean en {{branch}}, y estás en {{current}}. Vuelve con `git switch {{branch}}` o usa --new-run para empezar otra run desde aquí (por ejemplo, después de mergearla).",
+  "run.replanElsewhere":
+    "Las tareas de esta run se commitean en {{branch}}, y estás en {{current}}. Vuelve con `git switch {{branch}}` antes de replanificar, para que el plan nuevo quede junto a ellas.",
+  "run.switchFailed": "No se pudo crear la rama {{branch}}: {{details}}",
+  "run.stopped": "No se cambió nada.",
+  "commit.done": "{{id}} commiteada como {{sha}} en {{branch}}.",
+  "commit.failed":
+    "No se pudo commitear {{id}}: {{details}}. La tarea está hecha; commitea sus cambios a mano.",
+  "commit.replan": "Plan nuevo commiteado como {{sha}} en {{branch}}.",
+  "status.run": "Rama {{branch}}, creada desde {{from}}",
+  "status.runElsewhere": "Las tareas de esta run se commitean en {{branch}}; estás en {{current}}.",
+  "status.noCommits": "todavía sin commits",
+  "option.newRun":
+    "empezar una rama bae/ nueva desde la rama actual en vez de seguir la run registrada",
 };
