@@ -77,8 +77,13 @@ export async function headlessLoop(
     left--;
     ctx.prompter.info(t("next.attempt", { attempt, max: MAX_ATTEMPTS, backend: backend.name }));
     const startedAt = new Date();
-    const launched = await launch(ctx, run, startedAt, true, () =>
-      backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print, timeoutMs }),
+    const launched = await launch(
+      ctx,
+      run,
+      startedAt,
+      true,
+      () => backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print, timeoutMs }),
+      left === 0,
     );
     if (!launched.ok) {
       return left === 0 ? block(ctx, capture, launched.reason) : notDone(ctx, capture);
@@ -110,6 +115,7 @@ async function launch(
   startedAt: Date,
   headless: boolean,
   go: () => Promise<unknown>,
+  final = false,
 ): Promise<Launched> {
   await markActive(ctx.cwd, run.capture.id);
   const guard = await guardState(ctx.cwd);
@@ -127,7 +133,8 @@ async function launch(
   await enforceContract(ctx, run.capture, run.acceptance);
   await clearActive(ctx.cwd);
   const reason = failure instanceof Error ? failure.message : String(failure);
-  await record(ctx, run, startedAt, headless, { outcome: "failed", stage: "agent", reason });
+  const outcome = final ? "blocked" : "failed";
+  await record(ctx, run, startedAt, headless, { outcome, stage: "agent", reason });
   if (!(failure instanceof UserError)) throw failure;
   ctx.prompter.warn(reason);
   return { ok: false, reason };

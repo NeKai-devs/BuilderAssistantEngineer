@@ -1,6 +1,18 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { UserError } from "../../../src/core/errors.js";
-import { agent, attempts, bypassRepo, FAIL, LESSON, next, statusOf } from "./harness.js";
+import {
+  agent,
+  attempts,
+  bypassRepo,
+  FAIL,
+  LESSON,
+  next,
+  REVIEW_PASS,
+  statusOf,
+  TASK,
+} from "./harness.js";
 
 describe("bypass 10: blocked cannot be dodged by crashing or restarting", () => {
   it("counts attempts across invocations and records the ones that ended in an agent error", async () => {
@@ -20,6 +32,31 @@ describe("bypass 10: blocked cannot be dodged by crashing or restarting", () => 
     expect(second.code).toBe(1);
     expect(second.calls.filter((call) => call.options.access === "edit")).toHaveLength(1);
     expect(await statusOf(cwd)).toBe("blocked");
+  });
+
+  it("gives a task blocked by agent errors a new budget once a person sets it back to pending", async () => {
+    const cwd = await bypassRepo();
+    const crash = async () => {
+      throw new UserError("claude exited with code 1");
+    };
+    await next(cwd, ["--headless", "--yes"], [crash]);
+    await next(cwd, ["--headless", "--yes"], [crash]);
+    const third = await next(cwd, ["--headless", "--yes"], [crash, LESSON]);
+    expect(third.code).toBe(1);
+    expect(await statusOf(cwd)).toBe("blocked");
+    expect((await attempts(cwd)).at(-1)?.outcome).toBe("blocked");
+    const path = join(cwd, TASK);
+    await writeFile(
+      path,
+      (await readFile(path, "utf8")).replace("status: blocked", "status: pending"),
+    );
+    const again = await next(
+      cwd,
+      ["--headless", "--yes"],
+      [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS],
+    );
+    expect(again.code).toBe(0);
+    expect(await statusOf(cwd)).toBe("done");
   });
 
   it("gives the headless agent the configured timeout", async () => {
