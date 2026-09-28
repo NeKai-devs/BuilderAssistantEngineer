@@ -75,7 +75,7 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
   const before = await unchangedSince(cwd, capture.snapshot, all.files);
   const late = await Promise.all(
     hidden
-      .filter((path) => !before.has(path))
+      .filter((path) => !before.has(path) && !isDependency(path))
       .map(async (path) => ({ path, text: await newFileText(cwd, path) })),
   );
   return { ok: true, ref, changes: withoutPaths(all, before), before, late };
@@ -129,20 +129,33 @@ function withoutPaths(changes: TaskChanges, skip: Set<string>): TaskChanges {
   };
 }
 
+const DEPENDENCY_DIRS = new Set(["node_modules", ".venv", "venv", "bower_components"]);
+
 function codeRoots(paths: string[]): Set<string> {
   return new Set(
     paths
-      .filter((path) => (languageOf(path) || isTestFile(path)) && !isBuildOutput(path))
+      .filter(
+        (path) =>
+          (languageOf(path) || isTestFile(path)) && !isBuildOutput(path) && !isDependency(path),
+      )
       .map(rootOf)
       .filter((root) => !root.startsWith(".")),
   );
 }
 
 function toolOutput(path: string, roots: Set<string>): boolean {
+  if (isDependency(path)) return true;
   if (languageOf(path) || isTestFile(path)) return false;
   const root = rootOf(path);
   if (root.startsWith(".") || (root === "" && path.startsWith("."))) return true;
   return isBuildOutput(path) || !roots.has(root);
+}
+
+function isDependency(path: string): boolean {
+  return path
+    .split("/")
+    .slice(0, -1)
+    .some((part) => DEPENDENCY_DIRS.has(part));
 }
 
 function rootOf(path: string): string {
