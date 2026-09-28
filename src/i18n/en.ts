@@ -362,6 +362,10 @@ export const en = {
     "This run's tasks are committed on {{branch}}, and you are on {{current}}. Switch back with `git switch {{branch}}`, or pass --new-run to start another run from here (for example after merging it).",
   "run.replanElsewhere":
     "This run's tasks are committed on {{branch}}, and you are on {{current}}. Switch back with `git switch {{branch}}` before replanning, so the new plan lands next to them.",
+  "run.confirm": "Create the branch {{branch}} from {{from}} and commit each finished task there?",
+  "run.declined":
+    "Staying on {{current}}. Finished tasks are not committed; the next run of next asks again, and --yes creates the branch without asking.",
+  "run.finished": "Every task is done on {{branch}}. Open a pull request with:",
   "run.switchFailed": "Could not create the branch {{branch}}: {{details}}",
   "run.stopped": "Nothing was changed.",
   "commit.done": "Committed {{id}} as {{sha}} on {{branch}}.",
@@ -371,6 +375,8 @@ export const en = {
   "status.run": "Branch {{branch}}, created from {{from}}",
   "status.runElsewhere": "This run's tasks are committed on {{branch}}; you are on {{current}}.",
   "status.noCommits": "no commits yet",
+  "option.noVerify":
+    "commit without the repository's pre-commit and commit-msg hooks, like git commit --no-verify",
   "option.newRun":
     "start a new bae/ branch from the current branch instead of continuing the recorded run",
 } as const;

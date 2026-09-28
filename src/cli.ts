@@ -5,7 +5,7 @@ import { type CommandContext, type CommandDeps, defaultDeps } from "./commands/c
 import { type InitOptions, runInit } from "./commands/init.js";
 import { type NextOptions, runNext } from "./commands/next.js";
 import { type PlanOptions, runPlan } from "./commands/plan.js";
-import { runReplan } from "./commands/replan.js";
+import { type ReplanOptions, runReplan } from "./commands/replan.js";
 import { type ReviewOptions, runReview } from "./commands/review.js";
 import { runStatus } from "./commands/status.js";
 import { BACKENDS } from "./config/schema.js";
@@ -64,6 +64,7 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
     .option("--allow-skip", t("option.allowSkip"))
     .option("--new-run", t("option.newRun"))
+    .option("--no-verify", t("option.noVerify"))
     .action((options: NextOptions, command: Command) => runNext(context(command), options));
   program
     .command("status")
@@ -72,7 +73,8 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
   program
     .command("replan")
     .description(t("command.replan"))
-    .action((_options: unknown, command: Command) => runReplan(context(command)));
+    .option("--no-verify", t("option.noVerify"))
+    .action((options: ReplanOptions, command: Command) => runReplan(context(command), options));
   program
     .command("review")
     .description(t("command.review"))

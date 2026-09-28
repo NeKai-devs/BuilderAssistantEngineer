@@ -76,6 +76,7 @@ depends_on: [T-001]
 size: S | M | L
 risk: low | medium | high
 tests: required | optional | fix
+type: feat | fix | refactor | test | docs | chore
 ---
 ## Goal
 What exists when this is done and why it matters.
@@ -94,6 +95,8 @@ What could go wrong, and what the task depends on outside the repository or its 
 ## Log
 
 End every task with an empty `## Log` heading: the agent that executes the task writes its handoff note there, and the CLI requires it before marking the task done.
+
+`type` is the conventional-commit type of the commit the CLI makes when the task is done: `feat` for new behavior, `fix` for a bug fix, `refactor` for a change that keeps behavior, `test` for tests only, `docs` for documentation only, `chore` for tooling, configuration and anything else.
 
 `tests: required` when the task adds or changes behavior: the CLI fails the task unless it runs more tests than before or adds assertions to a test file. `tests: optional` for docs, configuration or refactors already covered by existing tests. `tests: fix` when the goal of the task is to repair tests that already fail: the CLI accepts it only when the project's test command ends green.
 

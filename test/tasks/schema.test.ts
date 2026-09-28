@@ -25,6 +25,7 @@ describe("task files", () => {
       size: "S",
       risk: "low",
       tests: "optional",
+      type: "chore",
     });
     expect(taskProblems(task)).toEqual([]);
   });

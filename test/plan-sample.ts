@@ -6,6 +6,7 @@ export type TaskOptions = {
   tests?: "required" | "optional" | "fix";
   scope?: string;
   log?: string;
+  type?: string;
 };
 
 export function taskFile(id: string, options: TaskOptions = {}): string {
@@ -19,6 +20,7 @@ export function taskFile(id: string, options: TaskOptions = {}): string {
     "size: S",
     "risk: low",
     `tests: ${options.tests ?? "optional"}`,
+    ...(options.type === undefined ? [] : [`type: ${options.type}`]),
     "---",
     "## Goal",
     `Goal of ${id}.`,

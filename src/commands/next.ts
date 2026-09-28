@@ -22,6 +22,7 @@ export type NextOptions = {
   acceptFinding?: string[];
   allowSkip?: boolean;
   newRun?: boolean;
+  verify?: boolean;
 };
 
 export async function runNext(ctx: CommandContext, options: NextOptions): Promise<void> {
@@ -58,6 +59,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     acceptance,
     allowSkip,
     unattended,
+    verify: options.verify !== false,
     tampered: [],
   };
   const prompt = await taskPrompt(ctx, capture, tasks);

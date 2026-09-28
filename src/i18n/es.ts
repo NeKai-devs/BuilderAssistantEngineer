@@ -374,6 +374,10 @@ export const es: Messages = {
     "Las tareas de esta run se commitean en {{branch}}, y estás en {{current}}. Vuelve con `git switch {{branch}}` o usa --new-run para empezar otra run desde aquí (por ejemplo, después de mergearla).",
   "run.replanElsewhere":
     "Las tareas de esta run se commitean en {{branch}}, y estás en {{current}}. Vuelve con `git switch {{branch}}` antes de replanificar, para que el plan nuevo quede junto a ellas.",
+  "run.confirm": "¿Crear la rama {{branch}} desde {{from}} y commitear ahí cada tarea terminada?",
+  "run.declined":
+    "Sigues en {{current}}. Las tareas terminadas no se commitean; el próximo next vuelve a preguntar, y --yes crea la rama sin preguntar.",
+  "run.finished": "Todas las tareas están hechas en {{branch}}. Abre el pull request con:",
   "run.switchFailed": "No se pudo crear la rama {{branch}}: {{details}}",
   "run.stopped": "No se cambió nada.",
   "commit.done": "{{id}} commiteada como {{sha}} en {{branch}}.",
@@ -383,6 +387,8 @@ export const es: Messages = {
   "status.run": "Rama {{branch}}, creada desde {{from}}",
   "status.runElsewhere": "Las tareas de esta run se commitean en {{branch}}; estás en {{current}}.",
   "status.noCommits": "todavía sin commits",
+  "option.noVerify":
+    "commitear sin los hooks pre-commit y commit-msg del repositorio, como git commit --no-verify",
   "option.newRun":
     "empezar una rama bae/ nueva desde la rama actual en vez de seguir la run registrada",
 };

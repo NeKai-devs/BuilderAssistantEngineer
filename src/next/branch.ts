@@ -52,20 +52,32 @@ export async function useRunBranch(ctx: CommandContext, newRun: boolean): Promis
   if (!newRun && recorded && (await branchExists(ctx.cwd, recorded.branch))) {
     stop(ctx, t("run.elsewhere", { branch: recorded.branch, current: current ?? "HEAD" }));
   }
+  return startRun(ctx, current);
+}
+
+async function startRun(ctx: CommandContext, current?: string): Promise<Run | undefined> {
   const branch = await freeName(ctx.cwd, `${RUN_PREFIX}${stamp(new Date())}`);
   const base = (await headCommit(ctx.cwd)) ?? EMPTY_TREE;
+  const from = current ?? base.slice(0, 12);
+  if (!ctx.flags.yes && !(await ctx.prompter.confirm(t("run.confirm", { branch, from }), true))) {
+    ctx.prompter.info(t("run.declined", { current: from }));
+    return undefined;
+  }
   const switched = await gitRun(ctx.cwd, ["switch", "-c", branch]);
   if (switched.exitCode !== 0) {
     stop(ctx, t("run.switchFailed", { branch, details: switched.stderr.trim() }));
   }
-  const run = await saveRun(ctx.cwd, {
-    branch,
-    from: current ?? base.slice(0, 12),
-    base,
-    startedAt: new Date().toISOString(),
-  });
-  ctx.prompter.info(t("run.started", { branch, from: run.from }));
+  const run = await saveRun(ctx.cwd, { branch, from, base, startedAt: new Date().toISOString() });
+  ctx.prompter.info(t("run.started", { branch, from }));
   return run;
+}
+
+export async function announcePullRequest(ctx: CommandContext): Promise<void> {
+  const run = await readRun(ctx.cwd);
+  if (!run || run.branch !== (await currentBranch(ctx.cwd))) return;
+  const known = run.from !== run.branch && (await branchExists(ctx.cwd, run.from));
+  const command = `gh pr create${known ? ` --base ${run.from}` : ""} --head ${run.branch}`;
+  ctx.prompter.note(command, t("run.finished", { branch: run.branch }));
 }
 
 export async function requireRunBranch(ctx: CommandContext): Promise<Run | undefined> {

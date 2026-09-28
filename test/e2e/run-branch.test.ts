@@ -18,6 +18,7 @@ const second = taskFile("T-002", {
   dependsOn: ["T-001"],
   command: PASS,
   scope: "- `src/second.ts`",
+  type: "feat",
 });
 
 async function handoffTo(cwd: string, path: string): Promise<void> {
@@ -36,6 +37,22 @@ async function status(cwd: string): Promise<string> {
   return printed.join("");
 }
 
+const COMMIT_MSG = [
+  "#!/bin/sh",
+  'read -r header < "$1"',
+  'case "$header" in',
+  '  "feat: "[a-z]*|"fix: "[a-z]*|"chore: "[a-z]*|"chore(bae): "[a-z]*) exit 0 ;;',
+  "esac",
+  "exit 1",
+  "",
+].join("\n");
+
+async function hook(cwd: string, name: string, script: string): Promise<void> {
+  const path = join(cwd, ".git", "hooks", name);
+  await writeFile(path, script);
+  await chmod(path, 0o755);
+}
+
 describe("next commits each finished task on a bae/ branch", () => {
   it("creates the branch from the current one and commits only the task's changes", async () => {
     const cwd = await bypassRepo();
@@ -45,16 +62,32 @@ describe("next commits each finished task on a bae/ branch", () => {
     expect(run.code).toBe(0);
     expect(branch(cwd)).toMatch(/^bae\/\d{4}-\d{2}-\d{2}-\d{4}$/);
     expect(run.log).toContain("created from main");
-    expect(subjects(cwd)[0]).toBe("bae: T-001 Do T-001");
+    expect(subjects(cwd)[0]).toBe("chore: do T-001 (T-001)");
+    expect(sh(cwd, "git log -1 --format=%b")).toBe("Bae-Task: T-001");
     const files = sh(cwd, "git show --name-only --format= HEAD").split("\n");
     expect(files).toContain("src/feature.ts");
     expect(files).toContain(TASK);
     expect(files).not.toContain("notes.txt");
     expect(sh(cwd, "git status --short")).toContain("notes.txt");
     expect(sh(cwd, "git show HEAD:docs/plan/tasks/T-001-first.md")).toContain("status: done");
+    expect(run.log).not.toContain("gh pr create");
   });
 
-  it("keeps committing on the same branch and shows it in status", async () => {
+  it("asks before creating the branch, and stays put without commits when told no", async () => {
+    const cwd = await bypassRepo();
+    const work = agent(cwd, { "src/feature.ts": "export const f = 1;\n" });
+    const declined = await next(cwd, [], [work, REVIEW_PASS], [false, true]);
+    expect(declined.ui.asked[0]).toMatch(
+      /^Create the branch bae\/\d{4}-\d{2}-\d{2}-\d{4} from main and commit each finished task there\?$/,
+    );
+    expect(declined.code).toBe(0);
+    expect(declined.log).toContain("Staying on main. Finished tasks are not committed");
+    expect(branch(cwd)).toBe("main");
+    expect(subjects(cwd)).toEqual(["plan"]);
+    expect(await statusOf(cwd)).toBe("done");
+  });
+
+  it("keeps committing on the same branch and prints the pull request command after the last task", async () => {
     const cwd = await bypassRepo({ files: { [SECOND]: second } });
     await next(
       cwd,
@@ -66,14 +99,19 @@ describe("next commits each finished task on a bae/ branch", () => {
       handoffTo(cwd, SECOND),
     );
     const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
-
     expect(run.code).toBe(0);
     expect(branch(cwd)).toBe(first);
-    expect(subjects(cwd).slice(0, 2)).toEqual(["bae: T-002 Do T-002", "bae: T-001 Do T-001"]);
+    expect(subjects(cwd).slice(0, 2)).toEqual([
+      "feat: do T-002 (T-002)",
+      "chore: do T-001 (T-001)",
+    ]);
+    expect(run.log).toContain(
+      `note: Every task is done on ${first}. Open a pull request with: gh pr create --base main --head ${first}`,
+    );
     const shown = await status(cwd);
     expect(shown).toContain(`Branch ${first}, created from main`);
-    expect(shown).toContain("bae: T-002 Do T-002");
-    expect(shown).toContain("bae: T-001 Do T-001");
+    expect(shown).toContain("feat: do T-002 (T-002)");
+    expect(shown).toContain("chore: do T-001 (T-001)");
   });
 
   it("stops outside the run's branch, and --new-run starts another one", async () => {
@@ -104,16 +142,31 @@ describe("next commits each finished task on a bae/ branch", () => {
     expect(branch(cwd)).toMatch(/^bae\//);
   });
 
-  it("does not run the repository's git hooks when it commits", async () => {
+  it("runs the repository's hooks, and a conventional commit-msg check accepts the message", async () => {
     const cwd = await bypassRepo();
-    await writeFile(join(cwd, ".git", "hooks", "pre-commit"), "#!/bin/sh\nexit 1\n");
-    await writeFile(join(cwd, ".git", "hooks", "post-commit"), "#!/bin/sh\ntouch hooked\n");
-    await chmod(join(cwd, ".git", "hooks", "pre-commit"), 0o755);
-    await chmod(join(cwd, ".git", "hooks", "post-commit"), 0o755);
+    await hook(cwd, "commit-msg", COMMIT_MSG);
+    await hook(cwd, "post-commit", "#!/bin/sh\necho ran > hooked\n");
     const run = await next(cwd, ["--yes"], [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS]);
     expect(run.code).toBe(0);
-    expect(subjects(cwd)[0]).toBe("bae: T-001 Do T-001");
-    expect(existsSync(join(cwd, "hooked"))).toBe(false);
+    expect(subjects(cwd)[0]).toBe("chore: do T-001 (T-001)");
+    expect(existsSync(join(cwd, "hooked"))).toBe(true);
+  });
+
+  it("keeps the task done and the commit pending when a hook fails, unless --no-verify", async () => {
+    const failing = "#!/bin/sh\necho lint failed >&2\nexit 1\n";
+    const cwd = await bypassRepo();
+    await hook(cwd, "pre-commit", failing);
+    const run = await next(cwd, ["--yes"], [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS]);
+    expect(run.code).toBe(0);
+    expect(await statusOf(cwd)).toBe("done");
+    expect(run.log).toContain("Could not commit T-001: lint failed.");
+    expect(subjects(cwd)).toEqual(["plan"]);
+    const skipped = await bypassRepo();
+    await hook(skipped, "pre-commit", failing);
+    const work = agent(skipped, { "src/feature.ts": "x\n" });
+    const forced = await next(skipped, ["--yes", "--no-verify"], [work, REVIEW_PASS]);
+    expect(forced.code).toBe(0);
+    expect(subjects(skipped)[0]).toBe("chore: do T-001 (T-001)");
   });
 
   it("keeps the task done and says so when git cannot commit", async () => {
@@ -162,7 +215,7 @@ describe("replan respects the run's branch", () => {
     const done = await replan(cwd);
     expect(done.code).toBe(0);
     expect(branch(cwd)).toBe(run);
-    expect(subjects(cwd)[0]).toBe("bae: replan");
+    expect(subjects(cwd)[0]).toBe("chore(bae): replan");
     expect(sh(cwd, "git show --name-only --format= HEAD")).toContain(
       "docs/plan/tasks/T-003-third.md",
     );

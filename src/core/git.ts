@@ -41,10 +41,15 @@ export async function git(cwd: string, args: string[]): Promise<string | undefin
   return result.exitCode === 0 ? result.stdout : undefined;
 }
 
-export async function gitRun(cwd: string, args: string[], input?: string): Promise<CommandResult> {
+export async function gitRun(
+  cwd: string,
+  args: string[],
+  input?: string,
+  timeoutMs = GIT_TIMEOUT_MS,
+): Promise<CommandResult> {
   return runCommand("git", [...HARDENED, ...args], {
     cwd,
-    timeoutMs: GIT_TIMEOUT_MS,
+    timeoutMs,
     ...(input === undefined ? {} : { input }),
   });
 }
