@@ -265,6 +265,8 @@ export const en = {
   "regression.lateStop": "{{id}} has no regression baseline from before its agent ran.",
   "regression.declinedStop":
     "Without running lint and tests first there is no baseline, so the task could not be done.",
+  "regression.noToolchain":
+    "No toolchain yet: the repository has no code or project manifest, so there is no baseline to record. {{id}} sets it up, and the project's lint and test commands must pass after it.",
   "regression.notFound":
     "`{{command}}` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run next again.",
   "regression.unusable":
@@ -275,6 +277,12 @@ export const en = {
   "skip.title": "Skipped with --allow-skip",
   "skip.stopped":
     "Nothing was launched. Fix the cause, or run next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
+  "env.denied":
+    "{{agent}} was not allowed to run {{commands}}, so another attempt would fail the same way. bae lets the agent run the task's checks and install dependencies; allow the rest in {{agent}}'s own permissions (for Claude Code, a rule such as `Bash({{first}} *)` in .claude/settings.json of a folder you trust), or run next without --headless and approve it yourself.",
+  "env.alsoDenied": "{{agent}} was also not allowed to run {{commands}}.",
+  "env.moreDenied": "and {{count}} more",
+  "env.notFound":
+    "`{{command}}` could not find a program it runs (exit 127): the project's dependencies are not installed, or a tool is missing. Another attempt would fail the same way; install them (for example `npm install`).",
   "next.budgetUsed": "The task already used its {{max}} automatic attempts.",
   "next.refusedBlocked":
     "{{id}} is blocked before launching the agent, because its checks cannot run. Fix the task's Verification or the commands in .bae/config.json, then set the task back to pending.",

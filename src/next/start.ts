@@ -5,6 +5,7 @@ import { bashPath } from "../core/bash.js";
 import { ExitCode } from "../core/errors.js";
 import { gitPaths, headCommit, isGitRepo } from "../core/git.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { detectProjectMode } from "../detect/mode.js";
 import { isTestFile } from "../digest/baseline.js";
 import {
   type Capture,
@@ -21,6 +22,7 @@ import { type Checks, refusal } from "../gates/gate.js";
 import { captureIgnore } from "../gates/ignore-rules.js";
 import {
   baselineFrom,
+  COMMAND_NOT_FOUND,
   runSuite,
   type SuiteBaseline,
   type SuiteResult,
@@ -37,8 +39,6 @@ import { type Task, verificationCommands, verificationScript } from "../tasks/sc
 import { setTaskStatus } from "../tasks/status.js";
 
 export type StartOptions = { allowSkip: boolean; unattended: boolean };
-
-const COMMAND_NOT_FOUND = 127;
 
 export function checksFor(task: Task, config: Config): Checks {
   return {
@@ -138,6 +138,10 @@ async function recordBaseline(
     (item) => !options.unrecognized.includes(item.command),
   );
   if (suite.length === 0) return baselineFrom([], options.unrecognized);
+  if ((await detectProjectMode(ctx.cwd)) === "greenfield") {
+    ctx.prompter.info(t("regression.noToolchain", { id: task.meta.id }));
+    return baselineFrom([], options.unrecognized);
+  }
   ctx.prompter.note(
     suite.map((item) => `$ ${item.command}`).join("\n"),
     t("regression.baselineTitle"),

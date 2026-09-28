@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -34,6 +35,32 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(run.code).toBe(1);
     expect(run.log).toMatch(/src\/secret\/key\.ts: Adds what looks like a credential/);
     expect(run.calls).toHaveLength(1);
+  });
+
+  it("does not review or commit dependencies installed under a node_modules the task ignores", async () => {
+    const cwd = await bypassRepo({ task: { scope: "- `src/feature.ts`\n- `.gitignore`" } });
+    const install = agent(cwd, {
+      "src/feature.ts": "export const f = 1;\n",
+      ".gitignore": "node_modules/\n",
+      "node_modules/left-pad/index.js": KEY(),
+    });
+    const run = await next(cwd, ["--yes"], [install, REVIEW_PASS]);
+    expect(run.code).toBe(0);
+    expect(run.log).not.toContain("node_modules/left-pad/index.js");
+    expect(execSync("git show --name-only --format= HEAD", { cwd }).toString()).not.toContain(
+      "node_modules",
+    );
+  });
+
+  it("still reviews a node_modules folder the repository does not ignore", async () => {
+    const cwd = await bypassRepo();
+    const install = agent(cwd, {
+      "src/feature.ts": "export const f = 1;\n",
+      "node_modules/left-pad/index.js": KEY(),
+    });
+    const run = await next(cwd, ["--yes"], [install, REVIEW_PASS]);
+    expect(run.code).toBe(1);
+    expect(run.log).toMatch(/node_modules\/left-pad\/index\.js: Adds what looks like a credential/);
   });
 
   it("keeps the change when the Scope lists the .gitignore", async () => {

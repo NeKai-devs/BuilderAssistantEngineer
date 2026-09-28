@@ -14,7 +14,7 @@ export type AgentName = "claude" | "opencode" | "codex" | "gemini";
 export type AgentSpec = {
   name: AgentName;
   command: string;
-  headless(access: Access, outputFile: string): string[];
+  headless(access: Access, outputFile: string, allow: string[]): string[];
   interactive(instruction: string): string[];
   readsOutputFile?: boolean;
   jsonOutput?: boolean;
@@ -35,7 +35,7 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
   claude: {
     name: "claude",
     command: "claude",
-    headless: (access) => [
+    headless: (access, _outputFile, allow) => [
       "-p",
       "--output-format",
       "stream-json",
@@ -45,7 +45,13 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       "none",
       ...(access === "read"
         ? ["--tools", "Read,Grep,Glob", "--setting-sources", "user"]
-        : ["--permission-mode", "acceptEdits", "--setting-sources", "user,project"]),
+        : [
+            ...allowFlag("--allowedTools", claudeRules(allow)),
+            "--permission-mode",
+            "acceptEdits",
+            "--setting-sources",
+            "user,project",
+          ]),
     ],
     interactive: (instruction) => [instruction],
     jsonOutput: true,
@@ -85,11 +91,12 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
   gemini: {
     name: "gemini",
     command: "gemini",
-    headless: (access) => [
+    headless: (access, _outputFile, allow) => [
       "--output-format",
       "text",
       "--approval-mode",
       access === "read" ? "plan" : "auto_edit",
+      ...(access === "read" ? [] : allowFlag("--allowed-tools", geminiRules(allow))),
       "--prompt",
       STDIN_INSTRUCTION,
     ],
@@ -121,7 +128,7 @@ async function runHeadless(
     await mkdir(tmp, { recursive: true });
     await rm(outputFile, { force: true });
   }
-  const args = spec.headless(options.access ?? "read", outputFile);
+  const args = spec.headless(options.access ?? "read", outputFile, options.allow ?? []);
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,
     input: prompt,
@@ -148,10 +155,34 @@ function parseClaudeJson(result: CommandResult): Parsed {
   const truncated =
     typeof data.stop_reason === "string" ? data.stop_reason === "max_tokens" : undefined;
   const answer = finalAnswer(events);
+  const denied = deniedTools(data.permission_denials);
   return {
     text: answer || data.result,
-    info: { model: models.join(", ") || undefined, costUsd: cost, truncated },
+    info: {
+      model: models.join(", ") || undefined,
+      costUsd: cost,
+      truncated,
+      ...(denied.length > 0 ? { denied } : {}),
+    },
   };
+}
+
+function deniedTools(value: unknown): string[] {
+  const denials = Array.isArray(value) ? value.map(asRecord) : [];
+  const commands = denials.map((denial) => asRecord(denial.tool_input).command);
+  return [...new Set(commands.filter((command): command is string => typeof command === "string"))];
+}
+
+function claudeRules(commands: string[]): string[] {
+  return commands.flatMap((command) => [`Bash(${command})`, `Bash(${command} *)`]);
+}
+
+function geminiRules(commands: string[]): string[] {
+  return commands.map((command) => `run_shell_command(${command})`);
+}
+
+function allowFlag(flag: string, rules: string[]): string[] {
+  return rules.length > 0 ? [flag, ...rules] : [];
 }
 
 function finalAnswer(events: Record<string, unknown>[]): string {

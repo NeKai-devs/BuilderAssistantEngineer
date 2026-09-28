@@ -273,6 +273,8 @@ export const es: Messages = {
     "{{id}} no tiene línea base de regresión de antes de que corriera su agente.",
   "regression.declinedStop":
     "Sin correr antes lint y tests no hay línea base, así que la tarea no podría completarse.",
+  "regression.noToolchain":
+    "Todavía no hay toolchain: el repositorio no tiene código ni manifiesto de proyecto, así que no hay baseline que registrar. {{id}} la crea, y los comandos de lint y tests del proyecto deben pasar después.",
   "regression.notFound":
     "`{{command}}` no encontró un programa que ejecuta (exit 127), así que no hay baseline. Instala las dependencias del proyecto (por ejemplo `npm install`) y vuelve a correr next.",
   "regression.unusable":
@@ -283,6 +285,12 @@ export const es: Messages = {
   "skip.title": "Omitido con --allow-skip",
   "skip.stopped":
     "No se lanzó nada. Corrige la causa, o vuelve a correr next con --allow-skip para seguir sin ese chequeo; la omisión queda en el log de la ejecución.",
+  "env.denied":
+    "{{agent}} no tuvo permiso para ejecutar {{commands}}, así que otro intento fallaría igual. bae deja al agente correr los chequeos de la tarea e instalar dependencias; permite lo demás en los permisos del propio {{agent}} (en Claude Code, una regla como `Bash({{first}} *)` en .claude/settings.json de una carpeta de confianza), o corre next sin --headless y apruébalo tú.",
+  "env.alsoDenied": "Tampoco se le permitió a {{agent}} ejecutar {{commands}}.",
+  "env.moreDenied": "y {{count}} más",
+  "env.notFound":
+    "`{{command}}` no encontró un programa que ejecuta (exit 127): faltan las dependencias del proyecto o una herramienta. Otro intento fallaría igual; instálalas (por ejemplo `npm install`).",
   "next.budgetUsed": "La tarea ya usó sus {{max}} intentos automáticos.",
   "next.refusedBlocked":
     "{{id}} queda bloqueada antes de lanzar el agente, porque sus chequeos no pueden correr. Corrige la Verificación de la tarea o los comandos de .bae/config.json y vuelve a ponerla en pending.",

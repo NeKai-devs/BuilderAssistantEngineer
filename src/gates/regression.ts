@@ -65,6 +65,7 @@ export type RegressionCheck = {
 };
 
 const OUTPUT_TAIL = 3_000;
+export const COMMAND_NOT_FOUND = 127;
 const BLOCKING = new Set<Verdict>([
   "regression",
   "unfinished",

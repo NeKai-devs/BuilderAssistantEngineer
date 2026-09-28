@@ -29,6 +29,7 @@ import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
 import { announcePullRequest } from "./branch.js";
 import { commitTask } from "./commit.js";
+import { affectsChecks, agentCommands, briefCommands, ruleHint } from "./permissions.js";
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
@@ -75,17 +76,27 @@ export async function headlessLoop(
   let prompt = first;
   let attempt = MAX_ATTEMPTS - left;
   const timeoutMs = capture.config.agent.timeoutMinutes * 60_000;
+  const allow = agentCommands(capture.config, capturedTask(capture));
   while (left > 0) {
     attempt++;
     left--;
     ctx.prompter.info(t("next.attempt", { attempt, max: MAX_ATTEMPTS, backend: backend.name }));
     const startedAt = new Date();
+    const denied: string[] = [];
     const launched = await launch(
       ctx,
       run,
       startedAt,
       true,
-      () => backend.run(prompt, { cwd: ctx.cwd, access: "edit", stream: ctx.print, timeoutMs }),
+      () =>
+        backend.run(prompt, {
+          cwd: ctx.cwd,
+          access: "edit",
+          stream: ctx.print,
+          timeoutMs,
+          allow,
+          onInfo: (info) => denied.push(...(info.denied ?? [])),
+        }),
       left === 0,
     );
     if (!launched.ok) {
@@ -93,11 +104,15 @@ export async function headlessLoop(
     }
     const result = await gate(ctx, run);
     await writeRunLog(ctx.cwd, capture.id, `# Attempt ${attempt}\n\n${result.report}`);
+    const cause = result.passed ? undefined : environmentCause(backend.name, denied, result);
     const blocked =
-      !result.passed && (result.stage === "refused" || (result.retryable && left === 0));
+      !result.passed &&
+      (cause !== undefined || result.stage === "refused" || (result.retryable && left === 0));
     const outcome = result.passed ? "done" : blocked ? "blocked" : "failed";
-    await record(ctx, run, startedAt, true, { outcome, gate: result });
+    const recorded = cause ? { ...result, reason: cause } : result;
+    await record(ctx, run, startedAt, true, { outcome, gate: recorded });
     if (result.passed) return complete(ctx, run);
+    if (cause) return block(ctx, capture, cause, false);
     if (blocked) return block(ctx, capture, result.reason ?? "");
     if (!result.retryable) return notDone(ctx, capture);
     await learnFromReviews(ctx, capture, result);
@@ -107,9 +122,17 @@ export async function headlessLoop(
       attempt: String(attempt),
       task_path: capture.path,
       max_log_lines: String(MAX_LOG_LINES),
+      permissions: permissionNote(capture),
     });
   }
   return false;
+}
+
+export function permissionNote(capture: Capture): string {
+  const commands = briefCommands(agentCommands(capture.config, capturedTask(capture)));
+  if (commands.length === 0) return "";
+  const list = commands.map((command) => `\`${command}\``).join(", ");
+  return `\n\nThis run is unattended, so nobody can approve a command. You may run these commands, with any arguments: ${list}. Any other command will be denied. One denied command does not mean the others are: if one is refused, keep going with the ones above, for example install dependencies even if a version check was refused.`;
 }
 
 async function launch(
@@ -180,9 +203,14 @@ async function record(
   });
 }
 
-async function block(ctx: CommandContext, capture: Capture, reason: string): Promise<boolean> {
+async function block(
+  ctx: CommandContext,
+  capture: Capture,
+  reason: string,
+  learn = true,
+): Promise<boolean> {
   await setTaskStatus(ctx.cwd, capturedTask(capture), "blocked");
-  await learnFromFailure(ctx, capture, "blocked");
+  if (learn) await learnFromFailure(ctx, capture, "blocked");
   const path = displayPath(runDir(ctx.cwd, capture.id));
   const task = capture.path;
   ctx.prompter.outro(
@@ -220,4 +248,32 @@ async function complete(ctx: CommandContext, run: GateRun): Promise<boolean> {
 async function everyTaskDone(cwd: string): Promise<boolean> {
   const tasks = await loadTaskFiles(cwd);
   return tasks.length > 0 && tasks.every((item) => item.task?.meta.status === "done");
+}
+
+const CHECK_STAGES = new Set(["regression", "verification"]);
+
+const SHOWN_DENIALS = 3;
+const DENIAL_CHARS = 80;
+
+function environmentCause(agent: string, denied: string[], result: Gate): string | undefined {
+  const needed = denied.filter(affectsChecks);
+  const commands = listDenials(needed);
+  if (result.environment) {
+    return needed.length > 0
+      ? `${result.environment} ${t("env.alsoDenied", { agent, commands })}`
+      : result.environment;
+  }
+  if (needed.length === 0 || !CHECK_STAGES.has(result.stage ?? "")) return undefined;
+  return t("env.denied", { agent, commands, first: ruleHint(needed[0] ?? "") });
+}
+
+function listDenials(denied: string[]): string {
+  const shown = denied.slice(0, SHOWN_DENIALS).map((command) => {
+    const line = command.replace(/\s+/g, " ").trim();
+    return `\`${line.length > DENIAL_CHARS ? `${line.slice(0, DENIAL_CHARS - 1)}…` : line}\``;
+  });
+  const more = denied.length - shown.length;
+  return more > 0
+    ? `${shown.join(", ")} ${t("env.moreDenied", { count: more })}`
+    : shown.join(", ");
 }
