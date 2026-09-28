@@ -24,8 +24,11 @@ import {
 } from "../tasks/attempts.js";
 import { MAX_LOG_LINES } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
+import { loadTaskFiles } from "../tasks/load.js";
 import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
+import { announcePullRequest } from "./branch.js";
+import { commitTask } from "./commit.js";
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
@@ -50,7 +53,7 @@ export async function attemptOnce(
   await writeRunLog(ctx.cwd, capture.id, result.report);
   const outcome = result.passed ? "done" : result.stage === "refused" ? "blocked" : "failed";
   await record(ctx, run, startedAt, false, { outcome, gate: result });
-  if (result.passed) return complete(ctx, capture);
+  if (result.passed) return complete(ctx, run);
   if (outcome === "blocked") return block(ctx, capture, result.reason ?? "");
   await learnFromReviews(ctx, capture, result);
   return notDone(ctx, capture);
@@ -94,7 +97,7 @@ export async function headlessLoop(
       !result.passed && (result.stage === "refused" || (result.retryable && left === 0));
     const outcome = result.passed ? "done" : blocked ? "blocked" : "failed";
     await record(ctx, run, startedAt, true, { outcome, gate: result });
-    if (result.passed) return complete(ctx, capture);
+    if (result.passed) return complete(ctx, run);
     if (blocked) return block(ctx, capture, result.reason ?? "");
     if (!result.retryable) return notDone(ctx, capture);
     await learnFromReviews(ctx, capture, result);
@@ -200,9 +203,18 @@ async function learnFromReviews(ctx: CommandContext, capture: Capture, result: G
   }
 }
 
-async function complete(ctx: CommandContext, capture: Capture): Promise<boolean> {
-  await setTaskStatus(ctx.cwd, capturedTask(capture), "done");
+async function complete(ctx: CommandContext, run: GateRun): Promise<boolean> {
+  const { capture } = run;
+  const task = capturedTask(capture);
+  await setTaskStatus(ctx.cwd, task, "done");
   await saveCapture(ctx.cwd, { ...capture, finished: true });
+  if (!ctx.flags.dryRun) await commitTask(ctx, capture, task.meta, { verify: run.verify });
+  if (await everyTaskDone(ctx.cwd)) await announcePullRequest(ctx);
   ctx.prompter.outro(t("next.done", { id: capture.id, command: `${CLI} next` }));
   return true;
+}
+
+async function everyTaskDone(cwd: string): Promise<boolean> {
+  const tasks = await loadTaskFiles(cwd);
+  return tasks.length > 0 && tasks.every((item) => item.task?.meta.status === "done");
 }

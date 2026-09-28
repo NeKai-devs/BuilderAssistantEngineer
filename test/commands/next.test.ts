@@ -92,7 +92,7 @@ describe("next", () => {
       cwd,
       [],
       [writesFile(cwd, "feature.txt"), REVIEW_PASS],
-      [true],
+      [true, true],
     );
     expect(code).toBe(0);
     expect(calls[0]?.options).toMatchObject({ interactive: true });
@@ -391,7 +391,7 @@ describe("next regression gate", () => {
 
   it("stops when the user declines the baseline, unless --allow-skip turns the check off", async () => {
     const cwd = await repo(PASS, { commands: { test: TESTS_FAIL } });
-    const stopped = await runNext(cwd, [], [], [false]);
+    const stopped = await runNext(cwd, [], [], [true, false]);
     expect(stopped.code).toBe(1);
     expect(stopped.calls).toHaveLength(0);
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("pending");
@@ -419,7 +419,12 @@ describe("next regression gate", () => {
 
   it("warns about dangerous commands and lets a person confirm them in an interactive run", async () => {
     const cwd = await repo(`rm -rf build && ${PASS}`);
-    const { code, ui } = await runNext(cwd, [], [writesFile(cwd, "a.txt"), REVIEW_PASS], [true]);
+    const { code, ui } = await runNext(
+      cwd,
+      [],
+      [writesFile(cwd, "a.txt"), REVIEW_PASS],
+      [true, true],
+    );
     expect(code).toBe(0);
     expect(ui.log).toContain(
       `warn: \`rm -rf build && ${PASS}\` looks dangerous (rm -rf); read it before you confirm.`,
@@ -559,7 +564,7 @@ describe("next lessons", () => {
 
   it("asks for a lesson once, after the second failed review, and respects a refusal", async () => {
     const cwd = await repo(PASS);
-    const first = await runNext(cwd, [], [writesFile(cwd, "a.txt"), REVIEW_FAIL], [true]);
+    const first = await runNext(cwd, [], [writesFile(cwd, "a.txt"), REVIEW_FAIL], [true, true]);
     expect(first.calls).toHaveLength(2);
     const second = await runNext(
       cwd,

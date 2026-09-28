@@ -84,3 +84,7 @@ To report a new case, including correct work that the gates stopped, use the [Re
 - Committed build output competes with source files for the reviewer's diff budget. (low)
 - Evidence checks cited paths between backticks, not paths in prose. It does not check `file.ts:L10`, `file.ts:10,20` or Windows paths. (low)
 - A bare Scope glob such as `*.ts` matches files at the repository root only. (low)
+
+## Task commits
+
+- The commit keeps an acronym at the start of a task title as written, and commitlint's conventional config rejects a subject that starts with an uppercase letter. The analyst starts titles with a verb; when a title still starts with an acronym, a commitlint hook rejects the commit, the task stays done and the commit stays pending with a warning. (low)

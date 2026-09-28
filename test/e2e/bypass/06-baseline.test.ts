@@ -17,7 +17,7 @@ import {
 describe("bypass 06: the baseline cannot be declined, taken late or partial", () => {
   it("stops when the baseline is declined, and records the skip when --allow-skip overrides it", async () => {
     const cwd = await bypassRepo({ config: { commands: { test: vitest() } } });
-    const declined = await next(cwd, [], [], [false]);
+    const declined = await next(cwd, [], [], [true, false]);
     expect(declined.code).toBe(1);
     expect(declined.calls).toHaveLength(0);
     expect(await statusOf(cwd)).toBe("pending");

@@ -39,6 +39,7 @@ export type GateRun = {
   acceptance: Acceptance;
   allowSkip: boolean;
   unattended: boolean;
+  verify: boolean;
   tampered: string[];
 };
 export type Gate = {

@@ -356,6 +356,29 @@ export const en = {
     "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
   "integrity.planned":
     "The task's Scope marks test files it removes, so the reviewer judges it instead.",
+  "run.started":
+    "Working on branch {{branch}}, created from {{from}}; each finished task is committed there.",
+  "run.elsewhere":
+    "This run's tasks are committed on {{branch}}, and you are on {{current}}. Switch back with `git switch {{branch}}`, or pass --new-run to start another run from here (for example after merging it).",
+  "run.replanElsewhere":
+    "This run's tasks are committed on {{branch}}, and you are on {{current}}. Switch back with `git switch {{branch}}` before replanning, so the new plan lands next to them.",
+  "run.confirm": "Create the branch {{branch}} from {{from}} and commit each finished task there?",
+  "run.declined":
+    "Staying on {{current}}. Finished tasks are not committed; the next run of next asks again, and --yes creates the branch without asking.",
+  "run.finished": "Every task is done on {{branch}}. Open a pull request with:",
+  "run.switchFailed": "Could not create the branch {{branch}}: {{details}}",
+  "run.stopped": "Nothing was changed.",
+  "commit.done": "Committed {{id}} as {{sha}} on {{branch}}.",
+  "commit.failed":
+    "Could not commit {{id}}: {{details}}. The task is done; commit its changes yourself.",
+  "commit.replan": "Committed the new plan as {{sha}} on {{branch}}.",
+  "status.run": "Branch {{branch}}, created from {{from}}",
+  "status.runElsewhere": "This run's tasks are committed on {{branch}}; you are on {{current}}.",
+  "status.noCommits": "no commits yet",
+  "option.noVerify":
+    "commit without the repository's pre-commit and commit-msg hooks, like git commit --no-verify",
+  "option.newRun":
+    "start a new bae/ branch from the current branch instead of continuing the recorded run",
 } as const;
 
 export type MessageKey = keyof typeof en;

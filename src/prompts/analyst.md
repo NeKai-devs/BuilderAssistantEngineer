@@ -36,7 +36,7 @@ Work through these steps before writing:
 4. Plan: phases, then tasks. Order by risk reduction and value; spikes for unknowns come first. Each phase has a demo criterion.
 5. Agents: 3-6 subagents specialized for this project (e.g. backend, frontend, data, tests, reviewer, docs). Each has one responsibility, explicit read/write scope, allowed tools, the project rules it enforces and a definition of done. A reviewer agent that checks acceptance criteria and conventions always exists.
 6. Memory: AGENTS.md must let an agent with zero context work here: purpose, stack, how to run, test, lint and build, architecture map, conventions, do and don't rules, where the plan lives, how to pick the next task.
-7. Self-check, then fix silently: every brownfield claim cited; assumptions listed; no task larger than one session; every task has verifiable acceptance criteria and verification commands; every absent baseline item covered by T-001; dependency graph acyclic; phase 1 demoable; non-scope items absent; language and output contract respected.
+7. Self-check, then fix silently: every brownfield claim cited; assumptions listed; no task larger than one session; every task has verifiable acceptance criteria and verification commands; every criterion reachable within the task's Scope and checked by its Verification, with external dependencies under Risks and notes; every absent baseline item covered by T-001; dependency graph acyclic; phase 1 demoable; non-scope items absent; language and output contract respected.
 
 ### Output contract (strict)
 Emit only these blocks, nothing outside them. Paths are relative to the repo root.
@@ -69,13 +69,14 @@ The project's commands, run from the repo root: the ones the repo has today, or 
 ### Task file format
 ---
 id: T-003
-title: imperative and specific
+title: imperative and specific, starting with a verb (Add, Expose, Fix), never with an acronym or a file name
 status: pending
 phase: 1
 depends_on: [T-001]
 size: S | M | L
 risk: low | medium | high
 tests: required | optional | fix
+type: feat | fix | refactor | test | docs | chore
 ---
 ## Goal
 What exists when this is done and why it matters.
@@ -86,13 +87,16 @@ In: the files expected to change, one backticked path per line, with files to cr
 ## Steps
 Suggested sequence, not a straitjacket.
 ## Acceptance criteria
-Checklist; every item objectively verifiable from the repository or the Verification block, never from output the agent must paste into the Log, since agents may not be allowed to run commands.
+Checklist; every item objectively verifiable from the repository or the Verification block, never from output the agent must paste into the Log, since agents may not be allowed to run commands. Each item must be reachable by changing only the files In Scope, and checked by a line of this task's Verification or by reading those files. What the task cannot do or check from the repository (a deploy, a live third-party service, accounts or credentials, a person's decision, another task's work) is not a criterion: put it under Risks and notes.
 ## Verification
 A fenced ```sh block that the CLI runs from the repo root as one bash script with `set -Eeuo pipefail`: it passes only when every line exits 0. A long command may continue on the next line with \, and `cd` carries over to later lines. Each block runs the project's test runner, linter or build, or a check with an expected result (`test -f`, `grep -q`, `curl -f`, `git diff --exit-code`); `echo`, `ls` or `cat` alone check nothing, and failures are never hidden with `|| true` or `set +e`. Prefer the tests for this task over the whole suite, since the CLI runs the project's lint, typecheck, build and test commands anyway. Unattended runs only execute known runners and checks (package managers, language toolchains, test runners, linters, make, read-only git, test, grep, diff, curl, jq), so run project scripts with `sh script.sh` or `node script.js`, not by path, and avoid `$( )`, `eval` and background jobs. Never use sudo, destructive commands or piped installers. Expected results in prose below the block.
 ## Risks and notes
+What could go wrong, and what the task depends on outside the repository or its Scope.
 ## Log
 
 End every task with an empty `## Log` heading: the agent that executes the task writes its handoff note there, and the CLI requires it before marking the task done.
+
+`type` is the conventional-commit type of the commit the CLI makes when the task is done: `feat` for new behavior, `fix` for a bug fix, `refactor` for a change that keeps behavior, `test` for tests only, `docs` for documentation only, `chore` for tooling, configuration and anything else.
 
 `tests: required` when the task adds or changes behavior: the CLI fails the task unless it runs more tests than before or adds assertions to a test file. `tests: optional` for docs, configuration or refactors already covered by existing tests. `tests: fix` when the goal of the task is to repair tests that already fail: the CLI accepts it only when the project's test command ends green.
 

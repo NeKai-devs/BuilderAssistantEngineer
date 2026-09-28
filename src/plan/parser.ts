@@ -74,7 +74,8 @@ export const PLAN_FORMAT = [
   "Allowed FILE paths: AGENTS.md, CLAUDE.md, GEMINI.md, docs/plan/**/*.md, docs/plan/tasks/T-NNN-slug.md,",
   ".claude/agents/*.md, .claude/commands/*.md, .opencode/agent/*.md, .opencode/command/*.md.",
   "Task files start with YAML frontmatter (id, title, status, phase, depends_on, size S|M|L,",
-  "risk low|medium|high, tests required|optional) and contain the sections Goal, Context, Scope, Steps, Acceptance criteria,",
+  "risk low|medium|high, tests required|optional|fix, type feat|fix|refactor|test|docs|chore) and contain the sections",
+  "Goal, Context, Scope, Steps, Acceptance criteria,",
   "Verification (commands in a ```sh block, one per line), Risks and notes, and an empty Log.",
   "Subagent files start with YAML frontmatter that includes a description.",
 ].join("\n");

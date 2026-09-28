@@ -6,6 +6,7 @@ import type { Checks, GateRun } from "../gates/gate.js";
 import { suiteCommands } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
 import { attemptOnce, headlessLoop } from "../next/attempts.js";
+import { useRunBranch } from "../next/branch.js";
 import { checksFor, recoverInterrupted, start, withSuiteCommands } from "../next/start.js";
 import { capturedTask } from "../review/run.js";
 import { MAX_ATTEMPTS, readAttempts, sinceBlocked } from "../tasks/attempts.js";
@@ -16,7 +17,13 @@ import { pickNext, waitingOn } from "../tasks/select.js";
 import type { CommandContext } from "./context.js";
 import { CLI, isAgentBackend, loadValidTasks, requireConfig } from "./shared.js";
 
-export type NextOptions = { headless?: boolean; acceptFinding?: string[]; allowSkip?: boolean };
+export type NextOptions = {
+  headless?: boolean;
+  acceptFinding?: string[];
+  allowSkip?: boolean;
+  newRun?: boolean;
+  verify?: boolean;
+};
 
 export async function runNext(ctx: CommandContext, options: NextOptions): Promise<void> {
   const acceptance = newAcceptance(options.acceptFinding);
@@ -39,6 +46,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     ctx.prompter.outro(t("next.dryRunDone"));
     return;
   }
+  await useRunBranch(ctx, Boolean(options.newRun));
   const allowSkip = Boolean(options.allowSkip);
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   const unattended = headless || Boolean(ctx.flags.yes);
@@ -51,6 +59,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     acceptance,
     allowSkip,
     unattended,
+    verify: options.verify !== false,
     tampered: [],
   };
   const prompt = await taskPrompt(ctx, capture, tasks);

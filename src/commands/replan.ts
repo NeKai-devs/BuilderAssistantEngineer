@@ -1,6 +1,8 @@
-import { planChanges } from "../artifacts/merge.js";
+import { type Change, planChanges } from "../artifacts/merge.js";
 import type { Config } from "../config/schema.js";
 import { t } from "../i18n/index.js";
+import { type Run, requireRunBranch } from "../next/branch.js";
+import { type CommitOptions, commitPaths } from "../next/commit.js";
 import { selectFiles } from "../plan/filter.js";
 import { buildPriorPlan } from "../plan/prior.js";
 import { generatePlan } from "../plan/run.js";
@@ -10,14 +12,24 @@ import { obsoleteTasks, reportPlan, writePlanFiles } from "./plan.js";
 import { CLI, requireConfig, saveCommands } from "./shared.js";
 
 const CHANGELOG = "docs/plan/CHANGELOG.md";
+const CONFIG_PATH = ".bae/config.json";
+const REPLAN_MESSAGE = ["chore(bae): replan"];
 
-export async function runReplan(ctx: CommandContext): Promise<void> {
+export type ReplanOptions = { verify?: boolean };
+
+export async function runReplan(ctx: CommandContext, options: ReplanOptions = {}): Promise<void> {
   const config = await requireConfig(ctx);
-  while (await replanOnce(ctx, config)) {}
+  const commit: CommitOptions = { verify: options.verify !== false };
+  while (await replanOnce(ctx, config, commit)) {}
 }
 
-async function replanOnce(ctx: CommandContext, config: Config): Promise<boolean> {
+async function replanOnce(
+  ctx: CommandContext,
+  config: Config,
+  commit: CommitOptions,
+): Promise<boolean> {
   ctx.prompter.intro(t("replan.intro"));
+  const run = await requireRunBranch(ctx);
   const tasks = await loadTaskFiles(ctx.cwd);
   if (tasks.length === 0) {
     ctx.prompter.outro(t("replan.noPlan", { command: `${CLI} plan` }));
@@ -38,5 +50,18 @@ async function replanOnce(ctx: CommandContext, config: Config): Promise<boolean>
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsoleteTasks(tasks, parsed)];
   const written = await writePlanFiles(ctx, changes);
   await saveCommands(ctx, parsed.commands);
+  if (run && written.length > 0) await commitPlan(ctx, run, written, commit);
   return reportPlan(ctx, parsed, written);
+}
+
+async function commitPlan(
+  ctx: CommandContext,
+  run: Run,
+  written: Change[],
+  options: CommitOptions,
+): Promise<void> {
+  const paths = [...written.map((change) => change.path), CONFIG_PATH];
+  const result = await commitPaths(ctx.cwd, paths, REPLAN_MESSAGE, options);
+  if (result.ok) ctx.prompter.info(t("commit.replan", { sha: result.sha, branch: run.branch }));
+  else ctx.prompter.warn(t("commit.failed", { id: "replan", details: result.details }));
 }

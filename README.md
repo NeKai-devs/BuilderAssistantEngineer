@@ -55,6 +55,7 @@ depends_on: [T-001, T-002]
 size: M
 risk: low
 tests: required
+type: feat
 ---
 ## Goal
 ## Context
@@ -77,6 +78,9 @@ The task's state lives in its frontmatter (`pending`, `in_progress`, `done`, `bl
 
 ```text
 $ npx builder-assistant-engineer status
+
+Branch bae/2026-09-28-1015, created from main
+  4f2c9a1 chore: create a reproducible quality gate (T-001)
 
 Phase 0  ████████████████████ 1/1
   ✔ T-001  M  medium  Create a reproducible quality gate  1 attempt(s), 14m
@@ -105,9 +109,9 @@ Local metrics
 | --- | --- |
 | `init` | Detects greenfield or brownfield, lets you choose the backend, target agents (multi-select) and language, runs the interview and saves `.bae/config.json` and `.bae/interview.md`. `--brief <files>` loads a written brief. |
 | `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. |
-| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
-| `status` | Phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
-| `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. |
+| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes, then commits it on the run's `bae/` branch. `--new-run` starts a new branch from the current one. `--no-verify` commits without the pre-commit and commit-msg hooks. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
+| `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
+| `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. During a run it must be on the run's branch, and commits the new plan there as `chore(bae): replan` (`--no-verify` skips the hooks). |
 | `review [task]` | Runs the mechanical checks and then the generated reviewer, read-only, on a task's diff against its acceptance criteria and `AGENTS.md`. Exits with 1 when the review fails. Defaults to the task in progress. Takes `--accept-finding <id>` too. |
 
 Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly what would be sent to the AI and changes nothing) and `-y, --yes` (accepts every confirmation).
@@ -139,11 +143,12 @@ Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly wh
 
 1. Picks the task in progress that still has attempts left, then the first pending task whose `depends_on` are all done, ordered by phase and id. A task in progress that used its attempts goes after the ready ones.
 2. Checks that the task can be verified at all. If its Verification is missing, trivial or refused, the task is marked `blocked` with the reason, and no agent is launched.
-3. When the regression gate is `full`, runs the project's lint, typecheck, build and test commands to record a baseline. Then it marks the task `in_progress` and takes the capture: the current commit, the files that were already uncommitted, the ignore rules, the config, the task, the prompts, the reviewer and every file that defines the checks.
-4. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted, and stops after `agent.timeoutMinutes`.
-5. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run (see `verify.allow`).
-6. If every gate passes, the task is marked `done`. Otherwise it stays `in_progress` and you see why.
-7. With `--headless`, a failed attempt is retried with the task plus the failure output. A task gets three attempts in total, counted across runs of `next`, including attempts that ended because the agent failed or timed out. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
+3. Works on the run's branch. The first `next` asks before it creates `bae/<date>-<time>` from the branch you are on and switches to it, and shows the name (`--yes` creates it without asking); later runs continue there. If you say no, you stay on your branch and finished tasks are not committed. If you are on another branch than the run's, `next` stops and says so; `--new-run` starts a new branch from where you are, for example after merging the previous one.
+4. When the regression gate is `full`, runs the project's lint, typecheck, build and test commands to record a baseline. Then it marks the task `in_progress` and takes the capture: the current commit, the files that were already uncommitted, the ignore rules, the config, the task, the prompts, the reviewer and every file that defines the checks.
+5. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted, and stops after `agent.timeoutMinutes`.
+6. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run (see `verify.allow`).
+7. If a gate fails, the task stays `in_progress` and you see why. If every gate passes, the task is marked `done` and committed as a [conventional commit](https://www.conventionalcommits.org): `<type>: <title> (T-NNN)` with a `Bae-Task: T-NNN` trailer, where `type` comes from the task's frontmatter (`feat`, `fix`, `refactor`, `test`, `docs` or `chore`, the default). The title's first letter is lowercased when the next one is lowercase, so `Add the login page` becomes `add the login page` while acronyms such as `API` stay as written, and the header stays within 100 characters. The analyst starts every title with a verb, so commitlint's conventional config accepts the message; a title that starts with an acronym fails its `subject-case` rule (see [docs/limits.md](docs/limits.md#task-commits)). The commit holds the task file and the files the task changed, not the files that were already uncommitted before it. Your git hooks run as usual; `--no-verify` skips the pre-commit and commit-msg hooks. If a hook fails or git cannot commit, the task stays done, the commit stays pending and you see why. After the last task of the plan, `next` prints the command to open the pull request, `gh pr create --base <your branch> --head bae/<run>`, without running it.
+8. With `--headless`, a failed attempt is retried with the task plus the failure output. A task gets three attempts in total, counted across runs of `next`, including attempts that ended because the agent failed or timed out. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
 
 When something a gate needs cannot be had (no git repository, a declined or unusable baseline, a task that was already in progress without a capture, a reviewer with no verdict), `next` stops and says why instead of skipping it. `--allow-skip` goes on without that check and records the skip in the run log and the attempt.
 
@@ -227,7 +232,7 @@ The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>`, `<<<
 ## Files and safety
 
 - `.bae/config.json` holds configuration only; `.bae/interview.md` holds your answers and the analyst's questions, and can be edited by hand. `.bae/tmp/` holds scratch files and is added to `.gitignore`.
-- What the gates trust lives outside the repository, in `~/.bae/<repo-key>/runs/T-NNN/` (`BAE_HOME` moves `~/.bae`): each task's capture with its base commit, baseline and protected files, the run logs, the attempt records (`attempts.jsonl`, the source of the `status` metrics) and the lesson.
+- What the gates trust lives outside the repository, in `~/.bae/<repo-key>/runs/T-NNN/` (`BAE_HOME` moves `~/.bae`): each task's capture with its base commit, baseline and protected files, the run logs, the attempt records (`attempts.jsonl`, the source of the `status` metrics) and the lesson. `run.json` there records the run's branch and the commit it started from.
 - The digest respects `.gitignore` and `.baeignore`, skips binaries, lockfiles and `node_modules`, never reads `.env` files or keys, redacts tokens and secrets it finds, and stays within a character budget (100,000 by default, `digest.maxChars` in the config) with priority manifests > entry points > docs > the rest.
 - Existing files are merged, not overwritten. Generated memory goes between `<!-- bae:begin -->` and `<!-- bae:end -->` in `AGENTS.md`, `CLAUDE.md` and `GEMINI.md`; your text outside the markers is kept. Plan files are shown as a diff before writing, and done tasks are never touched.
 - Nothing is sent anywhere except to the backend you choose. There is no telemetry.
