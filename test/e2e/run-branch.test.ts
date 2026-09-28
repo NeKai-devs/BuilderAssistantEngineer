@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -112,7 +113,7 @@ describe("next commits each finished task on a bae/ branch", () => {
     const run = await next(cwd, ["--yes"], [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS]);
     expect(run.code).toBe(0);
     expect(subjects(cwd)[0]).toBe("bae: T-001 Do T-001");
-    expect(sh(cwd, "ls")).not.toContain("hooked");
+    expect(existsSync(join(cwd, "hooked"))).toBe(false);
   });
 
   it("keeps the task done and says so when git cannot commit", async () => {
