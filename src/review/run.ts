@@ -1,98 +1,168 @@
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { LANGUAGE_NAMES } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import type { CommandContext } from "../commands/context.js";
-import type { Config } from "../config/schema.js";
 import { readTextIfExists } from "../core/fs.js";
-import { BAE_DIR } from "../core/paths.js";
-import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
+import { renderPrompt } from "../core/prompt-loader.js";
 import { truncateText } from "../digest/format.js";
+import { type Capture, capturedPrompt } from "../gates/capture.js";
+import { withoutLog } from "../gates/contract.js";
+import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
-import { readBase } from "../tasks/runs.js";
-import type { Task } from "../tasks/schema.js";
-import { taskDiff } from "./diff.js";
+import { logLines } from "../tasks/handoff.js";
+import { parseTask, type Task } from "../tasks/schema.js";
+import { type AddedText, committedText, taskChanges } from "./changes.js";
+import { reviewDiff } from "./diff.js";
+import { type MechanicalFacts, mechanicalReview } from "./mechanical.js";
 import { parseReview, REVIEW_FORMAT, type ReviewFinding } from "./parse.js";
+import { scopePaths } from "./scope.js";
 
 export type ReviewResult = {
   status: "pass" | "fail" | "skipped";
   findings: ReviewFinding[];
   reason?: string;
+  stage?: "mechanical" | "reviewer";
 };
 
-const AGENT_DIRS = [".claude/agents", ".opencode/agent"];
 const MAX_AGENTS_MD = 20_000;
-const DEFAULT_REVIEWER =
-  "A strict senior code reviewer. Checks that the changes meet every acceptance criterion, follow the project conventions, include tests, stay within the task scope and introduce no security issues.";
+const REASONS = {
+  noGit: "review.noGit",
+  noBase: "review.noBase",
+  gitError: "review.gitError",
+} as const;
+
+export function capturedTask(capture: Capture): Task {
+  return parseTask(capture.path, capture.task);
+}
 
 export async function reviewTask(
   ctx: CommandContext,
-  config: Config,
-  task: Task,
+  capture: Capture,
+  notes: ReviewFinding[] = [],
+  acceptance: Acceptance = newAcceptance(),
+  facts: MechanicalFacts = { testsGrew: false },
+  evidence = "",
 ): Promise<ReviewResult> {
-  const base = await readBase(ctx.cwd, task.meta.id);
-  const diff = await taskDiff(ctx.cwd, base, [BAE_DIR, task.path]);
-  if (diff === undefined) return { status: "skipped", findings: [], reason: t("review.noGit") };
-  if (diff.trim() === "") {
-    return { status: "fail", findings: [{ severity: "blocker", message: t("review.emptyDiff") }] };
+  const task = capturedTask(capture);
+  const view = await taskChanges(ctx.cwd, capture);
+  if (!view.ok) {
+    const reason = t(REASONS[view.reason]);
+    return view.reason === "noGit"
+      ? { status: "skipped", findings: [], reason }
+      : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
   }
-  const prompt = renderPrompt(await loadPrompt("review", ctx.cwd), {
-    reviewer: await findReviewer(ctx.cwd, config.backend),
-    agents_md: truncateText(
-      (await readTextIfExists(join(ctx.cwd, "AGENTS.md"))) ?? "(none)",
-      MAX_AGENTS_MD,
-    ),
-    task: task.text,
-    diff,
-    output_language: LANGUAGE_NAMES[config.lang],
+  const log = await currentLog(ctx.cwd, capture);
+  const scanned = {
+    ...view.changes,
+    added: [...view.changes.added, ...view.late, ...(log ? [log] : [])],
+  };
+  const history = await committedText(ctx.cwd, view.ref);
+  if (!history) {
+    const reason = t("review.gitError");
+    return { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
+  }
+  const mechanical = mechanicalReview(task, scanned, acceptance, { ...facts, history });
+  if (mechanical.passed && view.changes.files.length === 0) {
+    return { status: "pass", findings: mechanical.findings, reason: t("review.noChanges") };
+  }
+  if (!mechanical.passed) {
+    return {
+      status: "fail",
+      findings: mechanical.findings,
+      reason: t("mechanical.failed"),
+      stage: "mechanical",
+    };
+  }
+  const diff = await reviewDiff(
+    ctx.cwd,
+    view.ref,
+    view.changes,
+    scopePaths(task),
+    view.late.map((item) => item.path),
+  );
+  if (!diff) {
+    const reason = t("review.gitError");
+    return { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
+  }
+  const prompt = renderPrompt(capturedPrompt(capture, "review"), {
+    reviewer: capture.reviewer,
+    agents_md: truncateText(capture.agentsMd ?? "(none)", MAX_AGENTS_MD),
+    task: withoutLog(capture.task),
+    diff: diff.text,
+    checks: formatFindings([...mechanical.findings, ...notes]) || "(none)",
+    evidence: evidence || t("review.noEvidence"),
+    output_language: LANGUAGE_NAMES[capture.config.lang],
   });
   if (ctx.flags.dryRun) {
     ctx.print(`${prompt}\n`);
     return { status: "skipped", findings: [], reason: t("review.dryRun") };
   }
-  const backend = ctx.createBackend(config.backend);
+  const backend = ctx.createBackend(capture.config.backend);
   const reply = await ctx.prompter.spinner(t("review.running", { id: task.meta.id }), () =>
     runWithFormatRetry({
       backend,
       prompt,
-      options: { cwd: ctx.cwd, access: "read" },
+      options: {
+        cwd: ctx.cwd,
+        access: "read",
+        timeoutMs: capture.config.agent.timeoutMinutes * 60_000,
+      },
       parse: parseReview,
       format: REVIEW_FORMAT,
+      fixPrompt: capturedPrompt(capture, "fix-format"),
       onRetry: () => ctx.prompter.warn(t("format.retrying")),
     }),
   );
   const blocked = reply.findings.some((finding) => finding.severity === "blocker");
+  const unjustified = mechanical.findings.filter(
+    (finding) =>
+      finding.justify && !reply.findings.some((answer) => sameFile(answer.file, finding.file)),
+  );
+  const missing: ReviewFinding[] =
+    reply.verdict === "pass" && unjustified.length > 0
+      ? [
+          {
+            severity: "blocker",
+            message: t("review.unjustified", {
+              files: [...new Set(unjustified.map((finding) => finding.file ?? ""))].join(", "),
+            }),
+          },
+        ]
+      : [];
   return {
-    status: reply.verdict === "pass" && !blocked ? "pass" : "fail",
-    findings: reply.findings,
+    status: reply.verdict === "pass" && !blocked && missing.length === 0 ? "pass" : "fail",
+    findings: [...mechanical.findings, ...reply.findings, ...missing],
+    stage: "reviewer",
+    ...(missing[0] ? { reason: missing[0].message } : {}),
   };
 }
 
-export async function findReviewer(cwd: string, backend: Config["backend"]): Promise<string> {
-  const dirs = backend === "opencode" ? [...AGENT_DIRS].reverse() : AGENT_DIRS;
-  for (const dir of dirs) {
-    const path = join(cwd, ...dir.split("/"));
-    const name = (await listNames(path)).find(
-      (entry) => /review/i.test(entry) && entry.endsWith(".md"),
-    );
-    if (name) return (await readTextIfExists(join(path, name))) ?? DEFAULT_REVIEWER;
+function sameFile(answer: string | undefined, file: string | undefined): boolean {
+  if (!answer || !file) return false;
+  const clean = (path: string) =>
+    path
+      .replace(/\\/g, "/")
+      .replace(/^\.\//, "")
+      .replace(/:\d+.*$/, "");
+  return clean(answer) === clean(file);
+}
+
+async function currentLog(cwd: string, capture: Capture): Promise<AddedText | undefined> {
+  const text = await readTextIfExists(join(cwd, ...capture.path.split("/")));
+  if (text === undefined) return undefined;
+  try {
+    const lines = logLines(parseTask(capture.path, text));
+    return lines.length > 0 ? { path: capture.path, text: lines.join("\n") } : undefined;
+  } catch {
+    return undefined;
   }
-  return DEFAULT_REVIEWER;
 }
 
 export function formatFindings(findings: ReviewFinding[]): string {
   return findings
     .map(
       (finding) =>
-        `- [${finding.severity}] ${finding.file ? `${finding.file}: ` : ""}${finding.message}`,
+        `- [${finding.severity}]${finding.id ? ` (${finding.id})` : ""} ${finding.file ? `${finding.file}: ` : ""}${finding.message}`,
     )
     .join("\n");
-}
-
-async function listNames(dir: string): Promise<string[]> {
-  try {
-    return (await readdir(dir)).sort();
-  } catch {
-    return [];
-  }
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bashPath } from "../../src/core/bash.js";
 import { findUnsafe, runVerification } from "../../src/tasks/verify.js";
 import { tempDir } from "../helpers.js";
 
@@ -37,22 +38,38 @@ describe("findUnsafe", () => {
 });
 
 describe("runVerification", () => {
-  it("runs commands in the repo through a shell and stops at the first failure", async () => {
+  it("runs the block as one bash script from the repo, with continuations, pipefail and the failing line", async () => {
     const cwd = await tempDir();
+    const bash = (await bashPath()) ?? "bash";
     const output: string[] = [];
-    const result = await runVerification(
+    const passing = await runVerification(
       cwd,
-      ['node -e "console.log(process.cwd())"', 'node -e "process.exit(3)"', "never-runs"],
-      (chunk) => output.push(chunk),
+      ['node -e "console.log(process.cwd())" \\', '  && node -e "process.exit(0)"'],
+      { bash, onOutput: (chunk) => output.push(chunk) },
     );
-    expect(result.passed).toBe(false);
-    expect(result.runs.map((run) => [run.command, run.exitCode])).toEqual([
-      ['node -e "console.log(process.cwd())"', 0],
-      ['node -e "process.exit(3)"', 3],
-    ]);
-    expect(output.join("")).toContain('$ node -e "process.exit(3)"');
-    expect(result.runs[0]?.output.trim().toLowerCase()).toContain(
-      cwd.split(/[\\/]/).at(-1)?.toLowerCase(),
-    );
+    expect(passing.passed).toBe(true);
+    expect(passing.output.toLowerCase()).toContain(cwd.split(/[\\/]/).at(-1)?.toLowerCase());
+    const piped = await runVerification(cwd, ['node -e "process.exit(4)" | cat', "echo never"], {
+      bash,
+    });
+    expect(piped.passed).toBe(false);
+    expect(piped.exitCode).toBe(4);
+    expect(piped.output).not.toContain("never");
+    expect(piped.failed).toContain("cat");
+  });
+
+  it("reuses suite results and tolerates a preexisting failure only when another command checks the task", async () => {
+    const cwd = await tempDir();
+    const bash = (await bashPath()) ?? "bash";
+    const broken = "npm test";
+    const own = 'node -e "process.exit(0)"';
+    const known = new Map([[broken, { exitCode: 1, output: "" }]]);
+    const excused = new Set([broken]);
+    const checked = await runVerification(cwd, [broken, own], { bash, known, excused });
+    expect(checked.passed).toBe(true);
+    expect(checked.tolerated).toEqual([broken]);
+    expect(checked.output).toContain("$ npm test (exit 1, preexisting");
+    expect((await runVerification(cwd, [broken], { bash, known, excused })).passed).toBe(false);
+    expect((await runVerification(cwd, [broken, own], { bash, known })).passed).toBe(false);
   });
 });

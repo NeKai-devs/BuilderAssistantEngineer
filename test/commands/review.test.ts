@@ -59,6 +59,31 @@ describe("review", () => {
     expect(ui.log.join("\n")).toContain("- [major] src/app.js: usa console.log");
   });
 
+  it("fails the automatic checks without calling the reviewer", async () => {
+    const cwd = await reviewRepo();
+    await writeFiles(cwd, { ".env": "API_TOKEN=abc\n" });
+    const { code, ui, prompts } = await review(cwd, [], "");
+    expect(code).toBe(1);
+    expect(prompts).toEqual([]);
+    expect(ui.log).toContain(
+      "warn: Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
+    );
+    expect(ui.log.join("\n")).toMatch(
+      /- \[blocker\] \(secret-[0-9a-f]{8}\) \.env: Parece un archivo de secretos/,
+    );
+  });
+
+  it("passes the automatic findings to the reviewer", async () => {
+    const cwd = await reviewRepo();
+    await writeFiles(cwd, {
+      "docs/plan/tasks/T-001-a.md": taskFile("T-001", { status: "in_progress", scope: "- `lib/`" }),
+    });
+    const { prompts } = await review(cwd, [], '{"verdict": "pass", "findings": []}');
+    expect(prompts[0]).toContain(
+      "<checks>\n- [major] Cambios fuera del Scope de la tarea: src/app.js",
+    );
+  });
+
   it("fails clearly for an unknown task", async () => {
     const cwd = await reviewRepo();
     const { code, prompts } = await review(cwd, ["T-009"], "");

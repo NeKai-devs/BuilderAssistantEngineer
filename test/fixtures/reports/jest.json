@@ -1,0 +1,107 @@
+{
+  "numFailedTestSuites": 2,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 1,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 1,
+  "numRuntimeErrorTestSuites": 1,
+  "numTodoTests": 1,
+  "numTotalTestSuites": 2,
+  "numTotalTests": 4,
+  "openHandles": [],
+  "startTime": 1790521399718,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "duration": 3,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "group passes",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "passes"
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "duration": 3,
+          "failureDetails": [
+            {
+              "matcherResult": {
+                "actual": 1,
+                "expected": 2,
+                "message": "expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1",
+                "name": "toBe",
+                "pass": false
+              }
+            }
+          ],
+          "failureMessages": [
+            "Error: expect(received).toBe(expected) // Object.is equality"
+          ],
+          "fullName": "group fails",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "failed",
+          "title": "fails"
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "group skipped",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "skipped"
+        },
+        {
+          "ancestorTitles": [
+            "group"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "group todo",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "todo",
+          "title": "todo"
+        }
+      ],
+      "endTime": 1790521400193,
+      "message": "  \u25cf group \u203a fails\n\n    expect(received).toBe(expected) // Object.is equality\n\n    Expected: 2\n    Received: 1\n\n      1 | describe(\"group\", () => {\n      2 |   it(\"passes\", () => { expect(1).toBe(1); }",
+      "name": "/repo/test/a.test.js",
+      "startTime": 1790521399886,
+      "status": "failed"
+    },
+    {
+      "assertionResults": [],
+      "endTime": 1790521400409,
+      "message": "  \u25cf Test suite failed to run\n\n    Cannot find module './does-not-exist.js' from 'test/broken.test.js'\n\n    > 1 | require(\"./does-not-exist.js\");\n        |                               ^\n      2 | it(",
+      "name": "/repo/test/broken.test.js",
+      "startTime": 1790521400409,
+      "status": "failed"
+    }
+  ],
+  "wasInterrupted": false
+}

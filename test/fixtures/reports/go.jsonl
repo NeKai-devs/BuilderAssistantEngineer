@@ -1,0 +1,51 @@
+{"ImportPath":"example.com/s/b [example.com/s/b.test]","Action":"build-output","Output":"# example.com/s/b [example.com/s/b.test]\n"}
+{"ImportPath":"example.com/s/b [example.com/s/b.test]","Action":"build-output","Output":"b/b_test.go:5:32: undefined: undefinedThing\n"}
+{"ImportPath":"example.com/s/b [example.com/s/b.test]","Action":"build-fail"}
+{"Time":"2026-09-27T09:03:50.700761178-06:00","Action":"start","Package":"example.com/s/a"}
+{"Time":"2026-09-27T09:03:50.700870481-06:00","Action":"start","Package":"example.com/s/b"}
+{"Time":"2026-09-27T09:03:50.700895934-06:00","Action":"output","Package":"example.com/s/b","Output":"FAIL\texample.com/s/b [build failed]\n"}
+{"Time":"2026-09-27T09:03:50.700916762-06:00","Action":"fail","Package":"example.com/s/b","Elapsed":0,"FailedBuild":"example.com/s/b [example.com/s/b.test]"}
+{"Time":"2026-09-27T09:03:50.700977421-06:00","Action":"start","Package":"example.com/s/c"}
+{"Time":"2026-09-27T09:03:50.701001122-06:00","Action":"output","Package":"example.com/s/c","Output":"?   \texample.com/s/c\t[no test files]\n"}
+{"Time":"2026-09-27T09:03:50.701014867-06:00","Action":"skip","Package":"example.com/s/c","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.701026384-06:00","Action":"start","Package":"example.com/s/d"}
+{"Time":"2026-09-27T09:03:50.702953481-06:00","Action":"run","Package":"example.com/s/d","Test":"TestPrints"}
+{"Time":"2026-09-27T09:03:50.703027873-06:00","Action":"output","Package":"example.com/s/d","Test":"TestPrints","Output":"=== RUN   TestPrints\n"}
+{"Time":"2026-09-27T09:03:50.703039157-06:00","Action":"output","Package":"example.com/s/d","Test":"TestPrints","Output":"{\"Action\":\"pass\",\"Package\":\"x\",\"Test\":\"Fake\"}\n"}
+{"Time":"2026-09-27T09:03:50.703051993-06:00","Action":"output","Package":"example.com/s/d","Test":"TestFake","Output":"--- PASS: TestFake (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703057815-06:00","Action":"pass","Package":"example.com/s/d","Test":"TestFake","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703065602-06:00","Action":"output","Package":"example.com/s/d","Test":"TestPrints","Output":"--- PASS: TestPrints (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703070545-06:00","Action":"pass","Package":"example.com/s/d","Test":"TestPrints","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703073681-06:00","Action":"output","Package":"example.com/s/d","Output":"PASS\n"}
+{"Time":"2026-09-27T09:03:50.703094698-06:00","Action":"run","Package":"example.com/s/a","Test":"TestPasses"}
+{"Time":"2026-09-27T09:03:50.703100584-06:00","Action":"output","Package":"example.com/s/a","Test":"TestPasses","Output":"=== RUN   TestPasses\n"}
+{"Time":"2026-09-27T09:03:50.703118817-06:00","Action":"output","Package":"example.com/s/a","Test":"TestPasses","Output":"--- PASS: TestPasses (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703123089-06:00","Action":"pass","Package":"example.com/s/a","Test":"TestPasses","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703126278-06:00","Action":"run","Package":"example.com/s/a","Test":"TestFails"}
+{"Time":"2026-09-27T09:03:50.703129089-06:00","Action":"output","Package":"example.com/s/a","Test":"TestFails","Output":"=== RUN   TestFails\n"}
+{"Time":"2026-09-27T09:03:50.703133833-06:00","Action":"output","Package":"example.com/s/a","Test":"TestFails","Output":"    a_test.go:6: nope\n"}
+{"Time":"2026-09-27T09:03:50.703137777-06:00","Action":"output","Package":"example.com/s/a","Test":"TestFails","Output":"--- FAIL: TestFails (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.70314161-06:00","Action":"fail","Package":"example.com/s/a","Test":"TestFails","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703144628-06:00","Action":"run","Package":"example.com/s/a","Test":"TestSkipped"}
+{"Time":"2026-09-27T09:03:50.703147712-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSkipped","Output":"=== RUN   TestSkipped\n"}
+{"Time":"2026-09-27T09:03:50.703151281-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSkipped","Output":"    a_test.go:7: later\n"}
+{"Time":"2026-09-27T09:03:50.703155172-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSkipped","Output":"--- SKIP: TestSkipped (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703168621-06:00","Action":"skip","Package":"example.com/s/a","Test":"TestSkipped","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703174993-06:00","Action":"run","Package":"example.com/s/a","Test":"TestSub"}
+{"Time":"2026-09-27T09:03:50.703179897-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub","Output":"=== RUN   TestSub\n"}
+{"Time":"2026-09-27T09:03:50.703184508-06:00","Action":"run","Package":"example.com/s/a","Test":"TestSub/one"}
+{"Time":"2026-09-27T09:03:50.703187395-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub/one","Output":"=== RUN   TestSub/one\n"}
+{"Time":"2026-09-27T09:03:50.70319059-06:00","Action":"run","Package":"example.com/s/a","Test":"TestSub/two"}
+{"Time":"2026-09-27T09:03:50.703193325-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub/two","Output":"=== RUN   TestSub/two\n"}
+{"Time":"2026-09-27T09:03:50.703199016-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub/two","Output":"    a_test.go:10: bad\n"}
+{"Time":"2026-09-27T09:03:50.703203431-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub","Output":"--- FAIL: TestSub (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703207565-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub/one","Output":"    --- PASS: TestSub/one (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703211974-06:00","Action":"pass","Package":"example.com/s/a","Test":"TestSub/one","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.70321521-06:00","Action":"output","Package":"example.com/s/a","Test":"TestSub/two","Output":"    --- FAIL: TestSub/two (0.00s)\n"}
+{"Time":"2026-09-27T09:03:50.703218298-06:00","Action":"fail","Package":"example.com/s/a","Test":"TestSub/two","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703221203-06:00","Action":"fail","Package":"example.com/s/a","Test":"TestSub","Elapsed":0}
+{"Time":"2026-09-27T09:03:50.703224163-06:00","Action":"output","Package":"example.com/s/a","Output":"FAIL\n"}
+{"Time":"2026-09-27T09:03:50.703162602-06:00","Action":"output","Package":"example.com/s/d","Output":"ok  \texample.com/s/d\t0.002s\n"}
+{"Time":"2026-09-27T09:03:50.703342277-06:00","Action":"output","Package":"example.com/s/a","Output":"FAIL\texample.com/s/a\t0.002s\n"}
+{"Time":"2026-09-27T09:03:50.703360766-06:00","Action":"fail","Package":"example.com/s/a","Elapsed":0.003}
+{"Time":"2026-09-27T09:03:50.703630824-06:00","Action":"pass","Package":"example.com/s/d","Elapsed":0.003}

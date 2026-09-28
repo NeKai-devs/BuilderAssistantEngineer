@@ -60,7 +60,7 @@ describe("api backend", () => {
       onInfo: (i: unknown) => infos.push(i),
     };
     expect(await backend.run("PROMPT", options)).toBe("Hello");
-    expect(infos).toEqual([{ model: DEFAULT_ANTHROPIC_MODEL }]);
+    expect(infos).toEqual([{ model: DEFAULT_ANTHROPIC_MODEL }, { truncated: false }]);
     expect(chunks).toEqual(["Hel", "lo"]);
     const [request] = requests;
     expect(request?.url).toBe("https://api.anthropic.com/v1/messages");

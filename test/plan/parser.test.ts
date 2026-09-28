@@ -40,6 +40,30 @@ describe("parsePlan", () => {
     expect(plan.files[0]?.content).toContain("ends with <<<END FILE>>> on its own line.");
   });
 
+  it("adds an empty Log section to task files that lack one", () => {
+    const files = {
+      "AGENTS.md": "x",
+      "docs/plan/tasks/T-001-a.md": taskFile("T-001").replace("## Log\n", ""),
+    };
+    const plan = parsePlan(planOutput({ files }));
+    expect(plan.files[1]?.content.endsWith("None.\n\n## Log\n")).toBe(true);
+    expect(plan.tasks[0]?.body).toContain("## Log");
+  });
+
+  it("reads the project commands from the CONFIG block and drops nulls", () => {
+    const config =
+      '{"commands": {"test": "npm test", "lint": " npm run lint ", "typecheck": null}}';
+    const plan = parsePlan(planOutput({ config }));
+    expect(plan.commands).toEqual({ test: "npm test", lint: "npm run lint" });
+    expect(parsePlan(planOutput()).commands).toEqual({});
+  });
+
+  it("ignores an invalid CONFIG block with a warning instead of failing", () => {
+    const plan = parsePlan(planOutput({ config: "{nope" }));
+    expect(plan.commands).toEqual({});
+    expect(plan.warnings).toEqual(["ignored the CONFIG block: it is not valid JSON"]);
+  });
+
   it("tolerates chatter outside the blocks with a warning and fenced JSON questions", () => {
     const text = `Sure, here is the plan:\n${planOutput({ questions: "```json\n[]\n```" })}\nDone!`;
     const plan = parsePlan(text);

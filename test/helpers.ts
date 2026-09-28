@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { onTestFinished, vi } from "vitest";
+import type { Config } from "../src/config/schema.js";
 import { runCommand } from "../src/core/process.js";
+import { type Capture, prepareCapture } from "../src/gates/capture.js";
+import { runDir } from "../src/tasks/runs.js";
+import type { Task } from "../src/tasks/schema.js";
 
 const FIXTURES = fileURLToPath(new URL("./fixtures/repos/", import.meta.url));
 
@@ -58,4 +62,29 @@ export async function gitCommitAll(cwd: string, message: string): Promise<void> 
     const result = await runCommand("git", args, { cwd });
     if (result.exitCode !== 0) throw new Error(result.stderr);
   }
+}
+
+export function testConfig(overrides: Partial<Config> = {}): Config {
+  return {
+    version: 1,
+    mode: "greenfield",
+    backend: "claude",
+    targets: ["claude-code"],
+    lang: "en",
+    digest: { maxChars: 20_000 },
+    commands: {},
+    gates: { regression: "full", timeoutMinutes: 15 },
+    verify: { allow: [] },
+    secrets: { allow: [] },
+    agent: { timeoutMinutes: 45 },
+    ...overrides,
+  };
+}
+
+export function captureFor(cwd: string, task: Task, config = testConfig()): Promise<Capture> {
+  return prepareCapture(cwd, config, task);
+}
+
+export function runFile(cwd: string, id: string, name = ""): string {
+  return join(runDir(cwd, id), ...name.split("/").filter(Boolean));
 }

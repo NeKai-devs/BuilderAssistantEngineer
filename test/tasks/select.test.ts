@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTask } from "../../src/tasks/schema.js";
+import { parseTask, type Task } from "../../src/tasks/schema.js";
 import { pickNext, waitingOn } from "../../src/tasks/select.js";
 import { taskFile } from "../plan-sample.js";
 
@@ -32,5 +32,14 @@ describe("pickNext", () => {
     expect(
       pickNext([task("T-001", "blocked"), task("T-002", "pending", ["T-001"])]),
     ).toBeUndefined();
+  });
+});
+
+describe("pickNext with a used-up retry budget", () => {
+  it("prefers a ready pending task over an in-progress task that used its attempts", () => {
+    const tasks = [task("T-001", "in_progress"), task("T-002", "pending")];
+    expect(pickNext(tasks)?.meta.id).toBe("T-001");
+    expect(pickNext(tasks, new Set(["T-001"]))?.meta.id).toBe("T-002");
+    expect(pickNext([tasks[0] as Task], new Set(["T-001"]))?.meta.id).toBe("T-001");
   });
 });

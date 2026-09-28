@@ -39,6 +39,27 @@ describe("eval metrics", () => {
       tasksWithVerification: { hits: 1, total: 2 },
       lineRefs: { hits: 1, total: 2 },
       paths: { hits: 2, total: 4 },
+      claims: { hits: 0, total: 0 },
+      testsRequired: { hits: 0, total: 2 },
+      tasksWithLog: { hits: 2, total: 2 },
+    });
+  });
+
+  it("counts existence claims in architecture, ADRs and task Context", async () => {
+    const repo = await tempDir();
+    await writeFiles(repo, { "main.go": "package main\n" });
+    const context = taskFile("T-001", { tests: "required", log: "Done." }).replace(
+      "Read AGENTS.md.",
+      "Read `main.go:1` and `internal/ghost.go`.",
+    );
+    const files = [
+      { path: "docs/plan/02-architecture.md", text: "`main.go` and `cmd/new.go` (new)." },
+      { path: "docs/plan/tasks/T-001-a.md", text: context },
+    ];
+    expect(await measurePlan(repo, files)).toMatchObject({
+      claims: { hits: 1, total: 2 },
+      testsRequired: { hits: 1, total: 1 },
+      tasksWithLog: { hits: 0, total: 1 },
     });
   });
 

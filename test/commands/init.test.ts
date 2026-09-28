@@ -40,12 +40,17 @@ describe("init", () => {
       targets: ["claude-code"],
       lang: "es",
       digest: { maxChars: 100_000 },
+      commands: {},
+      gates: { regression: "full", timeoutMinutes: 15 },
+      verify: { allow: [] },
+      secrets: { allow: [] },
+      agent: { timeoutMinutes: 45 },
     });
     const interview = await read(cwd, ".bae/interview.md");
     expect(interview).toContain("# Entrevista");
     expect(interview).toContain("- Modo: greenfield");
     expect(interview).toContain("A habit tracker for small teams.");
-    expect(await read(cwd, ".gitignore")).toBe(".bae/runs/\n.bae/tmp/\n");
+    expect(await read(cwd, ".gitignore")).toBe(".bae/tmp/\n");
   });
 
   it("runs the full interview with an adaptive follow-up on a brownfield repo", async () => {

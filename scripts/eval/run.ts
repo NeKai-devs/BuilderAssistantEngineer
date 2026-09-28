@@ -19,6 +19,7 @@ type Result = PlanMetrics & {
   mode: string;
   exitCode: number;
   files: number;
+  commands: number;
   durationMs: number;
   report: Partial<PlanReport>;
 };
@@ -78,6 +79,7 @@ async function evaluate(fixture: string): Promise<Result> {
       mode: config.mode,
       exitCode: plan.exitCode,
       files: artifacts.length,
+      commands: Object.keys(config.commands ?? {}).length,
       durationMs,
       report: await readReport(repo),
       ...(await measurePlan(repo, artifacts)),
@@ -197,6 +199,9 @@ function meta(result: Result) {
     formatErrors: report.formatErrors ?? [],
     questions: report.questions ?? 0,
     blockingQuestions: report.blockingQuestions ?? 0,
+    evidenceRetries: report.evidenceRetries ?? 0,
+    unverifiedPaths: report.unverifiedPaths ?? [],
+    repairs: report.repairs ?? [],
     lang: values.lang,
     targets: values.targets.split(","),
     analystSha256: analystSha,
@@ -215,8 +220,8 @@ function summary(results: Result[]): string {
     `- Language: ${values.lang}; targets: ${values.targets}`,
     `- analyst.md sha256: ${analystSha}; tool commit: ${toolCommit}; date: ${new Date().toISOString().slice(0, 10)}`,
     "",
-    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Questions (blocking) | Continuations | Format retries | Minutes | Cost USD |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Existence claims verified | Questions (blocking) | Continuations | Format retries | Local repairs | Evidence retries | Unverified after retry | Commands | tests: required | Empty Log | Minutes | Cost USD |",
+    `|${" --- |".repeat(20)}`,
   ];
   return `${[...header, ...results.map(row), totals(results)].join("\n")}\n`;
 }
@@ -232,9 +237,16 @@ function row(result: Result): string {
     formatRatio(result.tasksWithVerification),
     formatRatio(result.lineRefs),
     formatRatio(result.paths),
+    formatRatio(result.claims),
     `${report.questions ?? 0} (${report.blockingQuestions ?? 0})`,
     String(report.continuations ?? 0),
     String(report.formatRetries ?? 0),
+    String(report.repairs?.length ?? 0),
+    String(report.evidenceRetries ?? 0),
+    String(report.unverifiedPaths?.length ?? 0),
+    `${result.commands}/4`,
+    formatRatio(result.testsRequired),
+    formatRatio(result.tasksWithLog),
     minutes(result.durationMs),
     cost(report.costUsd),
   ]);
@@ -255,9 +267,16 @@ function totals(results: Result[]): string {
     formatRatio(sumRatios(results.map((result) => result.tasksWithVerification))),
     formatRatio(sumRatios(results.map((result) => result.lineRefs))),
     formatRatio(sumRatios(results.map((result) => result.paths))),
+    formatRatio(sumRatios(results.map((result) => result.claims))),
     `${sum((result) => result.report.questions ?? 0)} (${sum((result) => result.report.blockingQuestions ?? 0)})`,
     String(sum((result) => result.report.continuations ?? 0)),
     String(sum((result) => result.report.formatRetries ?? 0)),
+    String(sum((result) => result.report.repairs?.length ?? 0)),
+    String(sum((result) => result.report.evidenceRetries ?? 0)),
+    String(sum((result) => result.report.unverifiedPaths?.length ?? 0)),
+    `${sum((result) => result.commands)}/${results.length * 4}`,
+    formatRatio(sumRatios(results.map((result) => result.testsRequired))),
+    formatRatio(sumRatios(results.map((result) => result.tasksWithLog))),
     minutes(sum((result) => result.durationMs)),
     costs.length > 0 ? cost(costs.reduce((total, value) => total + (value ?? 0), 0)) : "-",
   ]);

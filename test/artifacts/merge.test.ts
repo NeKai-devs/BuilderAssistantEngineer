@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readLessons, withLessons } from "../../src/artifacts/lessons.js";
 import { mergeManaged, planChanges } from "../../src/artifacts/merge.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
 import { tempDir, writeFiles } from "../helpers.js";
@@ -18,6 +19,20 @@ describe("mergeManaged", () => {
     expect(mergeManaged(edited, "v2", "AGENTS.md")).toBe(
       "# My notes\n\nKeep me.\n\n<!-- bae:begin -->\nv2\n<!-- bae:end -->\n\n## Added by hand\n",
     );
+  });
+
+  it("keeps the lessons learned in AGENTS.md when the analyst rewrites the block", () => {
+    const before = mergeManaged(
+      undefined,
+      withLessons("v1", ["Rule one.", "Rule two."]),
+      "AGENTS.md",
+    );
+    const after = mergeManaged(before, "v2", "AGENTS.md");
+    expect(after).toBe(
+      "<!-- bae:begin -->\nv2\n\n## Lessons learned\n\n<!-- bae:lessons -->\n- Rule one.\n- Rule two.\n<!-- bae:lessons:end -->\n<!-- bae:end -->\n",
+    );
+    expect(readLessons(after)).toEqual(["Rule one.", "Rule two."]);
+    expect(mergeManaged(before, "v2", "CLAUDE.md")).not.toContain("Rule one.");
   });
 
   it("makes sure CLAUDE.md and GEMINI.md import AGENTS.md exactly once", () => {

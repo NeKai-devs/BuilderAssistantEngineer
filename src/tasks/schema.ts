@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { FormatError } from "../core/errors.js";
+import { trivialityProblems } from "./checks.js";
 import { splitFrontmatter } from "./frontmatter.js";
+import { logicalLines } from "./shell-words.js";
 
 export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
+export const TEST_POLICIES = ["required", "optional", "fix"] as const;
 
 export const TASK_ID = /^T-\d{3,}$/;
 export const TASK_PATH = /^docs\/plan\/tasks\/(T-\d{3,})-[A-Za-z0-9._-]+\.md$/;
@@ -22,6 +25,7 @@ export const taskMetaSchema = z.object({
     .transform((value) => value ?? []),
   size: z.enum(["S", "M", "L"]),
   risk: z.enum(["low", "medium", "high"]),
+  tests: z.enum(TEST_POLICIES).default("optional"),
 });
 
 export type TaskMeta = z.output<typeof taskMetaSchema>;
@@ -35,9 +39,17 @@ export const SECTIONS = {
   acceptance: ["acceptance criteria", "criterios de aceptación", "criterios de aceptacion"],
   verification: ["verification", "verificación", "verificacion"],
   risks: ["risks and notes", "riesgos y notas", "risks", "riesgos"],
+  log: ["log", "registro", "bitácora", "bitacora"],
 } as const;
 
 export type SectionKey = keyof typeof SECTIONS;
+
+const TRIVIALITY: Record<string, string> = {
+  masks:
+    "hides failures (|| true, set +e); the block runs with set -euo pipefail and must fail when a check fails",
+  trivial:
+    "runs nothing that checks the task; use the project's test runner, a linter or a check with an expected result (test -f, grep -q, curl -f)",
+};
 
 const COMMAND_BLOCK = /```(?:sh|bash|shell|console)[^\n]*\n([\s\S]*?)```/g;
 
@@ -61,25 +73,36 @@ export function taskProblems(task: Task): string[] {
   if (!missing.includes("verification") && verificationCommands(task.body).length === 0) {
     problems.push(`${task.path}: Verification needs at least one command in a \`\`\`sh block`);
   }
+  for (const problem of trivialityProblems(verificationScript(task.body))) {
+    problems.push(`${task.path}: Verification ${TRIVIALITY[problem.reason]}: ${problem.command}`);
+  }
   return problems;
 }
 
 export function sectionText(body: string, key: SectionKey): string | undefined {
+  return sectionTexts(body, key)[0];
+}
+
+export function sectionTexts(body: string, key: SectionKey): string[] {
   const aliases: readonly string[] = SECTIONS[key];
   const parts = body.split(/^##[ \t]+(.+?)[ \t]*$/m);
+  const found: string[] = [];
   for (let index = 1; index < parts.length; index += 2) {
     const heading = (parts[index] ?? "").trim().toLowerCase();
-    if (aliases.includes(heading)) return (parts[index + 1] ?? "").trim();
+    if (aliases.includes(heading)) found.push((parts[index + 1] ?? "").trim());
   }
-  return undefined;
+  return found;
+}
+
+export function verificationScript(body: string): string[] {
+  const section = sectionText(body, "verification") ?? "";
+  return Array.from(section.matchAll(COMMAND_BLOCK), (match) => match[1] ?? "")
+    .flatMap((block) => block.replace(/\r?\n$/, "").split(/\r?\n/))
+    .map((line) => line.replace(/^(\s*)\$\s+/, "$1"));
 }
 
 export function verificationCommands(body: string): string[] {
-  const section = sectionText(body, "verification") ?? "";
-  return Array.from(section.matchAll(COMMAND_BLOCK), (match) => match[1] ?? "")
-    .flatMap((block) => block.split(/\r?\n/))
-    .map((line) => line.trim().replace(/^\$\s+/, ""))
-    .filter((line) => line !== "" && !line.startsWith("#"));
+  return logicalLines(verificationScript(body));
 }
 
 function readFrontmatter(path: string, text: string) {

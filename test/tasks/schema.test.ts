@@ -24,6 +24,7 @@ describe("task files", () => {
       depends_on: ["T-001"],
       size: "S",
       risk: "low",
+      tests: "optional",
     });
     expect(taskProblems(task)).toEqual([]);
   });
@@ -64,7 +65,7 @@ describe("task files", () => {
     const updated = setFrontmatterFields(taskFile("T-001"), { status: "done" });
     expect(splitFrontmatter(updated)?.data.status).toBe("done");
     expect(updated).toContain("depends_on: []");
-    expect(updated.endsWith("None.\n")).toBe(true);
+    expect(updated.endsWith("None.\n## Log\n")).toBe(true);
   });
 
   it("reads frontmatter that is not strict YAML, like colons inside values", () => {

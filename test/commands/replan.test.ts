@@ -65,6 +65,35 @@ describe("replan", () => {
     );
   });
 
+  it("asks blocking questions after replanning and saves them to the interview", async () => {
+    const cwd = await tempDir();
+    await writeConfig(cwd, {
+      version: 1,
+      mode: "brownfield",
+      backend: "claude",
+      targets: ["codex"],
+      lang: "en",
+    });
+    await writeFiles(cwd, { "docs/plan/tasks/T-001-a.md": taskFile("T-001") });
+    const questions = '[{"question": "Keep the REST API?", "why": "scope", "blocking": true}]';
+    const reply = planOutput({
+      questions,
+      files: { "AGENTS.md": "# Project", "docs/plan/tasks/T-001-a.md": taskFile("T-001") },
+    });
+    const ui = fakePrompter(["all", "yes", false]);
+    const code = await main(["node", "bae", "replan"], cwd, {
+      prompter: ui.prompter,
+      createBackend: () => fakeBackend([reply]).backend,
+      env: {},
+      print: () => {},
+    });
+    expect(code).toBe(0);
+    expect(ui.asked.at(-1)).toBe(
+      "You answered blocking questions. Run the plan again now with your answers?",
+    );
+    expect(await read(cwd, ".bae/interview.md")).toContain("### Keep the REST API?");
+  });
+
   it("asks to run plan when there is no plan yet", async () => {
     const cwd = await tempDir();
     await writeConfig(cwd, {

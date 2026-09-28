@@ -5,12 +5,16 @@ export function orderTasks(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => a.meta.phase - b.meta.phase || compareIds(a.meta.id, b.meta.id));
 }
 
-export function pickNext(tasks: Task[]): Task | undefined {
+export function pickNext(
+  tasks: Task[],
+  exhausted: ReadonlySet<string> = new Set(),
+): Task | undefined {
   const ordered = orderTasks(tasks);
-  const inProgress = ordered.find((task) => task.meta.status === "in_progress");
-  if (inProgress) return inProgress;
-  return ordered.find(
-    (task) => task.meta.status === "pending" && waitingOn(task, tasks).length === 0,
+  const inProgress = ordered.filter((task) => task.meta.status === "in_progress");
+  return (
+    inProgress.find((task) => !exhausted.has(task.meta.id)) ??
+    ordered.find((task) => task.meta.status === "pending" && waitingOn(task, tasks).length === 0) ??
+    inProgress[0]
   );
 }
 

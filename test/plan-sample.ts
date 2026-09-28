@@ -3,6 +3,9 @@ export type TaskOptions = {
   dependsOn?: string[];
   status?: string;
   command?: string;
+  tests?: "required" | "optional" | "fix";
+  scope?: string;
+  log?: string;
 };
 
 export function taskFile(id: string, options: TaskOptions = {}): string {
@@ -15,13 +18,14 @@ export function taskFile(id: string, options: TaskOptions = {}): string {
     `depends_on: [${(options.dependsOn ?? []).join(", ")}]`,
     "size: S",
     "risk: low",
+    `tests: ${options.tests ?? "optional"}`,
     "---",
     "## Goal",
     `Goal of ${id}.`,
     "## Context",
     "Read AGENTS.md.",
     "## Scope",
-    "src/ only.",
+    options.scope ?? "src/ only.",
     "## Steps",
     "1. Do it.",
     "## Acceptance criteria",
@@ -33,6 +37,8 @@ export function taskFile(id: string, options: TaskOptions = {}): string {
     "Tests pass.",
     "## Risks and notes",
     "None.",
+    "## Log",
+    ...(options.log === undefined ? [] : [options.log]),
     "",
   ].join("\n");
 }
@@ -51,7 +57,12 @@ export function defaultFiles(): Record<string, string> {
 }
 
 export function planOutput(
-  parts: { summary?: string; questions?: string; files?: Record<string, string> } = {},
+  parts: {
+    summary?: string;
+    questions?: string;
+    config?: string;
+    files?: Record<string, string>;
+  } = {},
 ): string {
   const files = parts.files ?? defaultFiles();
   return [
@@ -61,6 +72,7 @@ export function planOutput(
     "<<<QUESTIONS>>>",
     parts.questions ?? "[]",
     "<<<END QUESTIONS>>>",
+    ...(parts.config === undefined ? [] : ["<<<CONFIG>>>", parts.config, "<<<END CONFIG>>>"]),
     ...Object.entries(files).flatMap(([path, content]) => [
       `<<<FILE: ${path}>>>`,
       content.trimEnd(),

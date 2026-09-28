@@ -69,6 +69,13 @@ describe("buildDigest", () => {
     expect(go.text).toContain("- main.go");
   });
 
+  it("never includes the values of a tracked .env file", async () => {
+    const digest = await buildDigest(await copyFixture("with-secrets"));
+    expect(digest.text).toContain(".env.example");
+    expect(digest.text).not.toContain("fixture-token-not-a-real-secret");
+    expect(digest.text).not.toContain("fixture-password-not-real");
+  });
+
   it("marks an empty folder as greenfield with every baseline item absent", async () => {
     const digest = await buildDigest(await tempDir());
     expect(digest.mode).toBe("greenfield");

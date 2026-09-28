@@ -2,13 +2,14 @@ import type { Backend as BackendName } from "../config/schema.js";
 
 export type Access = "read" | "edit";
 
-export type RunInfo = { model?: string; costUsd?: number };
+export type RunInfo = { model?: string; costUsd?: number; truncated?: boolean };
 
 export type RunOptions = {
   cwd: string;
   stream?: (chunk: string) => void;
   interactive?: boolean;
   access?: Access;
+  timeoutMs?: number;
   onInfo?: (info: RunInfo) => void;
 };
 

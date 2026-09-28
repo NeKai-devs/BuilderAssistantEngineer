@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="test/calc.test.js" time="0.038989" classname="test" file="/repo/test/calc.test.js"/>
+	<testsuite name="group" time="0.009879" disabled="0" errors="0" tests="2" failures="1" skipped="0" hostname="host">
+		<testcase name="nested ok" time="0.000980" classname="test" file="/repo/test/other.test.js"/>
+		<testcase name="nested fail" time="0.007402" classname="test" file="/repo/test/other.test.js" failure="The expression evaluated to a falsy value:&#10;&#10;  assert.ok(false)&#10;">
+			<failure type="testCodeFailure" message="The expression evaluated to a falsy value:&#10;&#10;  assert.ok(false)">
+Error [ERR_TEST_FAILURE]: The expression evaluated to a falsy value:
+
+  assert.ok(false)
+
+    at async Promise.all (index 0) {
+  code: 'ERR_TEST_FAILURE',
+  failureType: 'testCodeFailure',
+  cause: AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(false)
+  
+      at TestContext.&lt;anonymous> (/repo/test/other.test.js:3:113)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1306:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:897:18)
+      at Test.postRun (node:internal/test_runner/test:1447:19)
+      at Test.run (node:internal/test_runner/test:1372:12)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1771:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+}
+			</failure>
+		</testcase>
+	</testsuite>
+	<testcase name="skipped" time="0.000193" classname="test" file="/repo/test/other.test.js">
+		<skipped type="skipped" message="true"/>
+	</testcase>
+	<!-- tests 4 -->
+	<!-- suites 1 -->
+	<!-- pass 2 -->
+	<!-- fail 1 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 1 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 88.936476 -->
+</testsuites>

@@ -115,6 +115,7 @@ async function callAnthropic(
   }
   if (stopReason === "refusal") throw new UserError(t("backend.refusal"));
   if (stopReason === "max_tokens") throw new UserError(t("backend.truncated"));
+  options.onInfo?.({ truncated: false });
   return text;
 }
 
@@ -149,6 +150,7 @@ async function callOpenAi(
     finishReason = choice.finish_reason ?? finishReason;
   }
   if (finishReason === "length") throw new UserError(t("backend.truncated"));
+  options.onInfo?.({ truncated: false });
   return text;
 }
 

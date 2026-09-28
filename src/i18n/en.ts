@@ -89,7 +89,6 @@ export const en = {
   "plan.continuing":
     "The answer was cut off at {{marker}}; asking the analyst to continue from there.",
   "plan.summary": "Summary",
-  "plan.questions": "Open questions — answer them in .bae/interview.md and run replan",
   "plan.blocking": "blocking",
   "plan.done": "{{count}} file(s) written. Next: {{next}}",
   "plan.nothingWritten": "No files were written.",
@@ -115,7 +114,7 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
-  "next.blocked": "{{id}} is blocked after every retry failed. Logs: {{path}}",
+  "next.blocked": "{{id}} is blocked: {{reason}} Logs: {{path}}",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",
@@ -124,17 +123,18 @@ export const en = {
   "verify.confirm": "Run these verification commands now?",
   "verify.declined": "Verification was not run; the task stays in progress.",
   "verify.none": "The task has no verification commands in a ```sh block under Verification.",
-  "verify.unsafe":
-    "Refusing to run `{{command}}` ({{reason}}). Fix the task's Verification section.",
   "verify.failed": "Verification failed: `{{command}}` exited with {{code}}.",
   "verify.passed": "Verification passed.",
+  "verify.stillFailing":
+    "`{{command}}` failed before the task and still fails (exit {{code}}), so it did not block. If an acceptance criterion needs it to pass, the task is not done.",
   "review.intro": "builder-assistant-engineer · review",
   "review.running": "The reviewer is checking {{id}}…",
   "review.findings": "Review findings",
   "review.passed": "Review passed.",
   "review.failed": "Review failed for {{id}}.",
   "review.noGit": "Review skipped: this is not a git repository, so there is no diff to review.",
-  "review.emptyDiff": "No changes were found for this task.",
+  "review.noChanges":
+    "The task changed no files and its checks pass, so the reviewer was not called.",
   "review.dryRun": "Dry run: the review prompt above was not sent.",
   "review.noTask": "No task is in progress. Pass a task id, e.g. review T-003.",
   "review.unknownTask": "Task {{id}} was not found in docs/plan/tasks.",
@@ -155,6 +155,8 @@ export const en = {
   "error.unexpected": "Unexpected error. Please report it with the output below.",
   "backend.notInstalled":
     "`{{command}}` is not installed or not in PATH. Install it or pick another backend with --backend.",
+  "backend.timedOut":
+    "`{{command}}` did not finish within {{minutes}} minutes and was stopped (agent.timeoutMinutes in .bae/config.json).",
   "backend.failed": "`{{command}}` exited with code {{code}}:\n{{details}}",
   "backend.apiNotConfigured":
     "The api backend needs ANTHROPIC_API_KEY, or OPENAI_BASE_URL/OPENAI_API_KEY for an OpenAI-compatible endpoint.",
@@ -171,6 +173,189 @@ export const en = {
     "Paste it into your AI. Then paste the full answer here and finish with Ctrl-D (Ctrl-Z, Enter on Windows), or save it to {{path}} and press Enter.",
   "manual.awaitingDone": "Run it with your agent and press Enter when the task is finished.",
   "manual.emptyResponse": "No answer received. Paste it here or save it to {{path}}.",
+  "plan.commands": "Project commands saved to .bae/config.json",
+  "regression.title": "Regression check",
+  "regression.baselineTitle": "Regression baseline, before the task",
+  "regression.confirm": "Run the project's lint and test commands now to record the baseline?",
+  "regression.preexisting":
+    "`{{command}}` already fails before the task (exit {{code}}); recorded as preexisting, it will not block.",
+  "regression.found": "Regression: `{{command}}` exits with {{code}} after the task.",
+  "regression.stillFailing":
+    "`{{command}}` still fails (exit {{code}}), as it did before the task.",
+  "regression.passed": "Regression check passed.",
+  "evidence.retrying":
+    "{{count}} cited path(s) are not in the repository and not marked (new); asking the analyst to fix only those.",
+  "evidence.fixing": "The analyst is fixing the cited paths…",
+  "evidence.fixed": "Every cited path now exists or is marked (new).",
+  "evidence.unverified":
+    "{{count}} cited path(s) are still unverified; they are listed in the summary.",
+  "evidence.summary": "Unverified paths (not in the repository and not marked new):",
+  "mechanical.secretFile":
+    "Looks like a secrets file (.env, private key or credentials); keep it out of the change.",
+  "mechanical.secretValue":
+    "Adds what looks like a credential ({{kind}}); read it from the environment instead.",
+  "mechanical.noTests":
+    "The task requires tests (tests: required), but it neither runs more tests than before nor adds assertions to a test file.",
+  "mechanical.outOfScope": "Changed outside the task's Scope: {{files}}",
+  "mechanical.failed": "The automatic checks failed, so the reviewer was not run.",
+  "plan.openQuestions":
+    "Open questions, saved to .bae/interview.md; answer them there and run replan when you can",
+  "plan.questionsSaved": "{{count}} question(s) saved to .bae/interview.md.",
+  "plan.rerun": "You answered blocking questions. Run the plan again now with your answers?",
+  "plan.rerunning": "Running the plan again with your answers.",
+  "md.planQuestions": "Questions from the plan ({{date}})",
+  "md.why": "Why",
+  "md.options": "Options",
+  "md.blocking": "Blocking: the plan assumed an answer",
+  "md.answer": "Answer",
+  "md.open": "open, not answered yet",
+  "handoff.missing":
+    "{{path}} has no handoff note: write at most {{max}} lines under ## Log (what changed, decisions, traps).",
+  "handoff.tooLong": "The handoff note in {{path}} has {{count}} lines; keep it to {{max}}.",
+  "handoff.passed": "Handoff note present.",
+  "md.lessons": "Lessons learned",
+  "lesson.asking": "{{id}} failed repeatedly; asking the agent for the root cause and a rule…",
+  "lesson.title": "Lesson from {{id}}",
+  "lesson.body": "Root cause: {{cause}}\nRule: {{rule}}",
+  "lesson.confirm": "Add this rule to AGENTS.md?",
+  "lesson.added": "Rule added to AGENTS.md.",
+  "lesson.skipped": "Rule not added; it stays in {{path}}.",
+  "lesson.failed": "Could not get a lesson from the agent: {{details}}",
+  "status.blockedReason": "{{id}} is blocked: {{reason}}",
+  "status.metrics": "Local metrics",
+  "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
+  "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",
+  "status.regressions": "regressions caught: {{count}}",
+  "status.time": "time per done task: {{average}} on average, {{total}} in total",
+  "status.taskRuns": "{{attempts}} attempt(s), {{time}}",
+  "format.repaired": "Repaired the answer locally: {{repairs}}.",
+  "evidence.retryFailed":
+    "The request to fix the cited paths failed, so the plan keeps them as they are: {{details}}",
+  "regression.noCommands":
+    "No lint or test command in .bae/config.json or the manifests; the regression check is off until you add them under commands.",
+  "option.acceptFinding":
+    "accept one finding by its id (repeatable); only secrets, and contract or test findings on files the task's Scope lists",
+  "review.noBase":
+    "Review failed: the commit recorded when the task started no longer exists, so the task's changes cannot be isolated.",
+  "review.noCapture": "{{id}} has no capture from next; reviewing it against the current HEAD.",
+  "contract.title": "Contract",
+  "contract.failed":
+    "The task changed files that define its own checks; they were restored from the state captured before the task.",
+  "contract.recovered":
+    "An earlier run of {{id}} ended before its checks; the files it changed that define the checks were restored.",
+  "contract.task": "Edited the task file outside ## Log.",
+  "contract.tasks": "Edited another task file.",
+  "contract.bae": "Changed bae's own configuration or prompts.",
+  "contract.agents": "Changed an agent definition or the agent settings the reviewer runs with.",
+  "contract.gitignore": "Changed an ignore file, which decides what the review sees.",
+  "contract.scripts": "Changed {{detail}}, which the checks run.",
+  "contract.runner": "Changed the test runner configuration.",
+  "contract.restored": "Restored.",
+  "contract.removed": "Removed.",
+  "findings.accepted": "Accepted with --accept-finding.",
+  "findings.acceptedTitle": "Accepted findings",
+  "regression.failed": "The regression check failed.",
+  "regression.mustPass":
+    "`{{command}}` still fails (exit {{code}}), and the task is tests: fix, so the test suite must end green.",
+  "regression.uncomparable":
+    "`{{command}}` already failed before the task and still fails (exit {{code}}); its output has no counts to compare, so only green passes.",
+  "regression.worse":
+    "Regression: `{{command}}` fails more checks than before the task ({{now}}; before: {{before}}).",
+  "regression.lateStop": "{{id}} has no regression baseline from before its agent ran.",
+  "regression.declinedStop":
+    "Without running lint and tests first there is no baseline, so the task could not be done.",
+  "regression.unusable":
+    "`{{command}}` gives no usable baseline (exit {{code}}): it did not finish, or it fails with no counts to compare. The task could not be done while it stays red.",
+  "review.noVerdict": "The reviewer gave no verdict.",
+  "review.error": "The reviewer could not give a verdict: {{details}}",
+  "skip.used": "Going on without this check because of --allow-skip: {{what}}",
+  "skip.title": "Skipped with --allow-skip",
+  "skip.stopped":
+    "Nothing was launched. Fix the cause, or run next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
+  "next.budgetUsed": "The task already used its {{max}} automatic attempts.",
+  "next.refusedBlocked":
+    "{{id}} is blocked before launching the agent, because its checks cannot run. Fix the task's Verification or the commands in .bae/config.json, then set the task back to pending.",
+  "capture.lateStop":
+    "{{id}} is in progress without a capture from before its agent ran, so its checks have no trustworthy starting point. Set it back to pending, or run with --allow-skip.",
+  "capture.noGit": "This is not a git repository, so the review cannot see the task's changes.",
+  "option.allowSkip":
+    "go on when a check cannot run (no git, no baseline, no reviewer verdict); every skip is recorded",
+  "integrity.title": "Test integrity",
+  "integrity.failed": "The task removed or disabled tests.",
+  "integrity.deleted": "Deletes a test file.",
+  "integrity.skipMarker": "Adds a marker that skips or isolates tests ({{marker}}).",
+  "integrity.exclusion": "Adds a test runner configuration that leaves tests out ({{keys}}).",
+  "integrity.fewerTests":
+    "`{{command}}` runs fewer tests than before the task ({{now}}; before: {{before}}).",
+  "integrity.moreSkipped":
+    "`{{command}}` skips more tests than before the task ({{now}}; before: {{before}}).",
+  "verify.noBash":
+    "Verification runs as a bash script and no bash was found. On Windows install Git for Windows, which brings Git Bash; elsewhere put bash on PATH.",
+  "verify.masks":
+    "Verification hides failures in `{{command}}` (|| true, set +e). The block runs with set -euo pipefail and must fail when a check fails.",
+  "verify.trivial":
+    "Verification runs nothing that checks the task:\n{{command}}\nUse the project's test runner, a linter, or a check with an expected result (test -f, grep -q, curl -f).",
+  "verify.notAllowed":
+    "`{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json, or run next without --yes and --headless and confirm it yourself.",
+  "regression.notAllowed":
+    "The project command `{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json.",
+  "verify.dynamic": "it runs code that is built at run time or in another shell",
+  "verify.unknown": "unknown program",
+  "verify.unsafeWarning": "`{{command}}` looks dangerous ({{reason}}); read it before you confirm.",
+  "verify.onlyExcused":
+    "Verification only runs commands that already failed before the task, so it checks nothing about this task.",
+  "evidence.linesFailed":
+    "The plan cites lines that do not exist, even after asking the analyst to fix them:\n{{list}}\nThe plan was not written; the rejected answer is in {{path}}. Run plan again.",
+  "state.tampered":
+    "Code run for this task changed bae's own state outside the repository ({{files}}); it was restored and the attempt fails.",
+  "review.gitError":
+    "Review failed: git could not list the task's changes (a broken index, config or filter), so the checks cannot see them.",
+  "contract.memory": "Changed an agent memory file, which agents and reviewers read.",
+  "contract.git": "Changed git attributes, which decide how the review sees files.",
+  "contract.gitdir": "Changed the repository's git settings in .git, which the checks rely on.",
+  "contract.toolchain":
+    "Changed a package manager or tool setting that decides how the checks run.",
+  "contract.shadow": "Added a file that would run instead of the project's own tool.",
+  "contract.indexFlags":
+    "Marked files as unchanged in the git index (assume-unchanged or skip-worktree), which hides them from the review: {{files}}. The flags were cleared.",
+  "integrity.removedTests": "Removes tests that are not added back: {{tests}}.",
+  "integrity.lostAssertions":
+    "Removes {{count}} assertion line(s) from a test file without adding them back.",
+  "capture.headMoved":
+    "{{id}} keeps the commit recorded when it first started; commits made since then count as part of the task's changes.",
+  "contract.restoreFailed":
+    "Could not restore {{files}} from the capture. Fix them by hand; the next run checks them again before starting.",
+  "integrity.suppression": "Adds a comment that silences a checker ({{markers}}).",
+  "integrity.expectedOutput":
+    "Changes a snapshot or expected-output file, which decides what the tests accept.",
+  "regression.baselineTampered":
+    "Running the project's commands for the baseline changed files the checks depend on ({{files}}); they were restored and nothing was launched.",
+  "regression.unknown":
+    "`{{command}}` exits with {{code}}, but bae could not read how many tests ran, so it cannot tell whether they passed.",
+  "regression.unknownRunner":
+    "bae does not recognize the test runner behind `{{command}}`, so it cannot tell whether the tests pass. Set commands.test in .bae/config.json to the runner itself, for example `npx vitest run`, `npx jest`, `pytest`, `go test -v ./...`, `cargo test` or `dotnet test`.",
+  "regression.noCounts":
+    "`{{command}}` gives no usable baseline: it passes but does not say how many tests ran, so the task could not be compared with it.",
+  "regression.unreadSkipped": "`{{command}}` did not say how many tests ran",
+  "contract.scoped":
+    "The task's Scope lists this file, so the change stays: the checks run with it and the reviewer sees it.",
+  "contract.weakerScripts": "It stops running what these scripts ran: {{scripts}}.",
+  "contract.weakerRunner": "It adds settings that leave tests out ({{keys}}).",
+  "contract.weakerToolchain":
+    "It adds a setting that changes how the package manager or the test runner starts.",
+  "review.noEvidence": "(none: this review was not run right after next's checks)",
+  "integrity.scoped":
+    "The task's Scope lists this file, so the reviewer must say why this change is correct.",
+  "review.unjustified":
+    "The reviewer passed the task without saying why these changes to test files are correct: {{files}}.",
+  "mechanical.secretHistory":
+    "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
+  "mechanical.secretFileHistory":
+    "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
+  "regression.noTestsYet":
+    "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
+  "integrity.planned":
+    "The task's Scope marks test files it removes, so the reviewer judges it instead.",
 } as const;
 
 export type MessageKey = keyof typeof en;

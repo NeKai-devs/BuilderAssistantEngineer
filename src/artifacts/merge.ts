@@ -4,6 +4,7 @@ import type { PlanFile } from "../plan/parser.js";
 import { setFrontmatterFields } from "../tasks/frontmatter.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import { TASK_PATH } from "../tasks/schema.js";
+import { LESSONS_BEGIN, readLessons, withLessons } from "./lessons.js";
 
 export const MANAGED_BEGIN = "<!-- bae:begin -->";
 export const MANAGED_END = "<!-- bae:end -->";
@@ -21,7 +22,8 @@ export async function planChanges(cwd: string, files: PlanFile[]): Promise<Chang
   return Promise.all(files.map((file) => changeFor(cwd, file, tasks)));
 }
 
-export function mergeManaged(before: string | undefined, content: string, path: string): string {
+export function mergeManaged(before: string | undefined, generated: string, path: string): string {
+  const content = path === "AGENTS.md" ? keepLessons(before, generated) : generated;
   const block = (body: string) => `${MANAGED_BEGIN}\n${body.trim()}\n${MANAGED_END}`;
   const merged = (body: string) => {
     if (before === undefined) return `${block(body)}\n`;
@@ -35,6 +37,19 @@ export function mergeManaged(before: string | undefined, content: string, path: 
   const result = merged(content);
   if (!IMPORTING_FILES.has(path) || IMPORT_LINE.test(result)) return result;
   return merged(`@AGENTS.md\n\n${content.trim()}`);
+}
+
+export function managedBody(text: string): string {
+  const start = text.indexOf(MANAGED_BEGIN);
+  const end = text.indexOf(MANAGED_END);
+  if (start === -1 || end < start) return "";
+  return text.slice(start + MANAGED_BEGIN.length, end).trim();
+}
+
+function keepLessons(before: string | undefined, content: string): string {
+  const lessons = readLessons(before ?? "");
+  if (lessons.length === 0 || content.includes(LESSONS_BEGIN)) return content;
+  return withLessons(content, lessons);
 }
 
 async function changeFor(
