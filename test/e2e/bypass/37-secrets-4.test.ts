@@ -76,6 +76,8 @@ describe("bypass 37: secrets are found where they stay, and look-alikes are not"
     expect(() => parseReview('Verdict: fail.\n{"verdict": "pass", "findings": []}')).toThrow();
     expect(() => parseReview('{"verdict": "fail", "findings": [], "verdict": "pass"}')).toThrow();
     expect(parseReview('Looks good.\n{"verdict": "pass", "findings": []}').verdict).toBe("pass");
-    expect(parseReview('No test fails now.\n{"verdict": "pass", "findings": []}').verdict).toBe("pass");
+    expect(parseReview('No test fails now.\n{"verdict": "pass", "findings": []}').verdict).toBe(
+      "pass",
+    );
   });
 });
