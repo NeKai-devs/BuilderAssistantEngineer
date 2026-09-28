@@ -14,6 +14,8 @@ import {
   verifyCommit,
 } from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
+import { isTestFile } from "../digest/baseline.js";
+import { isBuildOutput, languageOf } from "../digest/files.js";
 import type { Capture } from "../gates/capture.js";
 import { TASKS_DIR } from "../gates/contract.js";
 import { captureIgnore, ignoreMatcher, untrackedFiles } from "../gates/ignore-rules.js";
@@ -55,8 +57,9 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
   }
   const current = ignoreMatcher(await captureIgnore(cwd));
   const found = untracked.filter((path) => !isExcluded(path));
-  const created = found.filter((path) => !current(path, false));
-  const hidden = found.filter((path) => current(path, false));
+  const roots = codeRoots([...((await gitPaths(cwd, ["ls-files", "--cached"])) ?? []), ...found]);
+  const hidden = found.filter((path) => current(path, false) && toolOutput(path, roots));
+  const created = found.filter((path) => !hidden.includes(path));
   const lines = diffLines(patch);
   const contents = await Promise.all(created.map((path) => newFileText(cwd, path)));
   const all: TaskChanges = {
@@ -124,6 +127,26 @@ function withoutPaths(changes: TaskChanges, skip: Set<string>): TaskChanges {
     deleted: changes.deleted.filter(keep),
     untracked: changes.untracked.filter(keep),
   };
+}
+
+function codeRoots(paths: string[]): Set<string> {
+  return new Set(
+    paths
+      .filter((path) => (languageOf(path) || isTestFile(path)) && !isBuildOutput(path))
+      .map(rootOf)
+      .filter((root) => !root.startsWith(".")),
+  );
+}
+
+function toolOutput(path: string, roots: Set<string>): boolean {
+  if (languageOf(path) || isTestFile(path)) return false;
+  const root = rootOf(path);
+  if (root.startsWith(".") || (root === "" && path.startsWith("."))) return true;
+  return isBuildOutput(path) || !roots.has(root);
+}
+
+function rootOf(path: string): string {
+  return path.includes("/") ? (path.split("/")[0] ?? "") : "";
 }
 
 function isExcluded(path: string): boolean {
