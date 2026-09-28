@@ -96,4 +96,25 @@ test/                 unit and end-to-end tests
 
 Use [Conventional Commits](https://www.conventionalcommits.org): `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`. Pull request titles are checked, because squash merges use them as the commit message.
 
-Releases are automated with release-please. Every push to `main` updates a release pull request with the next version and the changelog. Merging it creates the GitHub release and stages the new version on npm through trusted publishing (OIDC, no token). A maintainer then approves it with 2FA: `npm stage list builder-assistant-engineer` shows the staged version, and `npm stage approve <stage-id>` (or the package page on npmjs.com) publishes it. If the publish step fails after the GitHub release exists, run the workflow again by hand for that tag, `gh workflow run release.yml -f tag=vX.Y.Z`: it checks out the tag, checks that `package.json` has that version and that npm does not have it yet, and stages it. Publishing uses only the OIDC token of the `publish` job; there is no npm token and no `.npmrc`. npm runs with verbose logging, and a failed run uploads npm's logs as the `npm-logs` artifact.
+### Releases
+
+Releases go through release-please and npm trusted publishing. There is no npm token anywhere: the `publish` job in `.github/workflows/release.yml` gets a short-lived OIDC token from GitHub (`id-token: write`, `contents: read`), and npm exchanges it for a publish credential. The trusted publisher on npmjs.com is `NeKai-devs / BuilderAssistantEngineer / release.yml`, with no environment, allowed to stage.
+
+1. Every push to `main` updates the release pull request that release-please keeps open, with the next version and the changelog.
+2. Merging that pull request creates the tag and the GitHub release, then the `publish` job builds the tag and stages it on npm with provenance. The job log ends with `staged with id <stage-id>`.
+3. A maintainer approves it with 2FA. npm 10 has no `stage` command, so run a current npm through `npx`:
+
+   ```bash
+   npx -y npm@latest stage list builder-assistant-engineer
+   npx -y npm@latest stage approve <stage-id>
+   ```
+
+   The package page on npmjs.com can approve it too. Then `npx builder-assistant-engineer@latest --version`, run from an empty folder, prints the new version.
+
+To recover when the tag and the GitHub release exist but npm does not have the version, run the workflow by hand for that tag:
+
+```bash
+gh workflow run release.yml -f tag=vX.Y.Z
+```
+
+It checks out the tag, checks that `package.json` has that version and that npm does not have it yet, and stages it; continue with step 3. npm runs with verbose logging, and a failed run uploads npm's logs as the `npm-logs` artifact.
