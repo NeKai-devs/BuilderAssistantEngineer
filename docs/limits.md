@@ -81,6 +81,7 @@ To report a new case, including correct work that the gates stopped, use the [Re
 - Some secret formats are not recognized: Azure storage connection strings, JDBC and SQL Server passwords, `Bearer` headers, `whsec_`, SendGrid `SG.`, XML `<password>`, and strings split in two. (medium)
 - Accepting a secret finding accepts other values of the same kind in the same file. (medium)
 - The file names of out-of-scope changes appear in the reviewer's list of findings, outside the markers that hold the diff. (medium)
+- Files under `node_modules`, `.venv`, `venv` or `bower_components` that the repository ignores after the task are not reviewed or scanned, so installed dependencies do not read as the task's code. A task whose Scope lists `.gitignore` could put code of its own there; the import that uses it still shows in the diff. (medium)
 - Committed build output competes with source files for the reviewer's diff budget. (low)
 - Evidence checks cited paths between backticks, not paths in prose. It does not check `file.ts:L10`, `file.ts:10,20` or Windows paths. (low)
 - A bare Scope glob such as `*.ts` matches files at the repository root only. (low)
