@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { configSchema } from "../../src/config/schema.js";
-import { affectsChecks, agentCommands } from "../../src/next/permissions.js";
+import { affectsChecks, agentCommands, briefCommands } from "../../src/next/permissions.js";
 import { parseTask } from "../../src/tasks/schema.js";
 import { taskFile } from "../plan-sample.js";
 
@@ -80,5 +80,21 @@ describe("agentCommands", () => {
     for (const helper of ["echo", "tail", "head", "grep", "git status", "git diff"]) {
       expect(commands).toContain(helper);
     }
+  });
+
+  it("lets the agent check versions and start a manifest, and lists commands briefly", () => {
+    const commands = agentCommands(config({ test: "npm test" }), task("test -f dist/cli.js"));
+    expect(commands).toEqual(
+      expect.arrayContaining(["npm --version", "node --version", "npm init"]),
+    );
+    expect(
+      briefCommands([
+        "npm test",
+        "test",
+        "test -f dist/cli.js",
+        "npx vitest run a.ts",
+        "npx vitest",
+      ]),
+    ).toEqual(["npm test", "test", "npx vitest"]);
   });
 });

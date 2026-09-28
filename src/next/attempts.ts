@@ -29,7 +29,7 @@ import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
 import { announcePullRequest } from "./branch.js";
 import { commitTask } from "./commit.js";
-import { affectsChecks, agentCommands, ruleHint } from "./permissions.js";
+import { affectsChecks, agentCommands, briefCommands, ruleHint } from "./permissions.js";
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
@@ -122,9 +122,17 @@ export async function headlessLoop(
       attempt: String(attempt),
       task_path: capture.path,
       max_log_lines: String(MAX_LOG_LINES),
+      permissions: permissionNote(capture),
     });
   }
   return false;
+}
+
+export function permissionNote(capture: Capture): string {
+  const commands = briefCommands(agentCommands(capture.config, capturedTask(capture)));
+  if (commands.length === 0) return "";
+  const list = commands.map((command) => `\`${command}\``).join(", ");
+  return `\n\nThis run is unattended, so nobody can approve a command. You may run these commands, with any arguments: ${list}. Any other command will be denied. One denied command does not mean the others are: if one is refused, keep going with the ones above, for example install dependencies even if a version check was refused.`;
 }
 
 async function launch(

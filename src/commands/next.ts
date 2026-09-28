@@ -5,7 +5,7 @@ import { newAcceptance } from "../gates/findings.js";
 import type { Checks, GateRun } from "../gates/gate.js";
 import { suiteCommands } from "../gates/regression.js";
 import { t } from "../i18n/index.js";
-import { attemptOnce, headlessLoop } from "../next/attempts.js";
+import { attemptOnce, headlessLoop, permissionNote } from "../next/attempts.js";
 import { useRunBranch } from "../next/branch.js";
 import { checksFor, recoverInterrupted, start, withSuiteCommands } from "../next/start.js";
 import { capturedTask } from "../review/run.js";
@@ -62,7 +62,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     verify: options.verify !== false,
     tampered: [],
   };
-  const prompt = await taskPrompt(ctx, capture, tasks);
+  const prompt = await taskPrompt(ctx, capture, tasks, headless);
   if (options.headless && !headless) ctx.prompter.warn(t("next.headlessNeedsAgent"));
   const done = headless
     ? await headlessLoop(ctx, run, prompt)
@@ -81,7 +81,12 @@ async function exhaustedTasks(ctx: CommandContext, tasks: Task[]): Promise<Set<s
   return new Set(used.filter(([, count]) => count >= MAX_ATTEMPTS).map(([id]) => id));
 }
 
-async function taskPrompt(ctx: CommandContext, capture: Capture, tasks: Task[]): Promise<string> {
+async function taskPrompt(
+  ctx: CommandContext,
+  capture: Capture,
+  tasks: Task[],
+  headless: boolean,
+): Promise<string> {
   const task = capturedTask(capture);
   const others = tasks.map((item) => (item.meta.id === task.meta.id ? task : item));
   const metrics = await readMetrics(
@@ -97,6 +102,7 @@ async function taskPrompt(ctx: CommandContext, capture: Capture, tasks: Task[]):
       suiteCommands(capture.config).length > 0
         ? ", then the project's lint and test commands, which must not turn red"
         : "",
+    permissions: headless ? permissionNote(capture) : "",
   });
 }
 

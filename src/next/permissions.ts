@@ -4,23 +4,25 @@ import { allowlistProblems } from "../tasks/checks.js";
 import { type Task, verificationScript } from "../tasks/schema.js";
 import { logicalLines, parseLine, program } from "../tasks/shell-words.js";
 
+const NPM = ["npm install", "npm ci", "npm init", "npm --version", "node --version"];
+const BUN = ["bun install", "bun add", "bun init", "bun --version"];
 const INSTALLERS: Record<string, string[]> = {
-  npm: ["npm install", "npm ci"],
-  npx: ["npm install", "npm ci"],
-  pnpm: ["pnpm install", "pnpm add"],
-  yarn: ["yarn install", "yarn add"],
-  bun: ["bun install", "bun add"],
-  bunx: ["bun install", "bun add"],
-  uv: ["uv sync", "uv add"],
-  poetry: ["poetry install", "poetry add"],
-  pip: ["pip install"],
-  pip3: ["pip3 install"],
-  pytest: ["pip install"],
-  python: ["python -m pip install"],
-  python3: ["python3 -m pip install"],
-  go: ["go mod tidy", "go mod download", "go get"],
-  cargo: ["cargo fetch", "cargo add"],
-  dotnet: ["dotnet restore", "dotnet add"],
+  npm: NPM,
+  npx: NPM,
+  pnpm: ["pnpm install", "pnpm add", "pnpm init", "pnpm --version", "node --version"],
+  yarn: ["yarn install", "yarn add", "yarn init", "yarn --version", "node --version"],
+  bun: BUN,
+  bunx: BUN,
+  uv: ["uv sync", "uv add", "uv init", "uv --version"],
+  poetry: ["poetry install", "poetry add", "poetry init", "poetry --version"],
+  pip: ["pip install", "pip --version", "python --version"],
+  pip3: ["pip3 install", "pip3 --version", "python3 --version"],
+  pytest: ["pip install", "python --version"],
+  python: ["python -m pip install", "python --version"],
+  python3: ["python3 -m pip install", "python3 --version"],
+  go: ["go mod tidy", "go mod download", "go get", "go mod init", "go version"],
+  cargo: ["cargo fetch", "cargo add", "cargo init", "cargo --version"],
+  dotnet: ["dotnet restore", "dotnet add", "dotnet new", "dotnet --version"],
 };
 const RUNNERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const RUN_VERBS = new Set(["run", "exec", "x", "dlx"]);
@@ -92,6 +94,12 @@ export function agentCommands(config: Config, task: Task): string[] {
   const commands = words.flatMap((command) => [command.join(" "), ...prefix(command)]);
   return [...new Set([...commands, ...installs, ...HELPERS])].filter(
     (command) => !RULE_BREAKING.test(command),
+  );
+}
+
+export function briefCommands(commands: string[]): string[] {
+  return commands.filter(
+    (command) => !commands.some((other) => other !== command && command.startsWith(`${other} `)),
   );
 }
 

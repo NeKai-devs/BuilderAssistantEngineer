@@ -55,6 +55,30 @@ describe("next --headless and the agent's environment", () => {
     const run = await next(cwd, HEADLESS, [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS]);
     expect(run.code).toBe(0);
     expect(run.calls[0]?.options.allow).toContain("node vitest.js run");
+    expect(run.calls[0]?.prompt).toContain(
+      "This run is unattended, so nobody can approve a command.",
+    );
+    expect(run.calls[0]?.prompt).toContain("`node vitest.js run`");
+    expect(run.calls[0]?.prompt).toContain("`git status`");
+  });
+
+  it("repeats the allowed commands in the retry prompt, and leaves them out of an interactive one", async () => {
+    const needsOk = `node -e "process.exit(require('fs').existsSync('src/ok.ts') ? 0 : 1)"`;
+    const cwd = await bypassRepo({ task: { command: needsOk, scope: "- `src/`" } });
+    const retried = await next(cwd, HEADLESS, [
+      agent(cwd, { "src/feature.ts": "x\n" }),
+      agent(cwd, { "src/ok.ts": "export const ok = true;\n" }),
+      REVIEW_PASS,
+    ]);
+    expect(retried.calls[1]?.prompt).toContain("The previous attempt did not pass");
+    expect(retried.calls[1]?.prompt).toContain("This run is unattended");
+    const interactive = await bypassRepo();
+    const run = await next(
+      interactive,
+      ["--yes"],
+      [agent(interactive, { "src/feature.ts": "x\n" }), REVIEW_PASS],
+    );
+    expect(run.calls[0]?.prompt).not.toContain("This run is unattended");
   });
 
   it("blocks at once, naming the command, when the agent was denied a command it needed", async () => {
