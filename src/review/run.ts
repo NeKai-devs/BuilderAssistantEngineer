@@ -52,7 +52,10 @@ export async function reviewTask(
       : { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };
   }
   const log = await currentLog(ctx.cwd, capture);
-  const scanned = log ? { ...view.changes, added: [...view.changes.added, log] } : view.changes;
+  const scanned = {
+    ...view.changes,
+    added: [...view.changes.added, ...view.late, ...(log ? [log] : [])],
+  };
   const history = await committedText(ctx.cwd, view.ref);
   if (!history) {
     const reason = t("review.gitError");
@@ -70,7 +73,13 @@ export async function reviewTask(
       stage: "mechanical",
     };
   }
-  const diff = await reviewDiff(ctx.cwd, view.ref, view.changes, scopePaths(task));
+  const diff = await reviewDiff(
+    ctx.cwd,
+    view.ref,
+    view.changes,
+    scopePaths(task),
+    view.late.map((item) => item.path),
+  );
   if (!diff) {
     const reason = t("review.gitError");
     return { status: "fail", findings: [{ severity: "blocker", message: reason }], reason };

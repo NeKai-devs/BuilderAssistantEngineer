@@ -16,7 +16,7 @@ import {
 import { BAE_DIR } from "../core/paths.js";
 import type { Capture } from "../gates/capture.js";
 import { TASKS_DIR } from "../gates/contract.js";
-import { ignoreMatcher, untrackedFiles } from "../gates/ignore-rules.js";
+import { captureIgnore, ignoreMatcher, untrackedFiles } from "../gates/ignore-rules.js";
 import { unchangedSince } from "./snapshot.js";
 
 export type AddedText = { path: string; text: string };
@@ -28,7 +28,7 @@ export type TaskChanges = {
   untracked: string[];
 };
 export type ChangeView =
-  | { ok: true; ref: string; changes: TaskChanges; before: Set<string> }
+  | { ok: true; ref: string; changes: TaskChanges; before: Set<string>; late: AddedText[] }
   | { ok: false; reason: "noGit" | "noBase" | "gitError" };
 
 const MAX_NEW_FILE_BYTES = 1_000_000;
@@ -53,7 +53,10 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
   if (!names || !deleted || patch === undefined || !untracked) {
     return { ok: false, reason: "gitError" };
   }
-  const created = untracked.filter((path) => !isExcluded(path));
+  const current = ignoreMatcher(await captureIgnore(cwd));
+  const found = untracked.filter((path) => !isExcluded(path));
+  const created = found.filter((path) => !current(path, false));
+  const hidden = found.filter((path) => current(path, false));
   const lines = diffLines(patch);
   const contents = await Promise.all(created.map((path) => newFileText(cwd, path)));
   const all: TaskChanges = {
@@ -67,7 +70,12 @@ export async function taskChanges(cwd: string, capture: Capture): Promise<Change
     untracked: created,
   };
   const before = await unchangedSince(cwd, capture.snapshot, all.files);
-  return { ok: true, ref, changes: withoutPaths(all, before), before };
+  const late = await Promise.all(
+    hidden
+      .filter((path) => !before.has(path))
+      .map(async (path) => ({ path, text: await newFileText(cwd, path) })),
+  );
+  return { ok: true, ref, changes: withoutPaths(all, before), before, late };
 }
 
 export function diffLines(patch: string): { added: AddedText[]; removed: AddedText[] } {

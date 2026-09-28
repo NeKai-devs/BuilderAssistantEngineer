@@ -1,4 +1,7 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { writeFiles } from "../../helpers.js";
 import { agent, bypassRepo, fake, next, REVIEW_PASS, read } from "./harness.js";
 
 const KEY = () => `export const key = "${fake("AKIA", "ABCDEFGHIJKLMNOP")}";\n`;
@@ -65,5 +68,33 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(second.code).toBe(0);
     expect(await read(cwd, ".npmrc")).toContain("script-shell");
     expect(second.log).toContain(`(${id}) .npmrc: Changed a package manager or tool setting`);
+  });
+
+  it("keeps a cache that a tool ignores during the task out of the review, but still scans it", async () => {
+    const cwd = await bypassRepo({ task: { scope: "- `src/feature.ts`" } });
+    const exclude = async (lines: string) => {
+      const path = join(cwd, ".git", "info", "exclude");
+      await writeFile(path, `${await readFile(path, "utf8").catch(() => "")}${lines}`);
+    };
+    const hook = agent(cwd, { "src/feature.ts": "export const f = 1;\n" }, async () => {
+      await writeFiles(cwd, { ".tool/hook.cache.json": '{"session":"abc"}\n' });
+      await exclude(".tool/hook.cache.json\n");
+    });
+    const run = await next(cwd, ["--yes"], [hook, REVIEW_PASS]);
+    expect(run.code).toBe(0);
+    expect(run.log).not.toContain("Changed outside the task's Scope");
+    expect(run.calls[1]?.prompt).toContain("ignore rules added during the task leave out");
+    const hidden = await bypassRepo({ task: { scope: "- `src/feature.ts`" } });
+    const cheat = agent(
+      hidden,
+      { "src/feature.ts": "export const f = 1;\n", "src/k.ts": KEY() },
+      async () => {
+        const path = join(hidden, ".git", "info", "exclude");
+        await writeFile(path, `${await readFile(path, "utf8").catch(() => "")}src/k.ts\n`);
+      },
+    );
+    const blocked = await next(hidden, ["--yes"], [cheat, REVIEW_PASS]);
+    expect(blocked.code).toBe(1);
+    expect(blocked.log).toContain("src/k.ts: Adds what looks like a credential");
   });
 });

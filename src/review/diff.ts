@@ -22,6 +22,7 @@ export async function reviewDiff(
   ref: string,
   changes: TaskChanges,
   scope: string[],
+  hidden: string[] = [],
   budget = MAX_DIFF_CHARS,
 ): Promise<ReviewDiff | undefined> {
   const own = new Set(changes.files);
@@ -36,10 +37,15 @@ export async function reviewDiff(
   if (raw === undefined) return undefined;
   const tracked = splitDiff(raw).filter((piece) => own.has(piece.path));
   const created = await Promise.all(changes.untracked.map((path) => newFilePiece(cwd, path)));
-  return fitBudget([...tracked, ...created], scope, budget);
+  return fitBudget([...tracked, ...created], scope, budget, hidden);
 }
 
-export function fitBudget(pieces: DiffPiece[], scope: string[], budget: number): ReviewDiff {
+export function fitBudget(
+  pieces: DiffPiece[],
+  scope: string[],
+  budget: number,
+  hidden: string[] = [],
+): ReviewDiff {
   const generated = pieces.filter((piece) => isGenerated(piece.path)).map((piece) => piece.path);
   const ranked = pieces
     .filter((piece) => !isGenerated(piece.path))
@@ -67,6 +73,9 @@ export function fitBudget(pieces: DiffPiece[], scope: string[], budget: number):
   const notes = [
     omitted.length > 0 ? `Not shown, over the size budget: ${omitted.join(", ")}` : "",
     generated.length > 0 ? `Not shown, generated files: ${generated.join(", ")}` : "",
+    hidden.length > 0
+      ? `Not shown, new files that ignore rules added during the task leave out, usually caches a tool wrote (still scanned for secrets): ${hidden.join(", ")}`
+      : "",
   ].filter(Boolean);
   const body = [...parts, ...notes].join("\n\n");
   return {

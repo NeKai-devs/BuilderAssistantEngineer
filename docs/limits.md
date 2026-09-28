@@ -77,6 +77,7 @@ To report a new case, including correct work that the gates stopped, use the [Re
 
 - New files that are UTF-16 or contain a NUL byte are not scanned for secrets. (medium)
 - A file force-committed under `.bae/tmp/` is not seen. This needs `git add -f`. (medium)
+- A new file that an ignore rule added during the task leaves out (for example a tool's cache listed in `.git/info/exclude` by its hook) is still scanned for secrets and test markers, but the reviewer only sees its name, not its content, and it does not count against the Scope. (medium)
 - Some secret formats are not recognized: Azure storage connection strings, JDBC and SQL Server passwords, `Bearer` headers, `whsec_`, SendGrid `SG.`, XML `<password>`, and strings split in two. (medium)
 - Accepting a secret finding accepts other values of the same kind in the same file. (medium)
 - The file names of out-of-scope changes appear in the reviewer's list of findings, outside the markers that hold the diff. (medium)
