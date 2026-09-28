@@ -19,6 +19,7 @@ import type { Capture } from "./capture.js";
 import { enforceContract } from "./enforce.js";
 import type { Acceptance } from "./findings.js";
 import {
+  COMMAND_NOT_FOUND,
   checkRegressions,
   formatCounts,
   type RegressionCheck,
@@ -48,6 +49,7 @@ export type Gate = {
   report: string;
   stage?: GateStage;
   reason?: string;
+  environment?: string;
   regressions: string[];
   skips: string[];
 };
@@ -133,9 +135,11 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (afterSuite)
     return fail("contract", joinSections([...sections, afterSuite]), t("contract.failed"));
   if (regression && !regression.passed) {
+    const missing = regression.regressions.find((check) => check.exitCode === COMMAND_NOT_FOUND);
     return {
       ...fail("regression", joinSections(sections), t("regression.failed")),
       regressions: regression.regressions.map((check) => check.command),
+      ...(missing ? { environment: t("env.notFound", { command: missing.command }) } : {}),
     };
   }
   const checksRun = regression?.checks ?? [];
@@ -173,7 +177,10 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
       code: verification.exitCode,
     });
     ctx.prompter.warn(reason);
-    return fail("verification", joinSections(sections), reason);
+    const failed = fail("verification", joinSections(sections), reason);
+    if (verification.exitCode !== COMMAND_NOT_FOUND) return failed;
+    const command = verification.failed ?? "Verification";
+    return { ...failed, environment: t("env.notFound", { command }) };
   }
   ctx.prompter.success(t("verify.passed"));
   const handoff = handoffProblem(await currentTask(ctx, capture));

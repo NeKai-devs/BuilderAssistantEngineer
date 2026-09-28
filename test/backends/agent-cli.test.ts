@@ -83,6 +83,49 @@ describe("agent CLI backends", () => {
     expect(infos).toEqual([{ model: "claude-opus-5-5", costUsd: 0.25, truncated: true }]);
   });
 
+  it("allows the task's commands when claude or gemini may edit, and only then", async () => {
+    const allow = ["npm test", "npm install"];
+    const claude = AGENT_SPECS.claude.headless("edit", "", allow);
+    const rules = claude.slice(
+      claude.indexOf("--allowedTools") + 1,
+      claude.indexOf("--permission-mode"),
+    );
+    expect(rules).toEqual([
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npm install)",
+      "Bash(npm install *)",
+    ]);
+    expect(AGENT_SPECS.claude.headless("read", "", allow)).not.toContain("--allowedTools");
+    expect(AGENT_SPECS.claude.headless("edit", "", [])).not.toContain("--allowedTools");
+    const gemini = AGENT_SPECS.gemini.headless("edit", "", allow);
+    expect(gemini.slice(gemini.indexOf("--allowed-tools") + 1, gemini.indexOf("--prompt"))).toEqual(
+      ["run_shell_command(npm test)", "run_shell_command(npm install)"],
+    );
+    expect(AGENT_SPECS.gemini.headless("read", "", allow)).not.toContain("--allowed-tools");
+    expect(AGENT_SPECS.codex.headless("edit", "out.md", allow).join(" ")).not.toContain("npm");
+    expect(AGENT_SPECS.opencode.headless("edit", "", allow)).toEqual(["run"]);
+  });
+
+  it("reports the commands claude was not allowed to run", async () => {
+    const stdout = JSON.stringify({
+      type: "result",
+      result: "Blocked.",
+      permission_denials: [
+        { tool_name: "Bash", tool_input: { command: "npm --version" } },
+        { tool_name: "Bash", tool_input: { command: "npm --version" } },
+        { tool_name: "WebFetch", tool_input: { url: "https://example.com" } },
+      ],
+    });
+    const infos: { denied?: string[] }[] = [];
+    await createBackend("claude", { runner: fakeRunner({ stdout }).runner }).run("P", {
+      cwd: await tempDir(),
+      access: "edit",
+      onInfo: (info) => infos.push(info),
+    });
+    expect(infos[0]?.denied).toEqual(["npm --version"]);
+  });
+
   it("joins an answer that claude split over several messages after its last tool call", async () => {
     const assistant = (id: string, content: unknown[]) =>
       JSON.stringify({ type: "assistant", message: { id, content } });
@@ -128,9 +171,9 @@ describe("agent CLI backends", () => {
   });
 
   it("uses read-only modes for every agent by default", () => {
-    expect(AGENT_SPECS.opencode.headless("read", "")).toEqual(["run", "--agent", "plan"]);
-    expect(AGENT_SPECS.gemini.headless("read", "")).toContain("plan");
-    expect(AGENT_SPECS.codex.headless("read", "out.md")).toEqual([
+    expect(AGENT_SPECS.opencode.headless("read", "", [])).toEqual(["run", "--agent", "plan"]);
+    expect(AGENT_SPECS.gemini.headless("read", "", [])).toContain("plan");
+    expect(AGENT_SPECS.codex.headless("read", "out.md", [])).toEqual([
       "exec",
       "--color",
       "never",

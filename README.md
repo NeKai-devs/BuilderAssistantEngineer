@@ -20,7 +20,7 @@ npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one fil
 npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
-Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. A headless agent can only run the commands its CLI already allows: with Claude Code, open `claude` in the repo once, accept the trust prompt and allow the commands your tasks need, such as `npm`, or the agent cannot install or test anything. If a task ends `blocked`, fix the cause, set `status: pending` in its file and run `next` again. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
+Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. In a headless run bae lets the agent run the task's checks and install dependencies, and nothing else it would have to ask for; if the agent is denied a command it needed, the task stops at once and names the command to allow (see [Headless permissions](#headless-permissions)). If a task ends `blocked`, fix the cause, set `status: pending` in its file and run `next` again. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
 
 Tried it? Tell us how it went with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form, even if you stopped halfway.
 
@@ -120,7 +120,7 @@ nekai-pos is a private desktop point-of-sale app (Tauri 2, React and TypeScript,
 | Change | 68 files, +2,971 and −296 lines, 16 test files |
 | Cost | Not recorded. bae does not log the agent's cost in `next`, and the run used a Claude subscription, whose usage limit cut it twice; attempts cut that way are not counted above. |
 
-Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. The headless agents could not run commands: Claude Code ignores a project's `.claude/settings.json` permissions in a folder it has not trusted, which is why the quickstart asks you to open `claude` in the repo first.
+Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. The headless agents could not run commands, because Claude Code ignores a project's `.claude/settings.json` permissions in a folder it has not trusted; bae now passes the task's commands to the agent itself.
 
 ## Commands
 
@@ -139,14 +139,25 @@ Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly wh
 
 | Backend | Runs | `plan` and `review` | `next` | Needs |
 | --- | --- | --- | --- | --- |
-| `claude` | `claude -p` | read-only tools (`Read`, `Grep`, `Glob`) | interactive session; `--headless` uses `--permission-mode acceptEdits` | [Claude Code](https://code.claude.com) |
+| `claude` | `claude -p` | read-only tools (`Read`, `Grep`, `Glob`) | interactive session; `--headless` uses `--permission-mode acceptEdits` and `--allowedTools` for the task's commands | [Claude Code](https://code.claude.com) |
 | `opencode` | `opencode run` | `plan` agent (no edits) | interactive TUI; `--headless` uses the default build agent | [opencode](https://opencode.ai) |
 | `codex` | `codex exec` | `--sandbox read-only` | interactive session; `--headless` uses `--sandbox workspace-write` | [Codex CLI](https://github.com/openai/codex) |
-| `gemini` | `gemini -p` | `--approval-mode plan` | `gemini -i`; `--headless` uses `--approval-mode auto_edit` | [Gemini CLI](https://github.com/google-gemini/gemini-cli) |
+| `gemini` | `gemini -p` | `--approval-mode plan` | `gemini -i`; `--headless` uses `--approval-mode auto_edit` and `--allowed-tools` for the task's commands | [Gemini CLI](https://github.com/google-gemini/gemini-cli) |
 | `api` | HTTPS | single request with the digest | copy-and-paste flow, since an API cannot edit your repo | an API key |
 | `manual` | you | prints the prompt, copies it to the clipboard, reads the answer from stdin or `.bae/tmp/response.md` | copy-and-paste flow | any AI, even a web chat |
 
 `init` detects which agent CLIs are installed and suggests the first one. Agent backends receive the prompt on stdin, get the repository digest, and may explore the repository themselves. The analyst never writes files: the CLI parses its answer and writes them. No backend is ever run with permission bypass (`--dangerously-skip-permissions`, `--yolo` and similar).
+
+### Headless permissions
+
+A headless agent cannot ask you before it runs a command, so bae tells it which commands the task needs: the project's lint, typecheck, build and test commands, the task's Verification commands that bae itself would run unattended, and the install commands of the toolchains they use (`npm install` and `npm ci` for npm, `uv sync` and `uv add` for uv, `go mod tidy` and `go get` for Go, and so on). Nothing is written to your agent's settings. If the agent is still denied a command it needed and the checks fail, the task is blocked at once, without spending the other attempts, and the message names the command to allow.
+
+| Backend | How the commands reach the agent |
+| --- | --- |
+| `claude` | `--allowedTools` rules such as `Bash(npm test)` and `Bash(npm test *)`. Tested. |
+| `gemini` | `--allowed-tools run_shell_command(<command>)`. Gemini CLI matches these exactly in non-interactive mode, so a command with other arguments is still denied. Not tested against a real Gemini CLI. |
+| `opencode` | Nothing to pass: opencode allows shell commands unless your opencode config says otherwise. |
+| `codex` | No per-command permissions. `--sandbox workspace-write` runs commands, but the sandbox has no network by default, so installing dependencies fails: install them before `next`, or allow network in your Codex config. |
 
 ### API backend
 
@@ -167,7 +178,7 @@ Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly wh
 5. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted, and stops after `agent.timeoutMinutes`.
 6. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run (see `verify.allow`).
 7. If a gate fails, the task stays `in_progress` and you see why. If every gate passes, the task is marked `done` and committed as a [conventional commit](https://www.conventionalcommits.org): `<type>: <title> (T-NNN)` with a `Bae-Task: T-NNN` trailer, where `type` comes from the task's frontmatter (`feat`, `fix`, `refactor`, `test`, `docs` or `chore`, the default). The title's first letter is lowercased when the next one is lowercase, so `Add the login page` becomes `add the login page` while acronyms such as `API` stay as written, and the header stays within 100 characters. The analyst starts every title with a verb, so commitlint's conventional config accepts the message; a title that starts with an acronym fails its `subject-case` rule (see [docs/limits.md](docs/limits.md#task-commits)). The commit holds the task file and the files the task changed, not the files that were already uncommitted before it. Your git hooks run as usual; `--no-verify` skips the pre-commit and commit-msg hooks. If a hook fails or git cannot commit, the task stays done, the commit stays pending and you see why. After the last task of the plan, `next` prints the command to open the pull request, `gh pr create --base <your branch> --head bae/<run>`, without running it.
-8. With `--headless`, a failed attempt is retried with the task plus the failure output. A task gets three attempts in total, counted across runs of `next`, including attempts that ended because the agent failed or timed out. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
+8. With `--headless`, a failed attempt is retried with the task plus the failure output, unless the cause is the environment: a check that cannot find its program (exit 127), or a command the agent was denied. Another attempt would fail the same way, so the task is blocked at once with the cause and the remedy. A task gets three attempts in total, counted across runs of `next`, including attempts that ended because the agent failed or timed out. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
 
 When something a gate needs cannot be had (no git repository, a declined or unusable baseline, a task that was already in progress without a capture, a reviewer with no verdict), `next` stops and says why instead of skipping it. `--allow-skip` goes on without that check and records the skip in the run log and the attempt.
 
