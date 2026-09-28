@@ -36,7 +36,9 @@ export function planContext(
 
 function planState(tasks: Task[], current: Task): string {
   const done = tasks.filter((task) => task.meta.status === "done").length;
-  const blocked = tasks.filter((task) => task.meta.status === "blocked");
+  const blocked = tasks.filter(
+    (task) => task.meta.status === "blocked" || task.meta.status === "needs_review",
+  );
   const others = tasks.filter((task) => task.meta.id !== current.meta.id);
   const upNext = others
     .filter((task) => task.meta.status === "pending")

@@ -131,7 +131,11 @@ function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
     .map((task) => {
       const waiting = waitingOn(task, tasks);
       const reason =
-        task.meta.status === "blocked" ? "blocked" : `waiting on ${waiting.join(", ")}`;
+        task.meta.status === "blocked"
+          ? "blocked"
+          : task.meta.status === "needs_review"
+            ? t("next.needsReview", { note: task.meta.review_note ?? "" })
+            : `waiting on ${waiting.join(", ")}`;
       return `${task.meta.id} ${task.meta.title} (${reason})`;
     });
   ctx.prompter.note(stuck.join("\n"), t("next.nothingReady"));

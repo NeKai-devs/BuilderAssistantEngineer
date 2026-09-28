@@ -123,7 +123,26 @@ export const es: Messages = {
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
   "next.allDone": "Todas las tareas están hechas.",
   "next.nothingReady": "No hay ninguna tarea lista",
-  "next.unblock": "Desbloquea o termina las tareas de arriba, o ejecuta replan.",
+  "opencode.model": "opencode usará {{model}} (de {{source}}).",
+  "opencode.weakModel":
+    'opencode usará {{model}} (de {{source}}), que parece un modelo gratuito o pequeño. Un plan necesita un modelo fuerte: usa --backend claude, o pon un "model" más fuerte en opencode.json.',
+  "opencode.noModel":
+    'opencode no tiene "model" en opencode.json, así que usará el suyo por defecto, que puede ser gratuito. Un plan necesita un modelo fuerte: usa --backend claude, o pon un "model" en opencode.json.',
+  "plan.notAPlan":
+    "La respuesta ({{chars}} caracteres) no trae archivos del plan, así que no es un plan; se pide de nuevo con el prompt completo. La respuesta queda en {{path}}.",
+  "plan.needsReviewWarn":
+    "{{count}} tarea(s) aún tienen una Verification que la CLI no acepta: {{ids}}. Se escriben con status needs_review, y next no las correrá hasta que se corrijan.",
+  "plan.needsReview":
+    "{{count}} tarea(s) necesitan revisión antes de que next pueda correrlas: {{ids}}. El review_note de cada archivo dice qué corregir en su Verification; luego pon su status en pending.",
+  "verification.retrying":
+    "{{count}} tarea(s) tienen una Verification que la CLI no acepta: {{kinds}}. Se le pide al analista que corrija solo esas. Detalles en {{report}}.",
+  "verification.fixing": "El analista está corrigiendo la Verification de esas tareas",
+  "verification.fixed": "Todas las Verification están corregidas.",
+  "verification.retryFailed": "Falló la petición para corregir la Verification: {{details}}",
+  "status.reviewReason": "{{id}} necesita revisión: {{reason}}",
+  "next.needsReview": "necesita revisión: {{note}}",
+  "next.unblock":
+    "Corrige lo que dice en su archivo una tarea que necesita revisión y pon su status en pending, desbloquea o termina las demás tareas de arriba, o ejecuta replan.",
   "verify.commands": "Verificación",
   "verify.confirm": "¿Ejecutar ahora estos comandos de verificación?",
   "verify.declined": "No se ejecutó la verificación; la tarea sigue en curso.",

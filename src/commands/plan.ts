@@ -76,7 +76,7 @@ async function offerCommit(
 export function obsoleteTasks(tasks: LoadedTask[], parsed: ParsedPlan): Change[] {
   const kept = new Set(parsed.tasks.map((task) => task.meta.id));
   return tasks
-    .filter((task) => task.task?.meta.status === "pending" && !kept.has(task.id))
+    .filter((task) => isReplaceable(task.task?.meta.status) && !kept.has(task.id))
     .map((task) => ({ path: task.path, before: task.text, after: "", kind: "delete" }));
 }
 
@@ -113,4 +113,8 @@ export async function reportPlan(
 async function regenerate(ctx: CommandContext): Promise<boolean> {
   if (ctx.flags.yes) return true;
   return ctx.prompter.confirm(t("plan.existingPlan"), false);
+}
+
+function isReplaceable(status: string | undefined): boolean {
+  return status === "pending" || status === "needs_review";
 }

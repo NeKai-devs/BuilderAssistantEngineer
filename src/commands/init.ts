@@ -1,5 +1,6 @@
 import type { AgentName } from "../backends/agent-cli.js";
 import { hasApiCredentials } from "../backends/api.js";
+import { noteOpencodeModel } from "../backends/opencode-model.js";
 import {
   type Backend as BackendName,
   type Config,
@@ -70,6 +71,7 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
     secrets: existing?.secrets ?? { allow: [] },
     agent: existing?.agent ?? { timeoutMinutes: DEFAULT_AGENT_TIMEOUT_MINUTES },
   };
+  if (config.backend === "opencode") await noteOpencodeModel(ctx);
   const interview = await interviewFor(ctx, config, options);
   if (interview === undefined) return;
   await writeConfig(ctx.cwd, config);

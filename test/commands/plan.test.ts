@@ -318,7 +318,8 @@ describe("plan", () => {
 
   it("retries once when the answer is malformed", async () => {
     const cwd = await setup();
-    const { code, ai } = await runPlan(cwd, ["--yes"], ["no blocks here", planOutput()]);
+    const noSummary = planOutput().replace(/<<<SUMMARY>>>[\s\S]*?<<<END SUMMARY>>>/, "");
+    const { code, ai } = await runPlan(cwd, ["--yes"], [noSummary, planOutput()]);
     expect(code).toBe(0);
     expect(ai.prompts[1]).toContain("expected exactly one SUMMARY block, found 0");
     expect(await exists(cwd, "docs/plan/00-overview.md")).toBe(true);
@@ -328,12 +329,32 @@ describe("plan", () => {
     });
   });
 
+  it("asks again with the full prompt when the answer is not a plan, and keeps that answer", async () => {
+    const cwd = await setup();
+    const short = "I would build this with Flask and SQLite.";
+    const { code, ai, ui } = await runPlan(cwd, ["--yes"], [short, planOutput()]);
+    expect(code).toBe(0);
+    expect(ai.prompts[1]).toContain("- MODE: PLAN");
+    expect(ai.prompts[1]).toContain(
+      `Note: your previous answer (${short.length} characters) contained no <<<FILE: …>>> blocks`,
+    );
+    expect(ai.prompts[1]).not.toContain("did not follow the required output format");
+    expect(ui.log.join("\n")).toContain(
+      `The answer (${short.length} characters) has no plan files, so it is not a plan`,
+    );
+    expect(await read(cwd, ".bae/tmp/non-plan-answer.md")).toBe(short);
+    expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
+      nonPlanAnswers: 1,
+      formatRetries: 0,
+    });
+  });
+
   it("writes a failed report when the answer cannot be parsed", async () => {
     const cwd = await setup();
     const { code } = await runPlan(cwd, ["--yes"], ["nope", "still nope"]);
     expect(code).toBe(1);
     const report = JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"));
-    expect(report).toMatchObject({ ok: false, formatRetries: 1, tasks: 0 });
+    expect(report).toMatchObject({ ok: false, nonPlanAnswers: 1, tasks: 0 });
     expect(report.error).toContain("output format");
   });
 
