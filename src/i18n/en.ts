@@ -278,7 +278,9 @@ export const en = {
   "skip.stopped":
     "Nothing was launched. Fix the cause, or run next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
   "env.denied":
-    "{{agent}} was not allowed to run {{commands}}, so another attempt would fail the same way. bae lets the agent run the task's checks and install dependencies; allow the rest in {{agent}}'s own permissions (for Claude Code, a rule such as `Bash({{first}})` in .claude/settings.json of a folder you trust), or run next without --headless and approve it yourself.",
+    "{{agent}} was not allowed to run {{commands}}, so another attempt would fail the same way. bae lets the agent run the task's checks and install dependencies; allow the rest in {{agent}}'s own permissions (for Claude Code, a rule such as `Bash({{first}} *)` in .claude/settings.json of a folder you trust), or run next without --headless and approve it yourself.",
+  "env.alsoDenied": "{{agent}} was also not allowed to run {{commands}}.",
+  "env.moreDenied": "and {{count}} more",
   "env.notFound":
     "`{{command}}` could not find a program it runs (exit 127): the project's dependencies are not installed, or a tool is missing. Another attempt would fail the same way; install them (for example `npm install`).",
   "next.budgetUsed": "The task already used its {{max}} automatic attempts.",

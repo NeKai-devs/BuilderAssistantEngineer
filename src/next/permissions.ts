@@ -27,9 +27,51 @@ const RUN_VERBS = new Set(["run", "exec", "x", "dlx"]);
 const INTERPRETERS = new Set(["node", "python", "python3", "bash", "sh", "deno", "ruby", "perl"]);
 const SKIPPED = new Set(["", "cd", "export", "set", "true", "false"]);
 const RULE_BREAKING = /[(),'"`$\\*;&|<>]/;
-const LOOKUPS = new Set(["which", "type", "ls", "cat", "pwd", "echo", "env", "printenv", "head"]);
+const LOOKUPS = new Set([
+  "which",
+  "type",
+  "ls",
+  "cat",
+  "pwd",
+  "echo",
+  "printf",
+  "env",
+  "printenv",
+  "head",
+  "tail",
+  "wc",
+  "grep",
+  "rg",
+  "sort",
+  "uniq",
+  "diff",
+  "stat",
+  "true",
+  "test",
+]);
 const GIT_READS = new Set(["status", "log", "diff", "show", "ls-remote", "branch", "rev-parse"]);
 const INFO_FLAGS = new Set(["--version", "-v", "-V", "--help", "-h", "version"]);
+const HELPERS = [
+  "echo",
+  "printf",
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "grep",
+  "ls",
+  "pwd",
+  "sort",
+  "uniq",
+  "diff",
+  "which",
+  "true",
+  "test",
+  "git status",
+  "git diff",
+  "git log",
+  "git show",
+];
 
 export function agentCommands(config: Config, task: Task): string[] {
   const lines = [
@@ -48,14 +90,39 @@ export function agentCommands(config: Config, task: Task): string[] {
     .filter(([name = ""]) => !SKIPPED.has(name));
   const installs = words.flatMap(([name = ""]) => INSTALLERS[baseName(name)] ?? []);
   const commands = words.flatMap((command) => [command.join(" "), ...prefix(command)]);
-  return [...new Set([...commands, ...installs])].filter((command) => !RULE_BREAKING.test(command));
+  return [...new Set([...commands, ...installs, ...HELPERS])].filter(
+    (command) => !RULE_BREAKING.test(command),
+  );
 }
 
 export function affectsChecks(denied: string): boolean {
-  const [name = "", ...args] = denied.trim().split(/\s+/);
-  if (LOOKUPS.has(name)) return false;
-  if (name === "git" && GIT_READS.has(args[0] ?? "")) return false;
+  return firstNeeded(denied) !== undefined;
+}
+
+export function ruleHint(denied: string): string {
+  const words = firstNeeded(denied) ?? [];
+  return [...prefix(words), words.join(" ")][0] ?? denied;
+}
+
+function firstNeeded(denied: string): string[] | undefined {
+  return parseLine(denied)
+    .commands.map((command) => {
+      const { name, args } = program(command);
+      return [name, ...args];
+    })
+    .find((words) => needed(words));
+}
+
+function needed([name = "", ...args]: string[]): boolean {
+  if (SKIPPED.has(name) || LOOKUPS.has(baseName(name))) return false;
+  if (name === "git") return !GIT_READS.has(gitSubcommand(args) ?? "");
   return !(args.length > 0 && args.every((arg) => INFO_FLAGS.has(arg)));
+}
+
+function gitSubcommand(args: string[]): string | undefined {
+  let index = 0;
+  while (args[index] === "-C" || args[index] === "-c") index += 2;
+  return args[index];
 }
 
 function prefix([first = "", second, third]: string[]): string[] {

@@ -286,7 +286,9 @@ export const es: Messages = {
   "skip.stopped":
     "No se lanzó nada. Corrige la causa, o vuelve a correr next con --allow-skip para seguir sin ese chequeo; la omisión queda en el log de la ejecución.",
   "env.denied":
-    "{{agent}} no tuvo permiso para ejecutar {{commands}}, así que otro intento fallaría igual. bae deja al agente correr los chequeos de la tarea e instalar dependencias; permite lo demás en los permisos del propio {{agent}} (en Claude Code, una regla como `Bash({{first}})` en .claude/settings.json de una carpeta de confianza), o corre next sin --headless y apruébalo tú.",
+    "{{agent}} no tuvo permiso para ejecutar {{commands}}, así que otro intento fallaría igual. bae deja al agente correr los chequeos de la tarea e instalar dependencias; permite lo demás en los permisos del propio {{agent}} (en Claude Code, una regla como `Bash({{first}} *)` en .claude/settings.json de una carpeta de confianza), o corre next sin --headless y apruébalo tú.",
+  "env.alsoDenied": "Tampoco se le permitió a {{agent}} ejecutar {{commands}}.",
+  "env.moreDenied": "y {{count}} más",
   "env.notFound":
     "`{{command}}` no encontró un programa que ejecuta (exit 127): faltan las dependencias del proyecto o una herramienta. Otro intento fallaría igual; instálalas (por ejemplo `npm install`).",
   "next.budgetUsed": "La tarea ya usó sus {{max}} intentos automáticos.",

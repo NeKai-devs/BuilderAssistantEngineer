@@ -29,7 +29,7 @@ import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
 import { announcePullRequest } from "./branch.js";
 import { commitTask } from "./commit.js";
-import { affectsChecks, agentCommands } from "./permissions.js";
+import { affectsChecks, agentCommands, ruleHint } from "./permissions.js";
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
@@ -244,11 +244,28 @@ async function everyTaskDone(cwd: string): Promise<boolean> {
 
 const CHECK_STAGES = new Set(["regression", "verification"]);
 
+const SHOWN_DENIALS = 3;
+const DENIAL_CHARS = 80;
+
 function environmentCause(agent: string, denied: string[], result: Gate): string | undefined {
   const needed = denied.filter(affectsChecks);
-  if (needed.length > 0 && CHECK_STAGES.has(result.stage ?? "")) {
-    const commands = needed.map((command) => `\`${command}\``).join(", ");
-    return t("env.denied", { agent, commands, first: needed[0] ?? "" });
+  const commands = listDenials(needed);
+  if (result.environment) {
+    return needed.length > 0
+      ? `${result.environment} ${t("env.alsoDenied", { agent, commands })}`
+      : result.environment;
   }
-  return result.environment;
+  if (needed.length === 0 || !CHECK_STAGES.has(result.stage ?? "")) return undefined;
+  return t("env.denied", { agent, commands, first: ruleHint(needed[0] ?? "") });
+}
+
+function listDenials(denied: string[]): string {
+  const shown = denied.slice(0, SHOWN_DENIALS).map((command) => {
+    const line = command.replace(/\s+/g, " ").trim();
+    return `\`${line.length > DENIAL_CHARS ? `${line.slice(0, DENIAL_CHARS - 1)}…` : line}\``;
+  });
+  const more = denied.length - shown.length;
+  return more > 0
+    ? `${shown.join(", ")} ${t("env.moreDenied", { count: more })}`
+    : shown.join(", ");
 }

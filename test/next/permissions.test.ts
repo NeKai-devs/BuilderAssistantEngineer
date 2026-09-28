@@ -69,5 +69,16 @@ describe("agentCommands", () => {
     for (const command of ["npm --version", "node -v", "which npm", "git status", "ls src"]) {
       expect(affectsChecks(command)).toBe(false);
     }
+    expect(affectsChecks('npm install --save-dev vitest; echo "exit:$?"')).toBe(true);
+    expect(affectsChecks('grep -q x package.json; echo "x:$?"; grep -q y README.md')).toBe(false);
+    expect(affectsChecks("git -C /tmp/repo status --porcelain")).toBe(false);
+    expect(affectsChecks("cd web && npx tsc --noEmit")).toBe(true);
+  });
+
+  it("allows the helpers agents chain onto their commands", () => {
+    const commands = agentCommands(config({ test: "npm test" }), task("npm test"));
+    for (const helper of ["echo", "tail", "head", "grep", "git status", "git diff"]) {
+      expect(commands).toContain(helper);
+    }
   });
 });

@@ -66,10 +66,24 @@ describe("next --headless and the agent's environment", () => {
     expect(run.log).toContain(
       "claude was not allowed to run `npx biome init`, so another attempt would fail the same way.",
     );
-    expect(run.log).toContain("a rule such as `Bash(npx biome init)`");
+    expect(run.log).toContain("a rule such as `Bash(npx biome *)`");
     const [attempt] = await attempts(cwd);
     expect(attempt).toMatchObject({ outcome: "blocked", stage: "verification" });
     expect(attempt.reason).toContain("was not allowed to run `npx biome init`");
+  });
+
+  it("names the missing program first when the agent was also denied an install", async () => {
+    const cwd = await bypassRepo({ task: { command: 'node -e "process.exit(127)"' } });
+    const install = `npm install --save-dev ${"left-pad ".repeat(20)}; echo "exit:$?"`;
+    const run = await next(cwd, HEADLESS, [deniedWork(cwd, [install, "npm --version"])]);
+    expect(run.code).toBe(1);
+    expect(run.calls).toHaveLength(1);
+    expect(run.log).toContain("could not find a program it runs (exit 127)");
+    expect(run.log).toContain(
+      "claude was also not allowed to run `npm install --save-dev left-pad",
+    );
+    expect(run.log).toContain("…`.");
+    expect(run.log).not.toContain("`npm --version`");
   });
 
   it("blocks at once when a check cannot find its program", async () => {
