@@ -41,7 +41,7 @@ export function parseReview(text: string): ReviewReply {
     throw new FormatError("more than one verdict");
   }
   const outside = `${text.slice(0, start)} ${text.slice(end + 1)}`;
-  if (result.data.verdict === "pass" && /\bfail/i.test(outside)) {
+  if (result.data.verdict === "pass" && /\bverdict\b[^\n{]{0,20}\bfail/i.test(outside)) {
     throw new FormatError("the text around the JSON contradicts its verdict");
   }
   return result.data;
