@@ -96,4 +96,4 @@ test/                 unit and end-to-end tests
 
 Use [Conventional Commits](https://www.conventionalcommits.org): `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`. Pull request titles are checked, because squash merges use them as the commit message.
 
-Releases are automated with release-please. Every push to `main` updates a release pull request with the next version and the changelog. Merging it creates the GitHub release and publishes the package to npm (the repository needs an `NPM_TOKEN` secret).
+Releases are automated with release-please. Every push to `main` updates a release pull request with the next version and the changelog. Merging it creates the GitHub release and stages the new version on npm through trusted publishing (OIDC, no token). A maintainer then approves it with 2FA: `npm stage list builder-assistant-engineer` shows the staged version, and `npm stage approve <stage-id>` (or the package page on npmjs.com) publishes it.
