@@ -38,6 +38,8 @@ import { setTaskStatus } from "../tasks/status.js";
 
 export type StartOptions = { allowSkip: boolean; unattended: boolean };
 
+const COMMAND_NOT_FOUND = 127;
+
 export function checksFor(task: Task, config: Config): Checks {
   return {
     commands: verificationCommands(task.body),
@@ -164,16 +166,17 @@ async function recordBaseline(
     ctx.prompter.outro(t("skip.stopped"));
     throw new ExitCode(1);
   }
-  for (const result of results.filter((item) => item.exitCode !== 0)) {
-    ctx.prompter.warn(
-      t("regression.preexisting", { command: result.command, code: result.exitCode }),
-    );
-  }
   const found = unusableBaseline(results, task.meta.tests === "fix");
   const absent = options.fresh
     ? found.filter((result) => result.key === "test" && result.exitCode !== -1)
     : [];
   const unusable = found.filter((result) => !absent.includes(result));
+  for (const result of results.filter((item) => item.exitCode !== 0)) {
+    if (unusable.includes(result)) continue;
+    ctx.prompter.warn(
+      t("regression.preexisting", { command: result.command, code: result.exitCode }),
+    );
+  }
   for (const result of absent) {
     ctx.prompter.info(t("regression.noTestsYet", { command: result.command }));
   }
@@ -195,6 +198,7 @@ function unusableMessage(result: SuiteResult): string {
   const vars = { command: result.command, code: result.exitCode };
   if (result.unrecognized) return t("regression.unknownRunner", vars);
   if (result.key === "test" && result.exitCode === 0) return t("regression.noCounts", vars);
+  if (result.exitCode === COMMAND_NOT_FOUND) return t("regression.notFound", vars);
   return t("regression.unusable", vars);
 }
 

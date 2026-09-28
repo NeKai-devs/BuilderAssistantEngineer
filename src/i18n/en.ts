@@ -264,6 +264,8 @@ export const en = {
   "regression.lateStop": "{{id}} has no regression baseline from before its agent ran.",
   "regression.declinedStop":
     "Without running lint and tests first there is no baseline, so the task could not be done.",
+  "regression.notFound":
+    "`{{command}}` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run next again.",
   "regression.unusable":
     "`{{command}}` gives no usable baseline (exit {{code}}): it did not finish, or it fails with no counts to compare. The task could not be done while it stays red.",
   "review.noVerdict": "The reviewer gave no verdict.",

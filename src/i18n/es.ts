@@ -272,6 +272,8 @@ export const es: Messages = {
     "{{id}} no tiene línea base de regresión de antes de que corriera su agente.",
   "regression.declinedStop":
     "Sin correr antes lint y tests no hay línea base, así que la tarea no podría completarse.",
+  "regression.notFound":
+    "`{{command}}` no encontró un programa que ejecuta (exit 127), así que no hay baseline. Instala las dependencias del proyecto (por ejemplo `npm install`) y vuelve a correr next.",
   "regression.unusable":
     "`{{command}}` no da una línea base usable (exit {{code}}): no terminó, o falla sin conteos que comparar. La tarea no podría completarse mientras siga en rojo.",
   "review.noVerdict": "El revisor no dio veredicto.",
