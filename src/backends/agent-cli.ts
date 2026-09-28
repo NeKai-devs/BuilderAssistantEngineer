@@ -38,7 +38,8 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
     headless: (access) => [
       "-p",
       "--output-format",
-      "json",
+      "stream-json",
+      "--verbose",
       "--no-session-persistence",
       "--permission-prompts",
       "none",
@@ -136,16 +137,40 @@ async function runHeadless(
 }
 
 function parseClaudeJson(result: CommandResult): Parsed {
-  const data = parseObject(result.stdout);
+  const events = result.stdout.split(/\r?\n/).flatMap((line) => {
+    const event = line.trim().startsWith("{") ? parseObject(line.trim()) : undefined;
+    return event ? [event] : [];
+  });
+  const data = events.filter((event) => event.type === "result").at(-1);
   if (!data || typeof data.result !== "string") return { text: result.stdout, info: {} };
   const models = Object.keys(asRecord(data.modelUsage));
   const cost = typeof data.total_cost_usd === "number" ? data.total_cost_usd : undefined;
   const truncated =
     typeof data.stop_reason === "string" ? data.stop_reason === "max_tokens" : undefined;
+  const answer = finalAnswer(events);
   return {
-    text: data.result,
+    text: answer || data.result,
     info: { model: models.join(", ") || undefined, costUsd: cost, truncated },
   };
+}
+
+function finalAnswer(events: Record<string, unknown>[]): string {
+  let tail: string[] = [];
+  const seen = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "assistant") continue;
+    const message = asRecord(event.message);
+    const blocks = Array.isArray(message.content) ? message.content : [];
+    for (const block of blocks.map(asRecord)) {
+      if (block.type === "tool_use") tail = [];
+      if (block.type !== "text" || typeof block.text !== "string") continue;
+      const key = `${String(message.id ?? "")}:${block.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      tail.push(block.text);
+    }
+  }
+  return tail.join("");
 }
 
 function stderrModel(result: CommandResult, pattern: RegExp): string | undefined {

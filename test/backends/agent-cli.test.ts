@@ -46,7 +46,8 @@ describe("agent CLI backends", () => {
         args: [
           "-p",
           "--output-format",
-          "json",
+          "stream-json",
+          "--verbose",
           "--no-session-persistence",
           "--permission-prompts",
           "none",
@@ -80,6 +81,27 @@ describe("agent CLI backends", () => {
     expect(output).toBe("PLAN");
     expect(chunks).toEqual(["PLAN"]);
     expect(infos).toEqual([{ model: "claude-opus-5-5", costUsd: 0.25, truncated: true }]);
+  });
+
+  it("joins an answer that claude split over several messages after its last tool call", async () => {
+    const assistant = (id: string, content: unknown[]) =>
+      JSON.stringify({ type: "assistant", message: { id, content } });
+    const stdout = [
+      JSON.stringify({ type: "system", subtype: "init" }),
+      assistant("m1", [{ type: "text", text: "Let me read the repo." }]),
+      assistant("m1", [{ type: "tool_use", name: "Read", input: {} }]),
+      assistant("m2", [{ type: "text", text: "<<<SUMMARY>>>\nfirst half, " }]),
+      JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "Resume." }] } }),
+      assistant("m3", [{ type: "text", text: "second half\n<<<END SUMMARY>>>" }]),
+      JSON.stringify({
+        type: "result",
+        result: "second half\n<<<END SUMMARY>>>",
+        stop_reason: "end_turn",
+      }),
+    ].join("\n");
+    const { runner } = fakeRunner({ stdout });
+    const output = await createBackend("claude", { runner }).run("P", { cwd: await tempDir() });
+    expect(output).toBe("<<<SUMMARY>>>\nfirst half, second half\n<<<END SUMMARY>>>");
   });
 
   it("reads the model opencode prints on stderr", async () => {
