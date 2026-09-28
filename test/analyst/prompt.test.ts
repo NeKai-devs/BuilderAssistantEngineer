@@ -22,5 +22,7 @@ describe("buildAnalystPrompt", () => {
     expect(prompt).toContain("<repo_digest>\n# Repository digest\n</repo_digest>");
     expect(prompt).toContain("<prior_plan>\n(empty)\n</prior_plan>");
     expect(prompt).toContain("- CAN_EXPLORE_REPO: true");
+    expect(prompt).toContain("Each item must be reachable by changing only the files In Scope");
+    expect(prompt).toContain("is not a criterion: put it under Risks and notes.");
   });
 });
