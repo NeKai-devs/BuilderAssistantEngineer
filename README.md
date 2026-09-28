@@ -20,7 +20,7 @@ npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one fil
 npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
-Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
+Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. A headless agent can only run the commands its CLI already allows: with Claude Code, open `claude` in the repo once, accept the trust prompt and allow the commands your tasks need, such as `npm`, or the agent cannot install or test anything. If a task ends `blocked`, fix the cause, set `status: pending` in its file and run `next` again. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
 
 Tried it? Tell us how it went with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form, even if you stopped halfway.
 
@@ -120,7 +120,7 @@ nekai-pos is a private desktop point-of-sale app (Tauri 2, React and TypeScript,
 | Change | 68 files, +2,971 and −296 lines, 16 test files |
 | Cost | Not recorded. bae does not log the agent's cost in `next`, and the run used a Claude subscription, whose usage limit cut it twice; attempts cut that way are not counted above. |
 
-Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. One caveat for `--headless` with Claude Code: it ignores a project's `.claude/settings.json` permissions in a folder you have not trusted, so run `claude` there once and accept the prompt before a headless run.
+Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. The headless agents could not run commands: Claude Code ignores a project's `.claude/settings.json` permissions in a folder it has not trusted, which is why the quickstart asks you to open `claude` in the repo first.
 
 ## Commands
 

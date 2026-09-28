@@ -114,7 +114,8 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
-  "next.blocked": "{{id}} is blocked: {{reason}} Logs: {{path}}",
+  "next.blocked":
+    "{{id}} is blocked: {{reason}} Logs: {{path}}. To try again, fix the cause, set `status: pending` in {{task}} and run {{command}}.",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",

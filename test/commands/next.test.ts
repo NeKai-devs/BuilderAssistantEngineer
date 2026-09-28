@@ -176,6 +176,9 @@ describe("next", () => {
     expect(calls[3]?.prompt).toContain("# Attempt 3");
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("blocked");
     expect(await logs(cwd, "T-001")).toHaveLength(4);
+    expect(ui.log.at(-1)).toMatch(
+      /To try again, fix the cause, set `status: pending` in docs\/plan\/tasks\/T-001-first\.md and run npx builder-assistant-engineer next\.$/,
+    );
     expect(ui.log).toContain("success: Rule added to AGENTS.md.");
     expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toBe(
       "# Rules\n\n<!-- bae:begin -->\n## Lessons learned\n\n<!-- bae:lessons -->\n- Run the Verification commands before finishing.\n<!-- bae:lessons:end -->\n<!-- bae:end -->\n",

@@ -118,7 +118,8 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
-  "next.blocked": "{{id}} queda bloqueada: {{reason}} Logs: {{path}}",
+  "next.blocked":
+    "{{id}} queda bloqueada: {{reason}} Logs: {{path}}. Para reintentar, corrige la causa, pon `status: pending` en {{task}} y corre {{command}}.",
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
   "next.allDone": "Todas las tareas están hechas.",
   "next.nothingReady": "No hay ninguna tarea lista",

@@ -184,7 +184,10 @@ async function block(ctx: CommandContext, capture: Capture, reason: string): Pro
   await setTaskStatus(ctx.cwd, capturedTask(capture), "blocked");
   await learnFromFailure(ctx, capture, "blocked");
   const path = displayPath(runDir(ctx.cwd, capture.id));
-  ctx.prompter.outro(t("next.blocked", { id: capture.id, path, reason }));
+  const task = capture.path;
+  ctx.prompter.outro(
+    t("next.blocked", { id: capture.id, path, reason, task, command: `${CLI} next` }),
+  );
   return false;
 }
 
