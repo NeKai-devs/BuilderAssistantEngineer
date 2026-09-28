@@ -97,4 +97,17 @@ describe("bypass 08: an ignore file cannot hide a change from the checks", () =>
     expect(blocked.code).toBe(1);
     expect(blocked.log).toContain("src/k.ts: Adds what looks like a credential");
   });
+
+  it("still reviews a file in a code folder that a rule added during the task ignores", async () => {
+    const cwd = await bypassRepo({ task: { scope: "- `src/feature.ts`" } });
+    const work = agent(cwd, { "src/feature.ts": "export const f = 1;\n" }, async () => {
+      await writeFiles(cwd, { "src/settings.json": '{"mode":"UNREVIEWED_MARKER"}\n' });
+      const path = join(cwd, ".git", "info", "exclude");
+      await writeFile(path, `${await readFile(path, "utf8").catch(() => "")}src/settings.json\n`);
+    });
+    const run = await next(cwd, ["--yes"], [work, REVIEW_PASS]);
+    expect(run.log).toContain("Changed outside the task's Scope: src/settings.json");
+    expect(run.calls[1]?.prompt).toContain("UNREVIEWED_MARKER");
+    expect(run.calls[1]?.prompt).not.toContain("ignore rules added during the task leave out");
+  });
 });
