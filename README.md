@@ -11,15 +11,18 @@ It acts as your tech lead and architect. It interviews you, analyzes the reposit
 
 ## Quickstart (60 seconds)
 
+You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash.
+
 ```sh
-cd your-project
-npx builder-assistant-engineer init    # pick backend, agents and language; answer a short interview
-npx builder-assistant-engineer plan    # analyze the repo and write the plan, memory and subagents
-npx builder-assistant-engineer next    # run the next task, verify it, review it, mark it done
-npx builder-assistant-engineer status  # see progress
+cd your-project                       # new idea? mkdir my-idea && cd my-idea && git init
+npx builder-assistant-engineer init   # pick language, project type, AI and agents; answer the interview (Enter skips)
+npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes), then offers to commit them
+npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
-Requires Node.js 20.12 or newer, and bash for `next` (on Windows, the Git Bash that comes with Git for Windows). For `init`, `plan` and `next` you also need one of the [backends](#backends): an agent CLI you already use, an API key, or any AI you can copy and paste into.
+Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. A headless agent can only run the commands its CLI already allows: with Claude Code, open `claude` in the repo once, accept the trust prompt and allow the commands your tasks need, such as `npm`, or the agent cannot install or test anything. If a task ends `blocked`, fix the cause, set `status: pending` in its file and run `next` again. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
+
+Tried it? Tell us how it went with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form, even if you stopped halfway.
 
 ## What you get
 
@@ -103,12 +106,28 @@ Local metrics
 
 `plan` ends with a short summary. If the analyst has questions, blocking ones are asked right there and the rest are listed; every question and answer is saved to `.bae/interview.md`, and after answering a blocking question you can plan again immediately. A clear brief is expected to produce no questions.
 
+## Real-world run
+
+nekai-pos is a private desktop point-of-sale app (Tauri 2, React and TypeScript, encrypted SQLite). bae 0.2.0 planned one feature from its roadmap, formatting money and dates by locale, and ran it with `next --headless`, with Claude Code (claude-opus-5-5) as the agent and the reviewer.
+
+| | |
+| --- | --- |
+| Tasks | 9 of 9 done |
+| Attempts | 15; 6 tasks done on the first attempt |
+| Correct blocks | 3. Verification caught a hard-coded «Q» currency symbol still in a file, and a required test file that was missing. The reviewer held a plan criterion no code could meet (`"Q1,234.50"`, while the ICU puts a non-breaking space after «Q»), and the contract undid the agent's edits to other task files. The criterion was fixed in the plan and the task passed. |
+| False blocks | 1. A Claude Code plugin hook wrote a cache file in the middle of a task and the reviewer flagged it; fixed before release. |
+| Agent and gate time | 3.6 hours in total, 14 to 31 minutes per task |
+| Change | 68 files, +2,971 and −296 lines, 16 test files |
+| Cost | Not recorded. bae does not log the agent's cost in `next`, and the run used a Claude subscription, whose usage limit cut it twice; attempts cut that way are not counted above. |
+
+Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. The headless agents could not run commands: Claude Code ignores a project's `.claude/settings.json` permissions in a folder it has not trusted, which is why the quickstart asks you to open `claude` in the repo first.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `init` | Detects greenfield or brownfield, lets you choose the backend, target agents (multi-select) and language, runs the interview and saves `.bae/config.json` and `.bae/interview.md`. `--brief <files>` loads a written brief. |
-| `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. |
+| `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. At the end it offers to commit what it wrote, with `.bae/config.json` and `.bae/interview.md`, as `chore(bae): plan` (`--yes` commits without asking; `--no-verify` skips the pre-commit and commit-msg hooks). |
 | `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes, then commits it on the run's `bae/` branch. `--new-run` starts a new branch from the current one. `--no-verify` commits without the pre-commit and commit-msg hooks. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
 | `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
 | `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. During a run it must be on the run's branch, and commits the new plan there as `chore(bae): replan` (`--no-verify` skips the hooks). |

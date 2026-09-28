@@ -48,4 +48,22 @@ describe("bypass 06: the baseline cannot be declined, taken late or partial", ()
     expect(run.log).toContain(`Regression: \`${typecheck}\` exits with 1 after the task.`);
     expect(run.log).toContain(`Regression: \`${build}\` exits with 1 after the task.`);
   });
+
+  it.skipIf(process.platform === "win32")(
+    "says a baseline program is missing instead of calling it preexisting",
+    async () => {
+      const scripts = { lint: "missing-linter-xyz ." };
+      const cwd = await bypassRepo({
+        files: { "package.json": `${JSON.stringify({ scripts }, null, 2)}\n` },
+        config: { commands: { lint: "npm run lint" } },
+      });
+      const run = await next(cwd, ["--yes"], []);
+      expect(run.code).toBe(1);
+      expect(run.calls).toHaveLength(0);
+      expect(run.log).toContain(
+        "`npm run lint` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run next again.",
+      );
+      expect(run.log).not.toContain("recorded as preexisting");
+    },
+  );
 });

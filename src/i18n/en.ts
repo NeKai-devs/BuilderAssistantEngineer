@@ -114,7 +114,8 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
-  "next.blocked": "{{id}} is blocked: {{reason}} Logs: {{path}}",
+  "next.blocked":
+    "{{id}} is blocked: {{reason}} Logs: {{path}}. To try again, fix the cause, set `status: pending` in {{task}} and run {{command}}.",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",
@@ -264,6 +265,8 @@ export const en = {
   "regression.lateStop": "{{id}} has no regression baseline from before its agent ran.",
   "regression.declinedStop":
     "Without running lint and tests first there is no baseline, so the task could not be done.",
+  "regression.notFound":
+    "`{{command}}` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run next again.",
   "regression.unusable":
     "`{{command}}` gives no usable baseline (exit {{code}}): it did not finish, or it fails with no counts to compare. The task could not be done while it stays red.",
   "review.noVerdict": "The reviewer gave no verdict.",
@@ -372,6 +375,9 @@ export const en = {
   "commit.failed":
     "Could not commit {{id}}: {{details}}. The task is done; commit its changes yourself.",
   "commit.replan": "Committed the new plan as {{sha}} on {{branch}}.",
+  "commit.plan": "Committed the plan as {{sha}} on {{branch}}.",
+  "commit.planFailed": "Could not commit the plan: {{details}}. Commit its files yourself.",
+  "plan.commitConfirm": "Commit the plan files now, so next starts from them?",
   "status.run": "Branch {{branch}}, created from {{from}}",
   "status.runElsewhere": "This run's tasks are committed on {{branch}}; you are on {{current}}.",
   "status.noCommits": "no commits yet",

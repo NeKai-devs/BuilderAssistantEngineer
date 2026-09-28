@@ -118,7 +118,8 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
-  "next.blocked": "{{id}} queda bloqueada: {{reason}} Logs: {{path}}",
+  "next.blocked":
+    "{{id}} queda bloqueada: {{reason}} Logs: {{path}}. Para reintentar, corrige la causa, pon `status: pending` en {{task}} y corre {{command}}.",
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
   "next.allDone": "Todas las tareas están hechas.",
   "next.nothingReady": "No hay ninguna tarea lista",
@@ -272,6 +273,8 @@ export const es: Messages = {
     "{{id}} no tiene línea base de regresión de antes de que corriera su agente.",
   "regression.declinedStop":
     "Sin correr antes lint y tests no hay línea base, así que la tarea no podría completarse.",
+  "regression.notFound":
+    "`{{command}}` no encontró un programa que ejecuta (exit 127), así que no hay baseline. Instala las dependencias del proyecto (por ejemplo `npm install`) y vuelve a correr next.",
   "regression.unusable":
     "`{{command}}` no da una línea base usable (exit {{code}}): no terminó, o falla sin conteos que comparar. La tarea no podría completarse mientras siga en rojo.",
   "review.noVerdict": "El revisor no dio veredicto.",
@@ -384,6 +387,9 @@ export const es: Messages = {
   "commit.failed":
     "No se pudo commitear {{id}}: {{details}}. La tarea está hecha; commitea sus cambios a mano.",
   "commit.replan": "Plan nuevo commiteado como {{sha}} en {{branch}}.",
+  "commit.plan": "Plan commiteado como {{sha}} en {{branch}}.",
+  "commit.planFailed": "No se pudo commitear el plan: {{details}}. Commitea sus archivos a mano.",
+  "plan.commitConfirm": "¿Commitear ahora los archivos del plan, para que next parta de ellos?",
   "status.run": "Rama {{branch}}, creada desde {{from}}",
   "status.runElsewhere": "Las tareas de esta run se commitean en {{branch}}; estás en {{current}}.",
   "status.noCommits": "todavía sin commits",
