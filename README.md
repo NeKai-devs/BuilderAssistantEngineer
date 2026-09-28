@@ -11,15 +11,19 @@ It acts as your tech lead and architect. It interviews you, analyzes the reposit
 
 ## Quickstart (60 seconds)
 
+You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash.
+
 ```sh
-cd your-project
-npx builder-assistant-engineer init    # pick backend, agents and language; answer a short interview
-npx builder-assistant-engineer plan    # analyze the repo and write the plan, memory and subagents
-npx builder-assistant-engineer next    # run the next task, verify it, review it, mark it done
-npx builder-assistant-engineer status  # see progress
+cd your-project                       # new idea? mkdir my-idea && cd my-idea && git init
+npx builder-assistant-engineer init   # pick language, project type, AI and agents; answer the interview (Enter skips)
+npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes)
+git add -A && git commit -m "chore: add the bae plan"
+npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
-Requires Node.js 20.12 or newer, and bash for `next` (on Windows, the Git Bash that comes with Git for Windows). For `init`, `plan` and `next` you also need one of the [backends](#backends): an agent CLI you already use, an API key, or any AI you can copy and paste into.
+Exit the agent when the task is finished. `next` then runs the task's checks, the project's lint and tests and a review. If they pass, it marks the task done and commits it on the branch; if not, it says why, and you run `next` again. Run `next` once per task, or `next --headless` to let the agent work alone with up to three attempts. After the last task, `next` prints the command that opens the pull request. `npx builder-assistant-engineer status` shows where you are.
+
+Tried it? Tell us how it went with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form, even if you stopped halfway.
 
 ## What you get
 
@@ -102,6 +106,22 @@ Local metrics
 ```
 
 `plan` ends with a short summary. If the analyst has questions, blocking ones are asked right there and the rest are listed; every question and answer is saved to `.bae/interview.md`, and after answering a blocking question you can plan again immediately. A clear brief is expected to produce no questions.
+
+## Real-world run
+
+nekai-pos is a private desktop point-of-sale app (Tauri 2, React and TypeScript, encrypted SQLite). bae 0.2.0 planned one feature from its roadmap, formatting money and dates by locale, and ran it with `next --headless`, with Claude Code (claude-opus-5-5) as the agent and the reviewer.
+
+| | |
+| --- | --- |
+| Tasks | 9 of 9 done |
+| Attempts | 15; 6 tasks done on the first attempt |
+| Correct blocks | 3. Verification caught a hard-coded «Q» currency symbol still in a file, and a required test file that was missing. The reviewer held a plan criterion no code could meet (`"Q1,234.50"`, while the ICU puts a non-breaking space after «Q»), and the contract undid the agent's edits to other task files. The criterion was fixed in the plan and the task passed. |
+| False blocks | 1. A Claude Code plugin hook wrote a cache file in the middle of a task and the reviewer flagged it; fixed before release. |
+| Agent and gate time | 3.6 hours in total, 14 to 31 minutes per task |
+| Change | 68 files, +2,971 and −296 lines, 16 test files |
+| Cost | Not recorded. bae does not log the agent's cost in `next`, and the run used a Claude subscription, whose usage limit cut it twice; attempts cut that way are not counted above. |
+
+Two things came out of it. The analyst now keeps every acceptance criterion within what the task can change and check, and anything external goes under Risks. And `next` now commits each task on its own branch, where nekai-pos needed that branch rebuilt by hand. One caveat for `--headless` with Claude Code: it ignores a project's `.claude/settings.json` permissions in a folder you have not trusted, so run `claude` there once and accept the prompt before a headless run.
 
 ## Commands
 

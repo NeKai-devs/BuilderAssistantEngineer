@@ -1,0 +1,67 @@
+name: First impression
+description: You tried bae for the first time. Tell us what you expected and where it got in your way.
+title: "first impression: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying bae. Short answers are fine, and a partial run is as useful as a full one.
+        Do not paste real credentials or private code. If the gates let broken work through, use the "Report a bypass" form instead.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What you wanted to get out of it, and what you thought init, plan and next would do.
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: The commands you ran and what came out of each one, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where you got stuck
+      description: The step where you stopped, waited, guessed or went to read something. Paste the message you saw if there was one.
+    validations:
+      required: false
+  - type: textarea
+    id: blocked
+    attributes:
+      label: Correct work that was blocked
+      description: A task the gates kept from done although the work was right, with the finding or message that stopped it. Write "none" if it did not happen.
+    validations:
+      required: true
+  - type: dropdown
+    id: project
+    attributes:
+      label: Project
+      options:
+        - New idea (empty folder)
+        - Existing repository
+    validations:
+      required: true
+  - type: dropdown
+    id: reached
+    attributes:
+      label: How far you got
+      options:
+        - Did not finish init
+        - Finished init
+        - Finished plan
+        - Ran next at least once
+        - Finished every task
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: bae version (`npx builder-assistant-engineer --version`), backend and agent CLI, OS, and the project's language or stack.
+      placeholder: 0.3.0, claude (Claude Code 2.x), macOS 15, TypeScript
+    validations:
+      required: true
