@@ -42,8 +42,22 @@ describe("trivialityProblems", () => {
     ["ls dist", "trivial"],
     ["true", "trivial"],
     ["curl http://localhost:3000", "trivial"],
+    ["npm test || :", "masks"],
+    ["npm test || echo failed", "masks"],
+    ["npm test; true", "masks"],
+    ["npm test & sleep 5", "masks"],
+    ["npx vitest run & curl -sf http://127.0.0.1:3000/", "masks"],
   ])("rejects %s", (line, reason) => {
     expect(trivialityProblems([line]).map((problem) => problem.reason)).toContain(reason);
+  });
+
+  it.each([
+    [["python3 app.py & sleep 1; curl -s http://127.0.0.1:8000/ | grep -q Hello; kill %1"]],
+    [["python3 app.py &", "trap 'kill $!' EXIT", "sleep 1", "curl -sf http://127.0.0.1:8000/"]],
+    [["npm start & sleep 2", "curl -sf http://localhost:3000/health", "kill $!"]],
+  ])("accepts a server started in the background: %j", (lines) => {
+    expect(trivialityProblems(lines)).toEqual([]);
+    expect(allowlistProblems(lines, [])).toEqual([]);
   });
 });
 
@@ -79,6 +93,22 @@ describe("allowlistProblems", () => {
     ["sh", "dynamic"],
   ])("rejects %s when nobody confirms", (line, reason) => {
     expect(allowlistProblems([line], []).map((problem) => problem.reason)).toEqual([reason]);
+  });
+
+  it("only lets kill and trap stop the script's own background job", () => {
+    expect(allowlistProblems(["kill $!", "kill -TERM %1", "trap 'kill $!' EXIT INT"], [])).toEqual(
+      [],
+    );
+    for (const line of [
+      "kill 1234",
+      "kill -9 -1",
+      "trap 'kill $!' ERR",
+      "trap 'rm -rf dist' EXIT",
+    ]) {
+      expect(allowlistProblems([line], []).map((problem) => problem.reason)).toEqual([
+        "notAllowed",
+      ]);
+    }
   });
 
   it("accepts commands that start with a configured prefix", () => {
