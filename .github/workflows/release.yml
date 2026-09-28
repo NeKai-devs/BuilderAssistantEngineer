@@ -68,3 +68,12 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm stage publish . --access public
+        env:
+          NPM_CONFIG_LOGLEVEL: verbose
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: npm-logs
+          path: ~/.npm/_logs/
+          include-hidden-files: true
+          retention-days: 14
