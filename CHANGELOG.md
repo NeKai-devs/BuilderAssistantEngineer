@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.1](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.0...v0.3.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* first-run friction found by following the quickstart ([117b389](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/117b3898c770cf805a58a94b7249db34edad0921))
+* **next:** allow the helpers agents chain onto commands, and name the real cause ([89b4d27](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/89b4d270141b81703c6ca46763bc76fb6699cbc7))
+* **next:** headless runs that work on first use ([f87c630](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/f87c630934533ce0d184eeff0830bd22249cc955))
+* **next:** let headless agents run the task's commands, and stop retrying what cannot change ([adb191c](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/adb191cdbe0a6668b3b9ee634c5c09963ad89b80))
+* **next:** say how to retry a blocked task, and warn about headless permissions ([f7ced76](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/f7ced76a332762aa934156a055e9e7cb578c1fdd))
+* **next:** say when a baseline program is missing, and stop calling it harmless ([78ef156](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/78ef15610d8cf7979c1423b7e711a02100f29363))
+* **next:** tell a headless agent which commands it may run ([7aa79cc](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/7aa79cc16755b63bec254faaed80d7b5bdc106b0))
+* **plan:** offer to commit the plan when it is written ([235ff9f](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/235ff9f813eff81e202af418b90c1738c62ef75a))
+* **review:** leave installed dependencies out of the task's changes ([0b67c73](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/0b67c73123dc65d05061eba704de78e462207bf6))
+
 ## [0.3.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.2.0...v0.3.0) (2026-09-28)
 
 
