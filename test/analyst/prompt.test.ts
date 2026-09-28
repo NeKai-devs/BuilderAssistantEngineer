@@ -24,5 +24,6 @@ describe("buildAnalystPrompt", () => {
     expect(prompt).toContain("- CAN_EXPLORE_REPO: true");
     expect(prompt).toContain("Each item must be reachable by changing only the files In Scope");
     expect(prompt).toContain("is not a criterion: put it under Risks and notes.");
+    expect(prompt).toContain("starting with a verb (Add, Expose, Fix), never with an acronym");
   });
 });

@@ -18,13 +18,14 @@ describe("taskMessage", () => {
     ]);
   });
 
-  it("defaults to chore and lowercases the first word, as commitlint's subject-case asks", () => {
+  it("defaults to chore and lowercases only a first letter followed by a lowercase one", () => {
     expect(taskMessage(meta("API keys rotate daily"))[0]).toBe(
-      "chore: api keys rotate daily (T-007)",
+      "chore: API keys rotate daily (T-007)",
     );
     expect(taskMessage(meta("GET /health returns ok", "fix"))[0]).toBe(
-      "fix: get /health returns ok (T-007)",
+      "fix: GET /health returns ok (T-007)",
     );
+    expect(taskMessage(meta("OAuth callback", "feat"))[0]).toBe("feat: OAuth callback (T-007)");
     expect(taskMessage(meta("wire the OAuth callback", "feat"))[0]).toBe(
       "feat: wire the OAuth callback (T-007)",
     );

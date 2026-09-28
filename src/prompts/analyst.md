@@ -69,7 +69,7 @@ The project's commands, run from the repo root: the ones the repo has today, or 
 ### Task file format
 ---
 id: T-003
-title: imperative and specific
+title: imperative and specific, starting with a verb (Add, Expose, Fix), never with an acronym or a file name
 status: pending
 phase: 1
 depends_on: [T-001]

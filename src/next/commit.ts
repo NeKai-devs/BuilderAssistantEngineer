@@ -94,7 +94,7 @@ export async function commitPaths(
 
 function subject(title: string): string {
   const trimmed = title.trim().replace(/\.+$/, "");
-  return trimmed.replace(/^[A-Z]\S*/, (word) => word.toLowerCase());
+  return /^[A-Z][a-z]/.test(trimmed) ? `${trimmed[0]?.toLowerCase()}${trimmed.slice(1)}` : trimmed;
 }
 
 function fit(text: string, room: number): string {
