@@ -384,6 +384,9 @@ export const es: Messages = {
   "commit.failed":
     "No se pudo commitear {{id}}: {{details}}. La tarea está hecha; commitea sus cambios a mano.",
   "commit.replan": "Plan nuevo commiteado como {{sha}} en {{branch}}.",
+  "commit.plan": "Plan commiteado como {{sha}} en {{branch}}.",
+  "commit.planFailed": "No se pudo commitear el plan: {{details}}. Commitea sus archivos a mano.",
+  "plan.commitConfirm": "¿Commitear ahora los archivos del plan, para que next parta de ellos?",
   "status.run": "Rama {{branch}}, creada desde {{from}}",
   "status.runElsewhere": "Las tareas de esta run se commitean en {{branch}}; estás en {{current}}.",
   "status.noCommits": "todavía sin commits",

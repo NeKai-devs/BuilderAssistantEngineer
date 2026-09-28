@@ -372,6 +372,9 @@ export const en = {
   "commit.failed":
     "Could not commit {{id}}: {{details}}. The task is done; commit its changes yourself.",
   "commit.replan": "Committed the new plan as {{sha}} on {{branch}}.",
+  "commit.plan": "Committed the plan as {{sha}} on {{branch}}.",
+  "commit.planFailed": "Could not commit the plan: {{details}}. Commit its files yourself.",
+  "plan.commitConfirm": "Commit the plan files now, so next starts from them?",
   "status.run": "Branch {{branch}}, created from {{from}}",
   "status.runElsewhere": "This run's tasks are committed on {{branch}}; you are on {{current}}.",
   "status.noCommits": "no commits yet",

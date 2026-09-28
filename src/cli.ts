@@ -56,6 +56,7 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("plan")
     .description(t("command.plan"))
     .addOption(new Option("--only <group>", t("option.only")).choices(ONLY_GROUPS))
+    .option("--no-verify", t("option.noVerify"))
     .action((options: PlanOptions, command: Command) => runPlan(context(command), options));
   program
     .command("next")

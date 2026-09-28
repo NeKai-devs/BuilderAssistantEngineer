@@ -63,5 +63,5 @@ async function commitPlan(
   const paths = [...written.map((change) => change.path), CONFIG_PATH];
   const result = await commitPaths(ctx.cwd, paths, REPLAN_MESSAGE, options);
   if (result.ok) ctx.prompter.info(t("commit.replan", { sha: result.sha, branch: run.branch }));
-  else ctx.prompter.warn(t("commit.failed", { id: "replan", details: result.details }));
+  else ctx.prompter.warn(t("commit.planFailed", { details: result.details }));
 }
