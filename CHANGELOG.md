@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.2.0...v0.3.0) (2026-09-28)
+
+
+### Features
+
+* **analyst:** keep acceptance criteria within the task's Scope ([9121570](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/912157051a8a8d933d74c5f33dedc08fce73f6f8))
+* conventional task commits on a bae/ run branch; criteria within Scope ([bec66a7](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/bec66a7b1819af00bf95b238b1c0571e69d36612))
+* **next:** commit each finished task on a bae/ run branch ([5529921](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/55299210af4fa7c3aac94a8298429c8c097be4a9))
+* **next:** conventional task commits that run the repo's hooks ([6d3f512](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/6d3f512ae8cf0eef4553e950e1c8ef3d9d51663c))
+
+
+### Bug Fixes
+
+* **next:** keep acronyms at the start of task commit subjects ([0251d3b](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/0251d3bfa43d2bfae5c0b4499c3d79a18cdc705b))
+* **next:** leave git's line-ending warnings out of commit failures ([4ada326](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/4ada326a0af4e0a0402a8e30b905603a31b21688))
+
 ## [0.2.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.1.0...v0.2.0) (2026-09-28)
 
 
