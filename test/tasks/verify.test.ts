@@ -38,6 +38,21 @@ describe("findUnsafe", () => {
 });
 
 describe("runVerification", () => {
+  it("keeps the body of a heredoc with a quoted delimiter out of the per-line checks", async () => {
+    const cwd = await tempDir();
+    const bash = (await bashPath()) ?? "bash";
+    const script = (code: number) => [
+      "node - <<'JS'",
+      "const x = 1;",
+      `process.exit(x === 1 ? ${code} : 9)`,
+      "JS",
+      "test -d .",
+    ];
+    expect((await runVerification(cwd, script(0), { bash })).passed).toBe(true);
+    const failed = await runVerification(cwd, script(3), { bash });
+    expect(failed).toMatchObject({ passed: false, exitCode: 3 });
+  });
+
   it("runs the block as one bash script from the repo, with continuations, pipefail and the failing line", async () => {
     const cwd = await tempDir();
     const bash = (await bashPath()) ?? "bash";

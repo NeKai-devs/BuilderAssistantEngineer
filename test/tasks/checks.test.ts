@@ -111,6 +111,24 @@ describe("allowlistProblems", () => {
     }
   });
 
+  it("lets kill stop a job whose pid the script saved from $!", () => {
+    const saved = [
+      "python3 app.py & APP_PID=$!",
+      "trap 'kill $APP_PID' EXIT",
+      "curl -sf http://127.0.0.1:8000/",
+    ];
+    expect(allowlistProblems(saved, [])).toEqual([]);
+    expect(
+      allowlistProblems(["OTHER=1234", "kill $OTHER"], []).map((problem) => problem.reason),
+    ).toEqual(["notAllowed"]);
+  });
+
+  it("reads a heredoc with a quoted delimiter as one command", () => {
+    const lines = ["python3 - <<'PY'", "import sys", "sys.exit(0)", "PY", "npm test"];
+    expect(logicalLines(lines)).toEqual(["python3 - <<'PY'", "npm test"]);
+    expect(allowlistProblems(lines, [])).toEqual([]);
+  });
+
   it("accepts commands that start with a configured prefix", () => {
     expect(allowlistProblems(["./scripts/check.sh --strict"], ["./scripts/check.sh"])).toEqual([]);
   });

@@ -86,7 +86,9 @@ export function trivialityProblems(lines: string[]): CheckProblem[] {
 }
 
 export function allowlistProblems(lines: string[], allow: string[]): CheckProblem[] {
-  return logicalLines(lines).flatMap((line) => {
+  const logical = logicalLines(lines);
+  const jobs = jobVariables(logical);
+  return logical.flatMap((line) => {
     const parsed = parseLine(line);
     if (parsed.substitution || /[<>]\(/.test(line)) {
       return [{ command: line, reason: "dynamic" as const }];
@@ -96,7 +98,8 @@ export function allowlistProblems(lines: string[], allow: string[]): CheckProble
     );
     const bad = parsed.commands.find(
       (command) =>
-        !allow.some((prefix) => command.text.startsWith(prefix)) && !allowed(command, downloads),
+        !allow.some((prefix) => command.text.startsWith(prefix)) &&
+        !allowed(command, downloads, jobs),
     );
     if (!bad) return [];
     const { name } = program(bad);
@@ -159,7 +162,7 @@ function runsOrChecks(command: SimpleCommand): boolean {
   return false;
 }
 
-function allowed(command: SimpleCommand, downloads: boolean): boolean {
+function allowed(command: SimpleCommand, downloads: boolean, jobs: Set<string>): boolean {
   if (HEADERS.has(command.words[0] ?? "")) return true;
   const { name, args } = unwrap(program(command));
   const base = baseName(name);
@@ -168,8 +171,8 @@ function allowed(command: SimpleCommand, downloads: boolean): boolean {
   if (DYNAMIC.has(base) || SHELLS.has(base)) return false;
   if (releases(base, args)) return false;
   if (base === "rm") return safeRemove(args);
-  if (base === "kill") return killsOwnJob(args);
-  if (base === "trap") return stopsOwnJob(args);
+  if (base === "kill") return killsOwnJob(args, jobs);
+  if (base === "trap") return stopsOwnJob(args, jobs);
   if (base === "git") return GIT_READ.has(args[0] ?? "");
   if (base === "curl" || base === "jq") return true;
   if (
@@ -183,12 +186,29 @@ function allowed(command: SimpleCommand, downloads: boolean): boolean {
   return RUNNERS.has(base) || CHECKS.has(base) || HELPERS.has(base);
 }
 
-function killsOwnJob(args: string[]): boolean {
-  const targets = args.filter((arg) => !/^-(?:[A-Z]+|\d+|s)$/.test(arg) && !/^[A-Z]+$/.test(arg));
-  return targets.length > 0 && targets.every((target) => /^(?:\$!|%\d*|%%|%\+)$/.test(target));
+function jobVariables(lines: string[]): Set<string> {
+  const names = lines.flatMap((line) =>
+    parseLine(line).commands.flatMap((command) => {
+      const match = /^([A-Za-z_]\w*)=\$!$/.exec(command.words[0] ?? "");
+      return match?.[1] && command.words.length === 1 ? [match[1]] : [];
+    }),
+  );
+  return new Set(names);
 }
 
-function stopsOwnJob(args: string[]): boolean {
+function killsOwnJob(args: string[], jobs: Set<string>): boolean {
+  const targets = args.filter((arg) => !/^-(?:[A-Z]+|\d+|s)$/.test(arg) && !/^[A-Z]+$/.test(arg));
+  return (
+    targets.length > 0 &&
+    targets.every((target) => {
+      if (/^(?:\$!|%\d*|%%|%\+)$/.test(target)) return true;
+      const name = /^\$\{?([A-Za-z_]\w*)\}?$/.exec(target)?.[1];
+      return name !== undefined && jobs.has(name);
+    })
+  );
+}
+
+function stopsOwnJob(args: string[], jobs: Set<string>): boolean {
   const [body = "", ...signals] = args;
   const commands = parseLine(body).commands;
   return (
@@ -197,7 +217,7 @@ function stopsOwnJob(args: string[]): boolean {
     commands.length > 0 &&
     commands.every((command) => {
       const { name, args: rest } = program(command);
-      return baseName(name) === "kill" && killsOwnJob(rest);
+      return baseName(name) === "kill" && killsOwnJob(rest, jobs);
     })
   );
 }
