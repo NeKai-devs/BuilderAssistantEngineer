@@ -118,6 +118,16 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
+  "trust.title": "Comandos que este repositorio hace ejecutar a bae",
+  "trust.suite": "Comandos del proyecto, antes y después de cada tarea:",
+  "trust.checks": "Comprobaciones de las tareas (## Verification):",
+  "trust.allowed": "También permitidos sin confirmación (verify.allow en .bae/config.json):",
+  "trust.confirm":
+    "bae todavía no ha ejecutado nada en este repositorio en esta máquina. Ejecutará los comandos de arriba con tus permisos, también con --yes y --headless, que no responden esta pregunta. ¿Confías en ellos?",
+  "trust.declined":
+    "No se ejecutó nada. Revisa .bae/config.json y los bloques ## Verification de docs/plan/tasks, y vuelve a ejecutar {{command}}.",
+  "trust.noTerminal":
+    "Antes de que bae ejecute por primera vez los comandos de este repositorio, una persona debe aprobarlos, y no hay terminal donde preguntar. Ejecuta {{command}} una vez en una terminal para aprobarlos.",
   "next.noChanges":
     "El agente no cambió ningún archivo para {{id}}, así que bae no ejecutó sus comprobaciones.",
   "next.stopped":
@@ -291,6 +301,8 @@ export const es: Messages = {
   "contract.scripts": "Cambió {{detail}}, que los chequeos ejecutan.",
   "contract.runner": "Cambió la configuración del runner de tests.",
   "contract.restored": "Restaurado.",
+  "contract.sealed":
+    "bae solo guarda una huella de este archivo, porque puede contener credenciales, así que no pudo restaurarlo: revísalo y devuélvelo a su estado tú.",
   "contract.removed": "Eliminado.",
   "findings.accepted": "Aceptado con --accept-finding.",
   "findings.acceptedTitle": "Hallazgos aceptados",

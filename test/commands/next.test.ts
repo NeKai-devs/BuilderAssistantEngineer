@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig } from "../../src/config/store.js";
+import { recordTrust } from "../../src/next/trust.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
 import { FAKE_FILES, vitest } from "../fake-vitest.js";
 import { fakePrompter, type Step, scriptedBackend } from "../fakes.js";
@@ -60,6 +61,7 @@ async function repo(command: string, options: RepoOptions = {}) {
 }
 
 async function runNext(cwd: string, args: string[], steps: Step[], answers: unknown[] = []) {
+  await recordTrust(cwd);
   const ui = fakePrompter(answers);
   const ai = scriptedBackend(steps);
   const printed: string[] = [];

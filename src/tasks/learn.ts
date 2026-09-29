@@ -9,7 +9,7 @@ import type { CommandContext } from "../commands/context.js";
 import { FormatError, UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { renderPrompt } from "../core/prompt-loader.js";
-import { displayPath } from "../core/state.js";
+import { displayPath, writeState } from "../core/state.js";
 import { truncateText } from "../digest/format.js";
 import { type Capture, capturedPrompt, trustAgentsMd } from "../gates/capture.js";
 import { withoutLog } from "../gates/contract.js";
@@ -71,7 +71,7 @@ export async function learnFromFailure(
     t("lesson.title", { id }),
   );
   const approved = ctx.flags.yes || (await ctx.prompter.confirm(t("lesson.confirm"), true));
-  await writeText(path, renderLesson(id, reason, lesson, approved));
+  await writeState(path, renderLesson(id, reason, lesson, approved));
   if (!approved) {
     ctx.prompter.info(t("lesson.skipped", { path: displayPath(path) }));
     return;

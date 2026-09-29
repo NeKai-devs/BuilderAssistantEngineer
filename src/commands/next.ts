@@ -10,6 +10,7 @@ import { t } from "../i18n/index.js";
 import { attemptOnce, headlessLoop, permissionNote } from "../next/attempts.js";
 import { useRunBranch } from "../next/branch.js";
 import { checksFor, recoverInterrupted, start, withSuiteCommands } from "../next/start.js";
+import { requireTrust } from "../next/trust.js";
 import { capturedTask } from "../review/run.js";
 import { MAX_ATTEMPTS, readAttempts, sinceBlocked } from "../tasks/attempts.js";
 import { MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
@@ -52,6 +53,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   const unattended = headless || Boolean(ctx.flags.yes);
   await preflight(ctx, config.backend);
+  await requireTrust(ctx, config, tasks);
   const enter = () => useRunBranch(ctx, Boolean(options.newRun));
   const capture = await start(ctx, config, task, { allowSkip, unattended, enter });
   if (!capture) throw new ExitCode(1);

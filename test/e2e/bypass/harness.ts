@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { main } from "../../../src/cli.js";
 import type { Config } from "../../../src/config/schema.js";
 import { writeConfig } from "../../../src/config/store.js";
+import { recordTrust } from "../../../src/next/trust.js";
 import { splitFrontmatter } from "../../../src/tasks/frontmatter.js";
 import { FAKE_FILES, vitest } from "../../fake-vitest.js";
 import { fakePrompter, type Step, scriptedBackend } from "../../fakes.js";
@@ -69,7 +70,14 @@ export async function handoff(cwd: string, note = "Did the work; no traps.") {
   if (!text.includes(note)) await writeFile(path, `${text.trimEnd()}\n${note}\n`);
 }
 
-export async function next(cwd: string, args: string[], steps: Step[], answers: unknown[] = []) {
+export async function next(
+  cwd: string,
+  args: string[],
+  steps: Step[],
+  answers: unknown[] = [],
+  trusted = true,
+) {
+  if (trusted) await recordTrust(cwd);
   const ui = fakePrompter(answers);
   const ai = scriptedBackend(steps);
   const printed: string[] = [];

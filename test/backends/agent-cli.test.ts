@@ -56,6 +56,8 @@ describe("agent CLI backends", () => {
           "Read,Grep,Glob",
           "--setting-sources",
           "user",
+          "--strict-mcp-config",
+          "--disable-slash-commands",
         ],
         input: "PROMPT",
         mode: "run",
@@ -260,5 +262,18 @@ describe("agent CLI backends", () => {
     const backend = createBackend("claude");
     expect(typeof (await backend.available?.())).toBe("boolean");
     expect(createBackend("manual").available).toBeUndefined();
+  });
+
+  it("gives the read-only analyst and reviewer none of the user's MCP connectors or skills (audit A8)", async () => {
+    const cwd = await tempDir();
+    const read = fakeRunner();
+    await createBackend("claude", { runner: read.runner }).run("P", { cwd, access: "read" });
+    expect(read.calls[0]?.args).toEqual(
+      expect.arrayContaining(["--strict-mcp-config", "--disable-slash-commands"]),
+    );
+    expect(read.calls[0]?.args).not.toContain("--mcp-config");
+    const edit = fakeRunner();
+    await createBackend("claude", { runner: edit.runner }).run("P", { cwd, access: "edit" });
+    expect(edit.calls[0]?.args).not.toContain("--strict-mcp-config");
   });
 });

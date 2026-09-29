@@ -114,6 +114,16 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
+  "trust.title": "Commands this repository makes bae run",
+  "trust.suite": "Project commands, before and after every task:",
+  "trust.checks": "Task checks (## Verification):",
+  "trust.allowed": "Also allowed when nobody confirms (verify.allow in .bae/config.json):",
+  "trust.confirm":
+    "bae has not run anything in this repository on this machine yet. It will run the commands above with your permissions, also under --yes and --headless, which do not answer this question. Do you trust them?",
+  "trust.declined":
+    "Nothing was run. Read .bae/config.json and the ## Verification blocks in docs/plan/tasks, then run {{command}} again.",
+  "trust.noTerminal":
+    "Before bae runs this repository's commands for the first time, a person must approve them, and there is no terminal to ask in. Run {{command}} once in a terminal to approve them.",
   "next.noChanges": "The agent changed no files for {{id}}, so bae did not run its checks.",
   "next.stopped":
     "{{reason}}\n{{id}} stays in progress, and this run does not count as one of its attempts. Fix the cause and run {{command}} again.",
@@ -283,6 +293,8 @@ export const en = {
   "contract.scripts": "Changed {{detail}}, which the checks run.",
   "contract.runner": "Changed the test runner configuration.",
   "contract.restored": "Restored.",
+  "contract.sealed":
+    "bae keeps only a fingerprint of this file, because it can hold credentials, so it could not restore it: check it and put it back by hand.",
   "contract.removed": "Removed.",
   "findings.accepted": "Accepted with --accept-finding.",
   "findings.acceptedTitle": "Accepted findings",

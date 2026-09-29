@@ -21,14 +21,14 @@ function missingModule(args: string[], text: string): boolean {
   const flag = args.indexOf("-m");
   const module = flag === -1 ? undefined : args[flag + 1];
   if (!module) return false;
-  const line = new RegExp(`: No module named ${escape(module)}\\s*$`, "m");
+  const line = new RegExp(`: No module named ${literal(module)}\\s*$`, "m");
   return line.test(text);
 }
 
 function missingScript(manager: string, args: string[], text: string): boolean {
   const script = scriptName(manager, args);
   if (!script) return false;
-  const name = escape(script);
+  const name = literal(script);
   return [
     new RegExp(`missing script:\\s*"?${name}"?\\s*$`, "im"),
     new RegExp(`Command "${name}" not found`),
@@ -47,6 +47,6 @@ function scriptName(manager: string, args: string[]): string | undefined {
   return manager === "npm" ? undefined : first;
 }
 
-function escape(text: string): string {
+function literal(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

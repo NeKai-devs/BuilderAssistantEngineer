@@ -45,7 +45,14 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       "--permission-prompts",
       "none",
       ...(access === "read"
-        ? ["--tools", "Read,Grep,Glob", "--setting-sources", "user"]
+        ? [
+            "--tools",
+            "Read,Grep,Glob",
+            "--setting-sources",
+            "user",
+            "--strict-mcp-config",
+            "--disable-slash-commands",
+          ]
         : [
             ...allowFlag("--allowedTools", claudeRules(allow)),
             "--permission-mode",

@@ -1,7 +1,7 @@
-import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { readTextIfExists } from "../core/fs.js";
 import { asRecord } from "../core/json.js";
+import { appendState } from "../core/state.js";
 import { runDir } from "./runs.js";
 
 export const GATE_STAGES = [
@@ -39,15 +39,11 @@ const STOPS_FILE = "stops.jsonl";
 const OUTCOMES = new Set<string>(["done", "failed", "blocked"]);
 
 export async function recordAttempt(cwd: string, id: string, attempt: Attempt): Promise<void> {
-  const dir = runDir(cwd, id);
-  await mkdir(dir, { recursive: true });
-  await appendFile(join(dir, ATTEMPTS_FILE), `${JSON.stringify(attempt)}\n`, "utf8");
+  await appendState(join(runDir(cwd, id), ATTEMPTS_FILE), `${JSON.stringify(attempt)}\n`);
 }
 
 export async function recordStop(cwd: string, id: string, stop: Stop): Promise<void> {
-  const dir = runDir(cwd, id);
-  await mkdir(dir, { recursive: true });
-  await appendFile(join(dir, STOPS_FILE), `${JSON.stringify(stop)}\n`, "utf8");
+  await appendState(join(runDir(cwd, id), STOPS_FILE), `${JSON.stringify(stop)}\n`);
 }
 
 export async function lastStop(cwd: string, id: string): Promise<Stop | undefined> {

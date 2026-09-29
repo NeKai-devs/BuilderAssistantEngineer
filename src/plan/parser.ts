@@ -2,10 +2,10 @@ import { posix } from "node:path";
 import { z } from "zod";
 import type { Commands } from "../config/schema.js";
 import { FormatError } from "../core/errors.js";
+import { allowlistProblems } from "../tasks/checks.js";
 import { splitFrontmatter } from "../tasks/frontmatter.js";
 import { findCycle } from "../tasks/graph.js";
 import { withLogSection } from "../tasks/handoff.js";
-import { allowlistProblems } from "../tasks/checks.js";
 import {
   parseTask,
   sectionProblems,

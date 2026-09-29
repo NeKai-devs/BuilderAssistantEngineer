@@ -2,9 +2,9 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { CommandContext } from "../commands/context.js";
 import { ExitCode } from "../core/errors.js";
-import { readTextIfExists, writeText } from "../core/fs.js";
+import { readTextIfExists } from "../core/fs.js";
 import { EMPTY_TREE, git, gitRun, headCommit, isGitRepo } from "../core/git.js";
-import { repoState } from "../core/state.js";
+import { repoState, writeState } from "../core/state.js";
 import { t } from "../i18n/index.js";
 
 export const RUN_PREFIX = "bae/";
@@ -102,7 +102,7 @@ export async function runCommits(cwd: string, run: Run): Promise<RunCommit[]> {
 }
 
 async function saveRun(cwd: string, run: Run): Promise<Run> {
-  await writeText(join(repoState(cwd), RUN_FILE), `${JSON.stringify(run, null, 2)}\n`);
+  await writeState(join(repoState(cwd), RUN_FILE), `${JSON.stringify(run, null, 2)}\n`);
   return run;
 }
 

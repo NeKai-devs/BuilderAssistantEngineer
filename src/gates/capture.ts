@@ -2,18 +2,19 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Config, configSchema } from "../config/schema.js";
-import { readTextIfExists, writeText } from "../core/fs.js";
+import { readTextIfExists } from "../core/fs.js";
 import { flaggedFiles, headCommit, isGitRepo } from "../core/git.js";
 import { BAE_DIR } from "../core/paths.js";
 import { loadPrompt, type Prompt } from "../core/prompt-loader.js";
-import { repoState } from "../core/state.js";
+import { repoState, writeState } from "../core/state.js";
+import { redact } from "../digest/redact.js";
 import { findReviewer } from "../review/reviewer.js";
 import { scopePaths } from "../review/scope.js";
 import { hashPaths, takeSnapshot } from "../review/snapshot.js";
 import { runDir } from "../tasks/runs.js";
 import type { Task } from "../tasks/schema.js";
 import { verificationCommands } from "../tasks/schema.js";
-import { collectProtected, TASKS_DIR } from "./contract.js";
+import { collectProtected, sealHash, TASKS_DIR } from "./contract.js";
 import { captureIgnore } from "./ignore-rules.js";
 import { suiteBaselineSchema, suiteCommands } from "./regression.js";
 
@@ -42,6 +43,7 @@ const captureSchema = z.object({
   reviewer: z.string(),
   agentsMd: z.string().optional(),
   protected: z.record(z.string(), z.string()),
+  sealed: z.record(z.string(), z.string()).default({}),
   shadows: z.array(z.string()).default([]),
   flagged: z.array(z.string()).default([]),
   baseline: suiteBaselineSchema.optional(),
@@ -53,6 +55,7 @@ const captureSchema = z.object({
 export type Capture = z.output<typeof captureSchema>;
 
 const CAPTURE_FILE = "capture.json";
+const SEALED_NAMES = new Set([".npmrc", ".yarnrc", ".yarnrc.yml", ".envrc", "bunfig.toml"]);
 const ACTIVE_FILE = "active.json";
 const AGENTS_MD = "AGENTS.md";
 
@@ -93,11 +96,26 @@ export async function readCapture(cwd: string, id: string): Promise<Capture | un
 
 export async function saveCapture(cwd: string, capture: Capture): Promise<void> {
   const path = join(runDir(cwd, capture.id), CAPTURE_FILE);
-  await writeText(path, `${JSON.stringify(capture, null, 2)}\n`);
+  await writeState(path, `${JSON.stringify(sealCapture(capture), null, 2)}\n`);
+}
+
+export function sealCapture(capture: Capture): Capture {
+  const kept: Record<string, string> = {};
+  const sealed = { ...capture.sealed };
+  for (const [path, text] of Object.entries(capture.protected)) {
+    if (holdsSecrets(path, text)) sealed[path] = sealHash(text);
+    else kept[path] = text;
+  }
+  return { ...capture, protected: kept, sealed };
+}
+
+function holdsSecrets(path: string, text: string): boolean {
+  const name = path.split("/").at(-1) ?? path;
+  return path === ".git/config" || SEALED_NAMES.has(name) || redact(text) !== text;
 }
 
 export async function markActive(cwd: string, id: string): Promise<void> {
-  await writeText(join(repoState(cwd), ACTIVE_FILE), `${JSON.stringify({ id })}\n`);
+  await writeState(join(repoState(cwd), ACTIVE_FILE), `${JSON.stringify({ id })}\n`);
 }
 
 export async function clearActive(cwd: string): Promise<void> {
@@ -152,6 +170,7 @@ async function captureContract(cwd: string, config: Config, task: Task) {
     ) as Capture["prompts"],
     reviewer: await findReviewer(cwd, config.backend),
     ...(agentsMd === undefined ? {} : { agentsMd }),
+    sealed: {},
     ...(await collectProtected(cwd, {
       suite: suiteCommands(config).map((item) => item.command),
       verification: verificationCommands(task.body),

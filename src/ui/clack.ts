@@ -25,6 +25,7 @@ export function createClackPrompter(): Prompter {
     text: async (message, placeholder) => unwrap(await clack.text({ message, placeholder })) ?? "",
     confirm: async (message, initial) =>
       unwrap(await clack.confirm({ message, initialValue: initial })),
+    canAsk: () => Boolean(process.stdin.isTTY),
     spinner: async (message, task) => {
       if (!process.stdout.isTTY) return staticSpinner(message, task);
       const spin = clack.spinner({ indicator: "timer" });
