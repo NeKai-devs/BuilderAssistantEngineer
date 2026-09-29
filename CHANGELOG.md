@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.3](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.2...v0.3.3) (2026-09-29)
+
+
+### Bug Fixes
+
+* 0.3.3 correctness and safety from the 0.3.2 audit ([9d031bd](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/9d031bd8f6d060af51ce02e96b8bcd52778a8a14))
+* **next:** check the agent CLI through the process runner ([8aef627](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/8aef62732be3d18788f928a00ca8998e267115fb))
+* **next:** never mark done an agent that did not work ([cad1c1b](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/cad1c1bb692e49aac89e3a9b60c888b9e8b71de9))
+* **plan:** write plans that next can run unattended ([a5a888b](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/a5a888b8d135c921868802f8baf0703d6fdaedbe))
+* **security:** ask before a repository's commands first run, and keep secrets out ([1acd5a0](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/1acd5a0c6c7b177b784ba69a628ded70d2968769))
+* **security:** re-ask for new commands, list what the agent loads, treat the repo as data ([3c2c8a2](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/3c2c8a292da9fc8dafee6fd521455f58880ce18b))
+
 ## [0.3.2](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.1...v0.3.2) (2026-09-29)
 
 
