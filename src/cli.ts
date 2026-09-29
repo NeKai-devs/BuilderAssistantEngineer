@@ -12,8 +12,10 @@ import { BACKENDS } from "./config/schema.js";
 import { type GlobalFlags, resolveSettings } from "./config/settings.js";
 import { readConfig } from "./config/store.js";
 import { ExitCode, UserError } from "./core/errors.js";
+import { formatCost, metered, newUsage, type Usage } from "./core/usage.js";
 import { isLang, LANGS, type Lang, setLang, t } from "./i18n/index.js";
 import { ONLY_GROUPS } from "./plan/filter.js";
+import { formatDuration } from "./tasks/metrics.js";
 
 export async function main(
   argv: string[],
@@ -22,12 +24,31 @@ export async function main(
 ): Promise<number> {
   const config = await readConfig(cwd).catch(() => undefined);
   setLang(resolveSettings({ lang: scanLang(argv) }, config).lang);
+  const merged = { ...defaultDeps(), ...deps };
+  const usage = merged.usage ?? newUsage();
+  const run = { ...merged, usage, createBackend: metered(merged.createBackend, usage) };
   try {
-    await buildProgram({ ...defaultDeps(), ...deps }, cwd).parseAsync(argv);
+    await buildProgram(run, cwd).parseAsync(argv);
+    printUsage(run.print, usage);
     return 0;
   } catch (error) {
-    return report(error);
+    const code = report(error);
+    printUsage(run.print, usage);
+    return code;
   }
+}
+
+function printUsage(print: (text: string) => void, usage: Usage): void {
+  if (usage.priced + usage.unpriced === 0) return;
+  const time = formatDuration(Date.now() - usage.startedAt);
+  const names = usage.unpricedBy.join(", ");
+  const cost =
+    usage.unpriced === 0
+      ? formatCost(usage.costUsd)
+      : usage.priced === 0
+        ? t("usage.notReported", { names })
+        : t("usage.partlyReported", { cost: formatCost(usage.costUsd), names });
+  print(`${pc.dim(t("usage.summary", { time, cost }))}\n`);
 }
 
 export function buildProgram(deps: CommandDeps, cwd: string): Command {

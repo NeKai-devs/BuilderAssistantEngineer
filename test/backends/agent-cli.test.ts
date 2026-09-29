@@ -49,6 +49,7 @@ describe("agent CLI backends", () => {
           "--output-format",
           "stream-json",
           "--verbose",
+          "--include-partial-messages",
           "--no-session-persistence",
           "--permission-prompts",
           "none",

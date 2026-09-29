@@ -8,6 +8,7 @@ import { baePaths } from "../core/paths.js";
 import { type CommandResult, runCommand, runInteractive } from "../core/process.js";
 import { findExecutable } from "../core/which.js";
 import { t } from "../i18n/index.js";
+import { claudeProgress } from "./claude-stream.js";
 import type { Access, Backend, RunInfo, RunOptions } from "./types.js";
 
 export type AgentName = "claude" | "opencode" | "codex" | "gemini";
@@ -42,6 +43,7 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       "--output-format",
       "stream-json",
       "--verbose",
+      "--include-partial-messages",
       "--no-session-persistence",
       "--permission-prompts",
       "none",
@@ -143,11 +145,15 @@ async function runHeadless(
     await rm(outputFile, { force: true });
   }
   const args = spec.headless(options.access ?? "read", outputFile, options.allow ?? []);
+  const progress = options.onProgress;
+  const onStdout = spec.jsonOutput
+    ? progress && claudeProgress(options.cwd, progress)
+    : options.stream;
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,
     input: prompt,
     timeoutMs: options.timeoutMs,
-    onStdout: spec.jsonOutput ? undefined : options.stream,
+    ...(onStdout ? { onStdout } : {}),
   });
   assertSucceeded(spec, result, options.timeoutMs);
   const parsed = spec.parse?.(result) ?? { text: result.stdout, info: {} };

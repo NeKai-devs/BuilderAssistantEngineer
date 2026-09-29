@@ -26,6 +26,7 @@ import {
   parsePlan,
   renderPlan,
 } from "./parser.js";
+import { planProgress } from "./progress.js";
 import { repairPlan } from "./repair.js";
 import {
   newPlanStats,
@@ -98,12 +99,14 @@ async function requestPlan(
   prompt: string,
   stats: PlanStats,
 ): Promise<ParsedPlan> {
-  return ctx.prompter.spinner(t("plan.analyzing"), (update) => {
+  return ctx.prompter.spinner(t("plan.analyzing", { backend: backend.name }), (update) => {
     const ending: Ending = {};
+    const tracker = planProgress(backend.name, update);
     const options: RunOptions = {
       cwd: ctx.cwd,
       access: "read",
-      stream: progress(update),
+      stream: tracker.stream,
+      onProgress: tracker.onProgress,
       onInfo: (info) => {
         recordInfo(stats, info);
         if (info.truncated !== undefined) ending.truncated = info.truncated;
@@ -391,12 +394,4 @@ async function repoFiles(cwd: string): Promise<string> {
   const { files } = await scanFiles(cwd);
   const list = files.map((file) => file.path).join("\n");
   return truncateText(list || "(no files)", MAX_REPO_FILES_CHARS);
-}
-
-function progress(update: (message: string) => void) {
-  let received = 0;
-  return (chunk: string) => {
-    received += chunk.length;
-    update(t("plan.progress", { chars: received.toLocaleString() }));
-  };
 }

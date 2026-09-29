@@ -1,8 +1,11 @@
+import pc from "picocolors";
+import type { Progress } from "../backends/types.js";
 import type { CommandContext } from "../commands/context.js";
 import { CLI, isAgentBackend } from "../commands/shared.js";
 import { EnvironmentError, UserError } from "../core/errors.js";
 import { renderPrompt } from "../core/prompt-loader.js";
 import { displayPath } from "../core/state.js";
+import { costSince, formatCost, mark, type UsageMark } from "../core/usage.js";
 import {
   type Capture,
   capturedPrompt,
@@ -28,8 +31,10 @@ import {
 import { MAX_LOG_LINES } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
 import { loadTaskFiles } from "../tasks/load.js";
+import { formatDuration } from "../tasks/metrics.js";
 import { runDir, writeRunLog } from "../tasks/runs.js";
 import { setTaskStatus } from "../tasks/status.js";
+import { describeProgress } from "../ui/progress.js";
 import { announcePullRequest } from "./branch.js";
 import { commitTask } from "./commit.js";
 import { affectsChecks, agentCommands, briefCommands, ruleHint } from "./permissions.js";
@@ -48,7 +53,7 @@ export async function attemptOnce(
     isAgentBackend(capture.config.backend) ? capture.config.backend : "manual",
   );
   ctx.prompter.info(t("next.launching", { backend: backend.name }));
-  const startedAt = new Date();
+  const startedAt = begin(ctx);
   const launched = await launch(ctx, run, startedAt, false, () =>
     backend.run(prompt, { cwd: ctx.cwd, interactive: true }),
   );
@@ -92,7 +97,7 @@ export async function headlessLoop(
     attempt++;
     left--;
     ctx.prompter.info(t("next.attempt", { attempt, max: MAX_ATTEMPTS, backend: backend.name }));
-    const startedAt = new Date();
+    const startedAt = begin(ctx);
     const denied: string[] = [];
     const launched = await launch(
       ctx,
@@ -107,6 +112,7 @@ export async function headlessLoop(
           timeoutMs,
           allow,
           onInfo: (info) => denied.push(...(info.denied ?? [])),
+          onProgress: (progress) => showStep(ctx, progress),
         }),
       left === 0,
     );
@@ -204,6 +210,20 @@ async function gate(ctx: CommandContext, run: GateRun): Promise<Gate> {
   return result;
 }
 
+const marks = new WeakMap<Date, UsageMark>();
+
+function begin(ctx: CommandContext): Date {
+  const startedAt = new Date();
+  marks.set(startedAt, mark(ctx.usage));
+  return startedAt;
+}
+
+function showStep(ctx: CommandContext, progress: Progress): void {
+  if (progress.type !== "tool") return;
+  const step = describeProgress(progress);
+  if (step) ctx.print(`${pc.dim(`  · ${step}`)}\n`);
+}
+
 type Outcome = {
   outcome: Attempt["outcome"];
   gate?: Gate;
@@ -222,9 +242,17 @@ async function record(
   const reason = result.gate?.reason ?? result.reason;
   const skips = result.gate?.skips ?? [];
   const accepted = run.acceptance.accepted.flatMap((finding) => (finding.id ? [finding.id] : []));
+  const durationMs = Date.now() - startedAt.getTime();
+  const from = marks.get(startedAt);
+  const costUsd = from ? costSince(ctx.usage, from) : undefined;
+  if (from) {
+    const cost = costUsd === undefined ? t("next.costUnknown") : formatCost(costUsd);
+    ctx.prompter.info(t("next.attemptUsage", { time: formatDuration(durationMs), cost }));
+  }
   await recordAttempt(ctx.cwd, run.capture.id, {
     startedAt: startedAt.toISOString(),
-    durationMs: Date.now() - startedAt.getTime(),
+    durationMs,
+    ...(costUsd === undefined ? {} : { costUsd }),
     headless,
     outcome: result.outcome,
     ...(stage ? { stage } : {}),

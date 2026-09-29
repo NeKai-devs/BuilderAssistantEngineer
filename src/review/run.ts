@@ -11,6 +11,7 @@ import { type Acceptance, newAcceptance } from "../gates/findings.js";
 import { t } from "../i18n/index.js";
 import { logLines } from "../tasks/handoff.js";
 import { parseTask, type Task } from "../tasks/schema.js";
+import { describeProgress } from "../ui/progress.js";
 import { type AddedText, committedText, taskChanges } from "./changes.js";
 import { reviewDiff } from "./diff.js";
 import { type MechanicalFacts, mechanicalReview } from "./mechanical.js";
@@ -98,7 +99,8 @@ export async function reviewTask(
     return { status: "skipped", findings: [], reason: t("review.dryRun") };
   }
   const backend = ctx.createBackend(capture.config.backend);
-  const reply = await ctx.prompter.spinner(t("review.running", { id: task.meta.id }), () =>
+  const running = t("review.running", { id: task.meta.id });
+  const reply = await ctx.prompter.spinner(running, (update) =>
     runWithFormatRetry({
       backend,
       prompt,
@@ -106,6 +108,10 @@ export async function reviewTask(
         cwd: ctx.cwd,
         access: "read",
         timeoutMs: capture.config.agent.timeoutMinutes * 60_000,
+        onProgress: (progress) => {
+          const step = progress.type === "tool" ? describeProgress(progress) : undefined;
+          if (step) update(`${running} · ${step}`);
+        },
       },
       parse: parseReview,
       format: REVIEW_FORMAT,

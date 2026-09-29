@@ -4,6 +4,11 @@ export type Access = "read" | "edit";
 
 export type RunInfo = { model?: string; costUsd?: number; truncated?: boolean; denied?: string[] };
 
+export type Progress =
+  | { type: "thinking" }
+  | { type: "text"; text: string }
+  | { type: "tool"; tool: string; detail: string };
+
 export type RunOptions = {
   cwd: string;
   stream?: (chunk: string) => void;
@@ -12,6 +17,7 @@ export type RunOptions = {
   timeoutMs?: number;
   allow?: string[];
   onInfo?: (info: RunInfo) => void;
+  onProgress?: (progress: Progress) => void;
 };
 
 export type Backend = {

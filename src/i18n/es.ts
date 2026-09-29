@@ -83,8 +83,21 @@ export const es: Messages = {
   "plan.intro": "builder-assistant-engineer · plan",
   "plan.noInterview":
     "No hay entrevista en .bae/interview.md; se planifica solo a partir del repositorio.",
-  "plan.analyzing": "El analista está construyendo el plan (puede tardar varios minutos)",
-  "plan.progress": "Recibiendo el plan… {{chars}} caracteres",
+  "plan.analyzing": "{{backend}} está escribiendo el plan; suele tardar 10–40 minutos",
+  "plan.progressStep": "{{backend}} está escribiendo el plan (10–40 min) · {{step}}",
+  "plan.progressFiles":
+    "{{backend}} está escribiendo el plan (10–40 min) · {{count}} archivo(s) · {{file}}",
+  "usage.summary": "Tardó {{time}} · coste de IA {{cost}}",
+  "usage.notReported": "no lo informa {{names}}",
+  "usage.partlyReported": "{{cost}}, más llamadas a {{names}} que no informan su coste",
+  "next.attemptUsage": "Este intento tardó {{time}} · coste de IA {{cost}}",
+  "next.costUnknown": "no informado (una sesión interactiva o un backend que no lo informa)",
+  "progress.thinking": "pensando",
+  "progress.read": "leyendo {{detail}}",
+  "progress.search": "buscando {{detail}}",
+  "progress.run": "ejecutando {{detail}}",
+  "progress.edit": "editando {{detail}}",
+  "progress.tool": "{{tool}} {{detail}}",
   "plan.existingPlan":
     "Ya existe un plan en docs/plan/tasks. ¿Regenerarlo desde cero? (replan conserva el progreso)",
   "plan.useReplan": "Sin cambios. Usa replan para actualizar el plan conservando lo hecho.",
@@ -280,6 +293,8 @@ export const es: Messages = {
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
   "status.regressions": "regresiones atrapadas: {{count}}",
+  "status.cost":
+    "coste de IA: {{cost}} en los {{priced}} de {{attempts}} intento(s) que lo informaron",
   "status.time": "tiempo por tarea hecha: {{average}} de media, {{total}} en total",
   "status.taskRuns": "{{attempts}} intento(s), {{time}}",
   "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
