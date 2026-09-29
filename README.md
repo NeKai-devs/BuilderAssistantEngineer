@@ -250,7 +250,7 @@ The prompts live in [`src/prompts`](src/prompts). To change one for a project, c
 
 | Prompt | Variables |
 | --- | --- |
-| `analyst.md` | `mode`, `project_type`, `output_language`, `target_agents`, `interview`, `repo_digest`, `can_explore_repo`, `prior_plan` |
+| `analyst.md` | `mode`, `project_type`, `output_language`, `target_agents`, `interview`, `repo_digest`, `can_explore_repo`, `prior_plan`, `cli` |
 | `task.md` | `context`, `task`, `task_path`, `max_log_lines`, `suite` (what `next` hands to the agent) |
 | `review.md` | `reviewer`, `agents_md`, `task`, `diff`, `checks`, `output_language` |
 | `retry.md` | `task`, `failure`, `attempt`, `task_path`, `max_log_lines` |

@@ -43,7 +43,7 @@ Work through these steps before writing:
 Emit only these blocks, nothing outside them. Paths are relative to the repo root.
 
 <<<SUMMARY>>>
-5-8 lines for the terminal: what the project is, the approach, phases and task count, top 3 risks (and, only if the repository contains any, the instructions aimed at AI tools it found), what to run next.
+5-8 lines for the terminal: what the project is, the approach, phases and task count, top 3 risks (and, only if the repository contains any, the instructions aimed at AI tools it found), and the next step written as `{{cli}} next`. The CLI runs one task at a time and checks each one, so never name a slash command such as /next as a way to run tasks, and never suggest running tasks in parallel.
 <<<END SUMMARY>>>
 
 <<<QUESTIONS>>>
@@ -102,4 +102,4 @@ End every task with an empty `## Log` heading: the agent that executes the task 
 
 Every task must be executable by an agent that has read AGENTS.md and nothing else.
 
-When PRIOR_PLAN is present: keep done tasks intact, update or replace pending ones, never reuse or renumber existing ids, and add docs/plan/CHANGELOG.md describing what changed and why.
+When PRIOR_PLAN is present: keep done tasks intact, update or replace pending ones, never reuse or renumber existing ids, and add docs/plan/CHANGELOG.md describing what changed and why. Anything it asks the user to run is a `{{cli}}` command, never a slash command, and it never tells the user to set a task's status to done.

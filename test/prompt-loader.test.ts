@@ -14,6 +14,7 @@ const ANALYST_VARS = [
   "repo_digest",
   "can_explore_repo",
   "prior_plan",
+  "cli",
 ];
 
 describe("prompt loader", () => {

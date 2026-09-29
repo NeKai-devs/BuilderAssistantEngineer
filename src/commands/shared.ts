@@ -8,7 +8,15 @@ import { loadTaskFiles } from "../tasks/load.js";
 import type { Task } from "../tasks/schema.js";
 import type { CommandContext } from "./context.js";
 
-export const CLI = "npx builder-assistant-engineer";
+export const CLI = invokedAs(process.argv[1]);
+
+export function invokedAs(script: string | undefined): string {
+  const name = (script ?? "")
+    .split(/[\\/]/)
+    .at(-1)
+    ?.replace(/\.(c?js|mjs|cmd|ps1|exe)$/i, "");
+  return name === "bae" ? "bae" : "npx builder-assistant-engineer";
+}
 
 export async function requireConfig(ctx: CommandContext): Promise<Config> {
   const config = await readConfig(ctx.cwd);

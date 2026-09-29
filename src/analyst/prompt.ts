@@ -1,3 +1,4 @@
+import { CLI } from "../commands/shared.js";
 import type { Mode, Target } from "../config/schema.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import type { Lang } from "../i18n/index.js";
@@ -30,6 +31,7 @@ export async function buildAnalystPrompt(cwd: string, input: AnalystInput): Prom
     repo_digest: wrap("repo_digest", input.digest),
     can_explore_repo: String(input.canExplore),
     prior_plan: IN_REQUEST,
+    cli: CLI,
   });
   const request = [
     "## REQUEST",
