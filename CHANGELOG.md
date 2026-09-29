@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.3...v0.4.0) (2026-09-29)
+
+
+### Features
+
+* 0.4.0 progress, cost, one path and safe repository state ([0f1708f](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/0f1708ffd2cf6e1d59d4a0f44c97500443c7241c))
+
+
+### Bug Fixes
+
+* **analyst:** let the plan read the system prompt that init's questions cached ([c3d6343](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/c3d6343e16a4d5621848aba241d46229009c3be5))
+* **checks:** read curl's arguments before deciding where it sends data ([bff0fc0](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/bff0fc0891bd67275128cce19827bcee08249eba))
+* **init:** name the next step with the command the user typed ([b59331e](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/b59331ed007b9d350cf092097b31db44f187e6b1))
+* **messages:** name every command the user must run as bae next, never /next ([583af70](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/583af70fadf9331b77f8fdcd9a3ffc8e08acfda8))
+* **progress:** keep the spinner on one terminal row ([a471296](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/a4712960a18f1a0c599e38044c3b5a77dd8ec618))
+
 ## [0.3.3](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.2...v0.3.3) (2026-09-29)
 
 
