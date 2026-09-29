@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.1...v0.3.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* **plan:** a first plan that never ends in nothing ([99fb65e](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/99fb65e0777ace9b24f38407a3e7f14b20c6aaea))
+* **plan:** never throw a plan away over a Verification block ([46b86ae](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/46b86aeeca20d390462a3eb51790f83e170d944a))
+* **verify:** accept a server started in the background ([3a5dfda](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/3a5dfda10fd272c8a60cfd950469b5d55f31962a))
+* **verify:** read quoted heredocs, and let kill stop a saved job pid ([bb86b73](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/bb86b735cfc61c233cd7141b9e76163039f49ff4))
+
 ## [0.3.1](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.0...v0.3.1) (2026-09-28)
 
 
