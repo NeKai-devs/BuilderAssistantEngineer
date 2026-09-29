@@ -4,6 +4,8 @@ import { t } from "../i18n/index.js";
 import type { Choice, Prompter } from "./prompter.js";
 
 const INTERRUPTED = 130;
+const SPINNER_FRAME = 16;
+const MIN_ROOM = 20;
 
 export function createClackPrompter(): Prompter {
   return {
@@ -35,9 +37,10 @@ export function createClackPrompter(): Prompter {
         process.exitCode = INTERRUPTED;
       };
       process.on("exit", interrupted);
-      spin.start(message);
+      const fit = (text: string) => fitLine(text, process.stdout.columns ?? 80);
+      spin.start(fit(message));
       try {
-        const result = await task((update) => spin.message(update));
+        const result = await task((update) => spin.message(fit(update)));
         spin.stop(message);
         return result;
       } catch (error) {
@@ -48,6 +51,11 @@ export function createClackPrompter(): Prompter {
       }
     },
   };
+}
+
+export function fitLine(text: string, columns: number): string {
+  const room = Math.max(columns - SPINNER_FRAME, MIN_ROOM);
+  return text.length > room ? `${text.slice(0, room - 1)}…` : text;
 }
 
 function unwrap<T>(value: T): Exclude<T, symbol> {
