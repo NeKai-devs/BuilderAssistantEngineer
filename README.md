@@ -16,7 +16,7 @@ You need Node.js 20.12 or newer, git, and an agent CLI you already use and are l
 ```sh
 cd your-project                       # new idea? mkdir my-idea && cd my-idea && git init
 npx builder-assistant-engineer init   # pick language, project type, AI and agents; answer the interview (Enter skips)
-npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes), then offers to commit them
+npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes, naming each file as it arrives), then offers to commit them
 npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
@@ -36,8 +36,8 @@ docs/plan/03-decisions/ADR-001-*.md
 docs/plan/04-roadmap.md           phases, demo criteria, dependency graph, task index
 docs/plan/tasks/T-001-*.md        one self-contained prompt per task
 .claude/agents/*.md               subagents in Claude Code's format, including a reviewer
-.opencode/agent/*.md              the same subagents in opencode's format
-.claude/commands/*.md             next, review and status commands (and .opencode/command/*.md)
+.opencode/agent/*.md              the same subagents in opencode's format, converted by bae
+.claude/commands/*.md             next, review and status commands from bae's templates (and .opencode/command/*.md); /next sends you to bae next and never marks a task done
 ```
 
 Every task works as a prompt on its own:
@@ -129,11 +129,13 @@ Two things came out of it. The analyst now keeps every acceptance criterion with
 | `init` | Detects greenfield or brownfield, lets you choose the backend, target agents (multi-select) and language, runs the interview and saves `.bae/config.json` and `.bae/interview.md`. `--brief <files>` loads a written brief. |
 | `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. At the end it offers to commit what it wrote, with `.bae/config.json` and `.bae/interview.md`, as `chore(bae): plan` (`--yes` commits without asking; `--no-verify` skips the pre-commit and commit-msg hooks). |
 | `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes, then commits it on the run's `bae/` branch. `--new-run` starts a new branch from the current one. `--no-verify` commits without the pre-commit and commit-msg hooks. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
-| `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
+| `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught, time per task and the AI cost the attempts reported. |
 | `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. During a run it must be on the run's branch, and commits the new plan there as `chore(bae): replan` (`--no-verify` skips the hooks). |
 | `review [task]` | Runs the mechanical checks and then the generated reviewer, read-only, on a task's diff against its acceptance criteria and `AGENTS.md`. Exits with 1 when the review fails. Defaults to the task in progress. Takes `--accept-finding <id>` too. |
 
 Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly what would be sent to the AI and changes nothing) and `-y, --yes` (accepts every confirmation).
+
+Every command that calls the AI ends with the time it took and what the AI cost, as the backend reports it (claude reports it for `claude -p` calls; an interactive session and some backends do not, and the line says so). With claude, `plan`, `review` and `next --headless` also show what the AI is doing while it works: the files it reads, the commands it runs and, in `plan`, each file of the plan as it arrives. The analyst's instructions and the repository digest go to claude as a system prompt, which the provider caches between the interview's follow-up questions, the plan and its retries.
 
 ## Backends
 
