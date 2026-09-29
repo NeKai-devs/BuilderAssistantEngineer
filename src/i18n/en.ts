@@ -96,6 +96,20 @@ export const en = {
     "---\ndescription: Review a task with bae's reviewer\n---\nDo not review or change files from this command. Tell the user to run, in a terminal at the repository root:\n\n    {{cli}} review $ARGUMENTS\n\n(a task id such as T-003, or nothing for the task in progress). Never change `status:` in a task file.",
   "progress.writing": "writing the answer",
   "ui.interrupted": "Interrupted. Nothing was written; run the same command again to start over.",
+  "lock.busy":
+    "Another bae command ({{command}}, process {{pid}}) is running in this repository. Wait for it to finish, then run this one again.",
+  "next.noCommits":
+    "This repository has no commits yet, so bae has nothing to compare the task with. Commit your files first: git add -A && git commit -m init",
+  "next.interrupted":
+    "The previous run of {{id}} stopped before its checks finished; bae restored the files that define its checks and starts it again.",
+  "config.unknownKeys":
+    "Ignoring settings bae does not know in .bae/config.json (check their spelling): {{keys}}",
+  "init.badConfig":
+    "The existing .bae/config.json cannot be read, so setup starts from the defaults and rewrites it: {{details}}",
+  "init.noGit":
+    "This folder is not a git repository. bae needs git to check each task and commit it: run git init, commit your files, then run plan.",
+  "init.notRoot":
+    "Setting up bae in this folder, not at the repository root ({{root}}). Commands run from any folder below it use this setup.",
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",

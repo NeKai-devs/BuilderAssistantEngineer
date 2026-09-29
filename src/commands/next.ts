@@ -1,6 +1,7 @@
 import { AGENT_SPECS, type AgentName } from "../backends/agent-cli.js";
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
+import { headCommit, isGitRepo } from "../core/git.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import type { Capture } from "../gates/capture.js";
 import { newAcceptance } from "../gates/findings.js";
@@ -52,6 +53,11 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   const allowSkip = Boolean(options.allowSkip);
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   const unattended = headless || Boolean(ctx.flags.yes);
+  if ((await isGitRepo(ctx.cwd)) && !(await headCommit(ctx.cwd))) {
+    ctx.prompter.warn(t("next.noCommits"));
+    ctx.prompter.outro(t("next.nothingRun", { command: `${CLI} next` }));
+    throw new ExitCode(1);
+  }
   await preflight(ctx, config.backend);
   await requireTrust(ctx, config, tasks);
   const enter = () => useRunBranch(ctx, Boolean(options.newRun));

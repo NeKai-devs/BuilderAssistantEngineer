@@ -101,6 +101,20 @@ export const es: Messages = {
   "progress.writing": "escribiendo la respuesta",
   "ui.interrupted":
     "Interrumpido. No se escribió nada; vuelve a ejecutar el mismo comando para empezar de nuevo.",
+  "lock.busy":
+    "Otro comando de bae ({{command}}, proceso {{pid}}) se está ejecutando en este repositorio. Espera a que termine y vuelve a ejecutar este.",
+  "next.noCommits":
+    "Este repositorio todavía no tiene commits, así que bae no tiene con qué comparar la tarea. Haz primero commit de tus archivos: git add -A && git commit -m init",
+  "next.interrupted":
+    "La ejecución anterior de {{id}} se detuvo antes de terminar sus comprobaciones; bae restauró los archivos que las definen y la empieza de nuevo.",
+  "config.unknownKeys":
+    "Se ignoran ajustes que bae no conoce en .bae/config.json (revisa cómo están escritos): {{keys}}",
+  "init.badConfig":
+    "No se puede leer el .bae/config.json existente, así que la configuración empieza con los valores por defecto y lo reescribe: {{details}}",
+  "init.noGit":
+    "Esta carpeta no es un repositorio git. bae necesita git para comprobar cada tarea y hacer commit: ejecuta git init, haz commit de tus archivos y luego plan.",
+  "init.notRoot":
+    "Configurando bae en esta carpeta, no en la raíz del repositorio ({{root}}). Los comandos ejecutados desde cualquier carpeta por debajo usan esta configuración.",
   "progress.thinking": "pensando",
   "progress.read": "leyendo {{detail}}",
   "progress.search": "buscando {{detail}}",

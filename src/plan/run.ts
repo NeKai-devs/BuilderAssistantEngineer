@@ -42,6 +42,8 @@ type Parse = (text: string) => ParsedPlan;
 type Ending = { truncated?: boolean };
 
 const MAX_CONTINUATIONS = 3;
+const PLAN_TIMEOUT_MS = 60 * 60_000;
+const FIX_TIMEOUT_MS = 30 * 60_000;
 const REJECTED_PLAN = "rejected-plan.md";
 const NON_PLAN = "non-plan-answer.md";
 const FILE_MARKER = /<<<\s*FILE\s*:/i;
@@ -107,6 +109,7 @@ async function requestPlan(
       cwd: ctx.cwd,
       access: "read",
       system: analyst.system,
+      timeoutMs: PLAN_TIMEOUT_MS,
       stream: tracker.stream,
       onProgress: tracker.onProgress,
       onInfo: (info) => {
@@ -213,6 +216,7 @@ async function fixVerification(
     reply = await backend.run(prompt, {
       cwd: ctx.cwd,
       access: "read",
+      timeoutMs: FIX_TIMEOUT_MS,
       onInfo: (info) => recordInfo(stats, info),
     });
   } catch (error) {
@@ -382,6 +386,7 @@ async function fixPaths(
     reply = await backend.run(prompt, {
       cwd: ctx.cwd,
       access: "read",
+      timeoutMs: FIX_TIMEOUT_MS,
       onInfo: (info) => recordInfo(stats, info),
     });
   } catch (error) {

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { wholePrompt } from "../analyst/prompt.js";
 import type { AgentName } from "../backends/agent-cli.js";
 import { hasApiCredentials } from "../backends/api.js";
@@ -16,6 +17,7 @@ import {
 import { readConfig, readInterview, writeConfig, writeInterview } from "../config/store.js";
 import { UserError } from "../core/errors.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { gitTop } from "../core/root.js";
 import { AGENT_BACKENDS, detectInstalledAgents, pickDefaultBackend } from "../detect/agents.js";
 import { detectProjectMode } from "../detect/mode.js";
 import { buildDigest } from "../digest/index.js";
@@ -53,8 +55,15 @@ const TARGET_FOR: Record<AgentName, Target> = {
 };
 
 export async function runInit(ctx: CommandContext, options: InitOptions): Promise<void> {
-  const existing = await readConfig(ctx.cwd);
   ctx.prompter.intro(t("init.intro"));
+  const existing = await readConfig(ctx.cwd).catch((error: unknown) => {
+    if (!(error instanceof UserError)) throw error;
+    ctx.prompter.warn(t("init.badConfig", { details: error.message }));
+    return undefined;
+  });
+  const top = await gitTop(ctx.cwd);
+  if (!top) ctx.prompter.warn(t("init.noGit"));
+  else if (resolve(top) !== resolve(ctx.cwd)) ctx.prompter.warn(t("init.notRoot", { root: top }));
   const lang = await chooseLang(ctx, existing);
   setLang(lang);
   const mode = await chooseMode(ctx, await detectProjectMode(ctx.cwd));
