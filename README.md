@@ -11,7 +11,7 @@ It acts as your tech lead and architect. It interviews you, analyzes the reposit
 
 ## Quickstart (60 seconds)
 
-You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash.
+You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash; agent sessions on Windows are not verified yet (see [Platform support](#platform-support)).
 
 ```sh
 cd your-project                       # new idea? mkdir my-idea && cd my-idea && git init
@@ -279,6 +279,13 @@ bae status
 ```
 
 `bae` is a short alias that only exists after a global install. Do not run `npx bae`: that is a different npm package.
+
+## Platform support
+
+- **Linux and macOS**: the CLI, the digest, the gates and the test suite are verified in CI; agent sessions have been run for real on Linux.
+- **Windows (Git Bash)**: the CLI, the digest, the gates and the test suite are verified in CI. Agent sessions on Windows are not verified.
+
+CI runs lint, typecheck, every test (the gate bypass tests included) and the build on the three systems with Node 20 and 24; six tests that depend on POSIX behavior (process groups, file modes, file names with `*` or `?`, a Unix virtualenv layout, a missing program's exit code) are skipped on Windows. This section is updated when someone runs bae on a real Windows machine: if you do, tell us with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form.
 
 ## Contributing
 
