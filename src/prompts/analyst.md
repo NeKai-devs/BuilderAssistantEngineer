@@ -35,7 +35,7 @@ Work through these steps before writing:
 2. Discover. Brownfield: stack and versions, architecture and module boundaries, data model, entry points, conventions, test coverage and quality signals, CI/CD, security posture, risky dependencies, debt hot spots, undocumented behavior; cite paths. Greenfield: stack and architecture with 2-3 alternatives and why they lost.
 3. Decide: one ADR per significant decision (context, decision, alternatives, consequences).
 4. Plan: phases, then tasks. Order by risk reduction and value; spikes for unknowns come first. Each phase has a demo criterion.
-5. Agents: 3-6 subagents specialized for this project (e.g. backend, frontend, data, tests, reviewer, docs). Each has one responsibility, explicit read/write scope, allowed tools, the project rules it enforces and a definition of done. A reviewer agent that checks acceptance criteria and conventions always exists.
+5. Agents: 3-6 subagents specialized for this project (e.g. backend, frontend, data, tests, reviewer, docs). Each has one responsibility, explicit read/write scope, allowed tools, the project rules it enforces and a definition of done. A reviewer agent that checks acceptance criteria and conventions always exists; the CLI runs it after every task, so its description and AGENTS.md must not ask the other agents to run it themselves.
 6. Memory: AGENTS.md must let an agent with zero context work here: purpose, stack, how to run, test, lint and build, architecture map, conventions, do and don't rules, where the plan lives, how to pick the next task.
 7. Self-check, then fix silently: every brownfield claim cited; assumptions listed; no task larger than one session; every task has verifiable acceptance criteria and verification commands; every criterion reachable within the task's Scope and checked by its Verification, with external dependencies under Risks and notes; every absent baseline item covered by T-001; dependency graph acyclic; phase 1 demoable; non-scope items absent; language and output contract respected.
 
@@ -64,8 +64,7 @@ The project's commands, run from the repo root: the ones the repo has today, or 
 <<<FILE: docs/plan/03-decisions/ADR-001-slug.md>>> … <<<END FILE>>> — one per decision
 <<<FILE: docs/plan/04-roadmap.md>>> … <<<END FILE>>> — phases, demo criteria, dependency graph, task index
 <<<FILE: docs/plan/tasks/T-001-slug.md>>> … <<<END FILE>>> — one per task
-<<<FILE: .claude/agents/name.md>>> and <<<FILE: .opencode/agent/name.md>>> — one pair per agent, each in that tool's native frontmatter format; emit only formats in TARGET_AGENTS
-<<<FILE: .claude/commands/next.md>>>, <<<FILE: .opencode/command/next.md>>>, plus review and status equivalents
+<<<FILE: .claude/agents/name.md>>> … <<<END FILE>>> — one per agent, whatever TARGET_AGENTS says, in Claude Code's subagent format: frontmatter with name, description, tools (a comma-separated list such as Read, Grep, Glob, Bash) and model: inherit. The CLI converts them for the other agents and writes the slash commands itself, so write no .opencode files and no commands.
 
 ### Task file format
 ---

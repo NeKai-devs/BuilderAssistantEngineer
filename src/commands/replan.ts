@@ -1,3 +1,4 @@
+import { withGeneratedFiles } from "../artifacts/generated.js";
 import { type Change, planChanges } from "../artifacts/merge.js";
 import type { Config } from "../config/schema.js";
 import { t } from "../i18n/index.js";
@@ -46,7 +47,7 @@ async function replanOnce(
   }
   if (!parsed.files.some((file) => file.path === CHANGELOG))
     ctx.prompter.warn(t("replan.noChangelog"));
-  const files = selectFiles(parsed.files, { targets: config.targets });
+  const files = selectFiles(withGeneratedFiles(parsed.files), { targets: config.targets });
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsoleteTasks(tasks, parsed)];
   const written = await writePlanFiles(ctx, changes);
   await saveCommands(ctx, parsed.commands);

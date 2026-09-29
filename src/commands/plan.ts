@@ -1,3 +1,4 @@
+import { withGeneratedFiles } from "../artifacts/generated.js";
 import { type Change, planChanges } from "../artifacts/merge.js";
 import { applyChanges, confirmChanges } from "../artifacts/write.js";
 import type { Config } from "../config/schema.js";
@@ -45,7 +46,10 @@ async function planOnce(
     ctx.prompter.outro(t("plan.dryRunDone"));
     return false;
   }
-  const files = selectFiles(parsed.files, { only: options.only, targets: config.targets });
+  const files = selectFiles(withGeneratedFiles(parsed.files), {
+    only: options.only,
+    targets: config.targets,
+  });
   const replaced = options.only === undefined || options.only === "plan";
   const obsolete = replaced ? obsoleteTasks(existing, parsed) : [];
   const changes = [...(await planChanges(ctx.cwd, files)), ...obsolete];

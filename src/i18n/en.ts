@@ -88,6 +88,12 @@ export const en = {
   "usage.partlyReported": "{{cost}}, plus calls to {{names}} that do not report their cost",
   "next.attemptUsage": "This attempt took {{time}} · AI cost {{cost}}",
   "next.costUnknown": "not reported (an interactive session or a backend that does not report it)",
+  "template.next":
+    "---\ndescription: Hand the next task of the plan to bae\n---\nDo not work on a task from this command. bae picks the next task, opens the agent on it, then runs its checks and the review and commits it; a task done any other way skips those checks.\n\nTell the user to exit this session and run, in a terminal at the repository root:\n\n    {{cli}} next\n\nNever change `status:` in a task file.",
+  "template.status":
+    "---\ndescription: Show the plan's progress\n---\nRun `{{cli}} status` from the repository root and show its output as it is. Change nothing.",
+  "template.review":
+    "---\ndescription: Review a task with bae's reviewer\n---\nDo not review or change files from this command. Tell the user to run, in a terminal at the repository root:\n\n    {{cli}} review $ARGUMENTS\n\n(a task id such as T-003, or nothing for the task in progress). Never change `status:` in a task file.",
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",

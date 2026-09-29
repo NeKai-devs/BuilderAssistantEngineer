@@ -67,6 +67,11 @@ describe("plan", () => {
     );
     expect(await exists(cwd, ".claude/agents/reviewer.md")).toBe(true);
     expect(await exists(cwd, ".opencode/agent/reviewer.md")).toBe(false);
+    expect(await read(cwd, ".claude/commands/next.md")).toContain(
+      "Tell the user to exit this session and run, in a terminal at the repository root:\n\n    npx builder-assistant-engineer next",
+    );
+    expect(await exists(cwd, ".claude/commands/status.md")).toBe(true);
+    expect(await exists(cwd, ".opencode/command/next.md")).toBe(false);
     expect(ui.log.join("\n")).toContain("1. [blocking] Which DB? — schema");
     expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
       questions: 2,
@@ -74,7 +79,7 @@ describe("plan", () => {
       files: 8,
     });
     expect(ui.log.at(-1)).toBe(
-      "outro: 7 file(s) written. Next: npx builder-assistant-engineer next",
+      "outro: 9 file(s) written. Next: npx builder-assistant-engineer next",
     );
   });
 
@@ -186,7 +191,7 @@ describe("plan", () => {
     expect(code).toBe(0);
     expect(ai.prompts).toHaveLength(1);
     expect(ui.asked).toEqual([
-      "Write 7 file(s)?",
+      "Write 9 file(s)?",
       "Which DB?",
       "You answered blocking questions. Run the plan again now with your answers?",
     ]);
@@ -202,7 +207,7 @@ describe("plan", () => {
       "### Product name?\n\n- Why: branding\n- Answer: _open, not answered yet_",
     );
     expect(ui.log.at(-1)).toBe(
-      "outro: 7 file(s) written. Next: npx builder-assistant-engineer next",
+      "outro: 9 file(s) written. Next: npx builder-assistant-engineer next",
     );
   });
 

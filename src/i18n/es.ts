@@ -92,6 +92,12 @@ export const es: Messages = {
   "usage.partlyReported": "{{cost}}, más llamadas a {{names}} que no informan su coste",
   "next.attemptUsage": "Este intento tardó {{time}} · coste de IA {{cost}}",
   "next.costUnknown": "no informado (una sesión interactiva o un backend que no lo informa)",
+  "template.next":
+    "---\ndescription: Pasa la siguiente tarea del plan a bae\n---\nNo trabajes en ninguna tarea desde este comando. bae elige la siguiente tarea, abre el agente con ella, ejecuta sus comprobaciones y la revisión y hace commit; una tarea hecha de otra forma se salta esas comprobaciones.\n\nDile al usuario que salga de esta sesión y ejecute, en una terminal en la raíz del repositorio:\n\n    {{cli}} next\n\nNunca cambies `status:` en un archivo de tarea.",
+  "template.status":
+    "---\ndescription: Muestra el avance del plan\n---\nEjecuta `{{cli}} status` en la raíz del repositorio y muestra su salida tal cual. No cambies nada.",
+  "template.review":
+    "---\ndescription: Revisa una tarea con el revisor de bae\n---\nNo revises ni cambies archivos desde este comando. Dile al usuario que ejecute, en una terminal en la raíz del repositorio:\n\n    {{cli}} review $ARGUMENTS\n\n(un id de tarea como T-003, o nada para la tarea en curso). Nunca cambies `status:` en un archivo de tarea.",
   "progress.thinking": "pensando",
   "progress.read": "leyendo {{detail}}",
   "progress.search": "buscando {{detail}}",

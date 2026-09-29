@@ -151,6 +151,8 @@ describe("next", () => {
     expect(code).toBe(0);
     expect(calls[0]?.options).toMatchObject({ access: "edit" });
     expect(calls[1]?.prompt).toContain("The previous attempt did not pass (attempt 1)");
+    expect(calls[0]?.prompt).toContain("so do not run the reviewer subagent yourself");
+    expect(calls[1]?.prompt).toContain("so do not run the reviewer subagent yourself");
     expect(calls[1]?.prompt).toContain(
       "rewrite the handoff note under `## Log` in docs/plan/tasks/T-001-first.md so it covers every attempt in at most 8 lines",
     );
