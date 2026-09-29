@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.4.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.3...v0.4.0) (2026-09-29)
+
+
+### Features
+
+* 0.4.0 progress, cost, one path and safe repository state ([0f1708f](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/0f1708ffd2cf6e1d59d4a0f44c97500443c7241c))
+* **progress:** show what the AI is doing and what each command cost ([16c1201](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/16c120165f678d811c188bef956d52202a871599))
+
+
+### Bug Fixes
+
+* **analyst:** let the plan read the system prompt that init's questions cached ([c3d6343](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/c3d6343e16a4d5621848aba241d46229009c3be5))
+* **checks:** read curl's arguments before deciding where it sends data ([bff0fc0](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/bff0fc0891bd67275128cce19827bcee08249eba))
+* **checks:** refuse inline code and uploads to other hosts when nobody confirms ([5c05be8](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/5c05be8fcd0e8aaca0ffa15fbdcf3caeb0a2fef1))
+* **cli:** exit 130 when a spinner is interrupted, and 1 when next has nothing to run ([8467318](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/8467318f0e4a34b181436ff9541e6c164c32c52a))
+* **init:** name the next step with the command the user typed ([b59331e](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/b59331ed007b9d350cf092097b31db44f187e6b1))
+* **messages:** name every command the user must run as bae next, never /next ([583af70](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/583af70fadf9331b77f8fdcd9a3ffc8e08acfda8))
+* **next:** do not start a task over uncommitted changes without asking ([12fe33d](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/12fe33d61039a19f26ffb421af014256bae45e61))
+* **next:** warn when the plan itself was never committed ([3b85cc3](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/3b85cc3b92d5e7fdd1e362b49107609d4cb841ed))
+* **plan:** name the next step as a bae command, never /next ([bfd4f3b](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/bfd4f3b260a49572a4011b4759173b3d7442b18b))
+* **process:** stop a headless agent's whole process tree, and clean scratch files on Ctrl-C ([b0c98a9](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/b0c98a971123903697a2d9891a84ac12c57eadac))
+* **progress:** keep the spinner on one terminal row ([a471296](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/a4712960a18f1a0c599e38044c3b5a77dd8ec618))
+* **progress:** say the AI is writing while text arrives, keep converted descriptions on one line ([3ed4ba1](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/3ed4ba12a7173feedc5f9a53c1993399f9615915))
+* **replan:** reopen a blocked task that the new plan rewrites ([ff04202](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/ff042027b97118d47d6cc2590ba302546bf518b9))
+* **repo:** lock, subdirectories, empty repositories, timeouts and setup warnings ([a2adf4a](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/a2adf4accb3c8f36fd1afdee102d0e256cebc073))
+
+
+### Performance Improvements
+
+* **analyst:** keep the instructions and digest in a cached system prompt ([78a9cd3](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/78a9cd36e0b3914026435032eb1dc2f8bea5ad60))
+* **plan:** stop asking the AI for files bae can write itself ([75e22b6](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/75e22b62da938acc7e041acf8c9eb2a1085f6d5f))
+
 ## [0.3.3](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.2...v0.3.3) (2026-09-29)
 
 
