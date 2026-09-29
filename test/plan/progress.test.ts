@@ -12,6 +12,7 @@ describe("planProgress", () => {
     tracker.onProgress({ type: "thinking" });
     expect(shown).toEqual([
       "claude is writing the plan (10–40 min) · reading src/app.ts",
+      "claude is writing the plan (10–40 min) · writing the answer",
       "claude is writing the plan (10–40 min) · 1 file(s) · AGENTS.md",
       "claude is writing the plan (10–40 min) · 2 file(s) · docs/plan/tasks/T-001-a.md",
     ]);

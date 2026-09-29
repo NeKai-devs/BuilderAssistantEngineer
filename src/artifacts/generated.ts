@@ -46,7 +46,7 @@ export function opencodeAgent(claude: string): string {
     mode: "subagent",
     ...(Object.keys(limits).length > 0 ? { tools: limits } : {}),
   };
-  return `---\n${stringify(front).trimEnd()}\n---\n${(parsed?.body ?? claude).replace(/^\n+/, "")}`;
+  return `---\n${stringify(front, { lineWidth: 0 }).trimEnd()}\n---\n${(parsed?.body ?? claude).replace(/^\n+/, "")}`;
 }
 
 function toolList(value: unknown): string[] | undefined {

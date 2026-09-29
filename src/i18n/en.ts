@@ -94,6 +94,7 @@ export const en = {
     "---\ndescription: Show the plan's progress\n---\nRun `{{cli}} status` from the repository root and show its output as it is. Change nothing.",
   "template.review":
     "---\ndescription: Review a task with bae's reviewer\n---\nDo not review or change files from this command. Tell the user to run, in a terminal at the repository root:\n\n    {{cli}} review $ARGUMENTS\n\n(a task id such as T-003, or nothing for the task in progress). Never change `status:` in a task file.",
+  "progress.writing": "writing the answer",
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",

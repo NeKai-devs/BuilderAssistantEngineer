@@ -13,6 +13,7 @@ export type PlanProgress = {
 
 export function planProgress(backend: string, update: (message: string) => void): PlanProgress {
   const files = new Set<string>();
+  const writing = t("progress.writing");
   let tail = "";
   let current = "";
   let step = "";
@@ -41,6 +42,9 @@ export function planProgress(backend: string, update: (message: string) => void)
     onProgress: (progress) => {
       if (progress.type === "text") {
         scan(progress.text);
+        if (current || step === writing) return;
+        step = writing;
+        show();
         return;
       }
       step = describeProgress(progress) ?? step;
