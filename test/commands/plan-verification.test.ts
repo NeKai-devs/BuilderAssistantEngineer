@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig, writeInterview } from "../../src/config/store.js";
+import { CLI } from "../../src/core/invoked.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
 import { fakeBackend, fakePrompter, scriptedBackend, trusting } from "../fakes.js";
 import { tempDir } from "../helpers.js";
@@ -75,7 +76,7 @@ describe("plan and a Verification the CLI cannot accept", () => {
     expect(String(reviewed?.review_note)).toContain("Verification hides failures");
     expect(String(reviewed?.review_note)).toContain("npm test || true");
     expect(run.log).toContain(
-      "1 task(s) need review before next can run them: T-002. Each file's review_note says what to fix",
+      `1 task(s) need review before ${CLI} next can run them: T-002. Each file's review_note says what to fix`,
     );
     expect(JSON.parse(await read(cwd, ".bae/tmp/plan-report.json"))).toMatchObject({
       ok: true,
@@ -178,7 +179,7 @@ describe("plan and a Verification the CLI cannot accept", () => {
     const refused = JSON.stringify({ commands: { lint: "./bin/lint" } });
     const run = await plan(cwd, [planOutput({ config: refused }), "No."]);
     expect(run.code).toBe(0);
-    expect(run.log).toContain("next --headless and next --yes will refuse them");
+    expect(run.log).toContain(`${CLI} next --headless and ${CLI} next --yes will refuse them`);
     expect(run.log).toContain("verify.allow");
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAnalystPrompt, wholePrompt } from "../../src/analyst/prompt.js";
-import { invokedAs } from "../../src/commands/shared.js";
+import { invokedAs } from "../../src/core/invoked.js";
 import { loadPrompt } from "../../src/core/prompt-loader.js";
 import { tempDir } from "../helpers.js";
 
@@ -82,7 +82,7 @@ describe("buildAnalystPrompt", () => {
     expect(plan.request).toContain("<prior_plan>\nT-001 done\n</prior_plan>");
   });
 
-  it("names the next step as a bae command, never /next, in the summary and the changelog", async () => {
+  it("names the next step as a bae command, never /next, in the summary, the changelog and every file", async () => {
     const built = await buildAnalystPrompt(await tempDir(), {
       mode: "PLAN",
       projectType: "greenfield",
@@ -98,6 +98,9 @@ describe("buildAnalystPrompt", () => {
     );
     expect(built.system).toContain("never name a slash command such as /next");
     expect(built.system).toContain("it never tells the user to set a task's status to done");
+    expect(built.system).toContain(
+      "`npx builder-assistant-engineer next` is the only way to run a task: never present a slash command such as /next as one",
+    );
     expect(invokedAs("/usr/local/bin/bae")).toBe("bae");
     expect(invokedAs("C:\\npm\\bae.cmd")).toBe("bae");
     expect(invokedAs("/home/u/.npm/_npx/1/node_modules/.bin/builder-assistant-engineer")).toBe(
