@@ -63,8 +63,8 @@ async function nextReply(context: AdaptiveContext, data: InterviewData): Promise
   return context.prompter.spinner(t("interview.thinking"), () =>
     runWithFormatRetry({
       backend: context.backend,
-      prompt,
-      options: { cwd: context.cwd, access: "read" },
+      prompt: prompt.request,
+      options: { cwd: context.cwd, access: "read", system: prompt.system },
       parse: parseInterviewReply,
       format: INTERVIEW_FORMAT,
       onRetry: () => context.prompter.warn(t("format.retrying")),

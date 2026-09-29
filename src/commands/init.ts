@@ -1,3 +1,4 @@
+import { wholePrompt } from "../analyst/prompt.js";
 import type { AgentName } from "../backends/agent-cli.js";
 import { hasApiCredentials } from "../backends/api.js";
 import { noteOpencodeModel } from "../backends/opencode-model.js";
@@ -180,7 +181,7 @@ async function interviewFor(
     canExplore: AGENT_BACKENDS.some((name) => name === config.backend),
   };
   if (ctx.flags.dryRun) {
-    ctx.print(`${await interviewPrompt(base, data)}\n`);
+    ctx.print(`${wholePrompt(await interviewPrompt(base, data))}\n`);
     ctx.prompter.outro(t("init.dryRunDone"));
     return undefined;
   }

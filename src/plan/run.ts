@@ -1,5 +1,5 @@
 import { join, relative } from "node:path";
-import { buildAnalystPrompt } from "../analyst/prompt.js";
+import { type AnalystPrompt, buildAnalystPrompt, wholePrompt } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import { noteOpencodeModel } from "../backends/opencode-model.js";
 import type { Backend, RunOptions } from "../backends/types.js";
@@ -68,7 +68,7 @@ export async function generatePlan(
     priorPlan: request.priorPlan,
   });
   if (ctx.flags.dryRun) {
-    ctx.print(`${prompt}\n`);
+    ctx.print(`${wholePrompt(prompt)}\n`);
     return undefined;
   }
   if (config.backend === "opencode") await noteOpencodeModel(ctx);
@@ -96,15 +96,17 @@ async function requestPlan(
   ctx: CommandContext,
   backend: Backend,
   parse: Parse,
-  prompt: string,
+  analyst: AnalystPrompt,
   stats: PlanStats,
 ): Promise<ParsedPlan> {
+  const prompt = analyst.request;
   return ctx.prompter.spinner(t("plan.analyzing", { backend: backend.name }), (update) => {
     const ending: Ending = {};
     const tracker = planProgress(backend.name, update);
     const options: RunOptions = {
       cwd: ctx.cwd,
       access: "read",
+      system: analyst.system,
       stream: tracker.stream,
       onProgress: tracker.onProgress,
       onInfo: (info) => {

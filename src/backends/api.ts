@@ -2,7 +2,7 @@ import { UserError } from "../core/errors.js";
 import { asRecord, parseObject } from "../core/json.js";
 import { t } from "../i18n/index.js";
 import { readSse } from "./sse.js";
-import type { Backend, RunOptions } from "./types.js";
+import { type Backend, type RunOptions, withSystem } from "./types.js";
 
 export type Env = Record<string, string | undefined>;
 
@@ -43,9 +43,10 @@ export function createApiBackend(overrides: Partial<ApiDeps> = {}): Backend {
       if (options.interactive) throw new UserError(t("backend.apiInteractive"));
       const target = resolveApiTarget(deps.env);
       options.onInfo?.({ model: target.model });
+      const full = withSystem(prompt, options);
       return target.provider === "anthropic"
-        ? callAnthropic(target, prompt, options, deps)
-        : callOpenAi(target, prompt, options, deps);
+        ? callAnthropic(target, full, options, deps)
+        : callOpenAi(target, full, options, deps);
     },
   };
 }

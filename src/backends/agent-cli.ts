@@ -9,7 +9,7 @@ import { type CommandResult, runCommand, runInteractive } from "../core/process.
 import { findExecutable } from "../core/which.js";
 import { t } from "../i18n/index.js";
 import { claudeProgress } from "./claude-stream.js";
-import type { Access, Backend, RunInfo, RunOptions } from "./types.js";
+import { type Access, type Backend, type RunInfo, type RunOptions, withSystem } from "./types.js";
 
 export type AgentName = "claude" | "opencode" | "codex" | "gemini";
 
@@ -18,6 +18,7 @@ export type AgentSpec = {
   command: string;
   headless(access: Access, outputFile: string, allow: string[]): string[];
   interactive(instruction: string): string[];
+  systemFile?: (path: string) => string[];
   readsOutputFile?: boolean;
   jsonOutput?: boolean;
   parse?: (result: CommandResult) => Parsed;
@@ -65,6 +66,7 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
           ]),
     ],
     interactive: (instruction) => [instruction],
+    systemFile: (path) => ["--append-system-prompt-file", path],
     jsonOutput: true,
     parse: parseClaudeJson,
   },
@@ -144,14 +146,20 @@ async function runHeadless(
     await mkdir(tmp, { recursive: true });
     await rm(outputFile, { force: true });
   }
-  const args = spec.headless(options.access ?? "read", outputFile, options.allow ?? []);
+  const systemFile = join(tmp, "system-prompt.md");
+  const separate = Boolean(options.system && spec.systemFile);
+  if (separate) await writeText(systemFile, options.system ?? "");
+  const args = [
+    ...spec.headless(options.access ?? "read", outputFile, options.allow ?? []),
+    ...(separate && spec.systemFile ? spec.systemFile(systemFile) : []),
+  ];
   const progress = options.onProgress;
   const onStdout = spec.jsonOutput
     ? progress && claudeProgress(options.cwd, progress)
     : options.stream;
   const result = await runner.run(spec.command, args, {
     cwd: options.cwd,
-    input: prompt,
+    input: separate ? prompt : withSystem(prompt, options),
     timeoutMs: options.timeoutMs,
     ...(onStdout ? { onStdout } : {}),
   });
@@ -235,7 +243,7 @@ async function runSession(
   options: RunOptions,
 ): Promise<string> {
   const promptFile = join(baePaths(options.cwd).tmp, "prompt.md");
-  await writeText(promptFile, prompt);
+  await writeText(promptFile, withSystem(prompt, options));
   const path = relative(options.cwd, promptFile).split("\\").join("/");
   const instruction = `Read ${path} and carry out the task it describes. It is your complete task prompt.`;
   const result = await runner.interactive(spec.command, spec.interactive(instruction), {

@@ -11,6 +11,7 @@ export type Progress =
 
 export type RunOptions = {
   cwd: string;
+  system?: string;
   stream?: (chunk: string) => void;
   interactive?: boolean;
   access?: Access;
@@ -25,3 +26,7 @@ export type Backend = {
   available?(): Promise<boolean>;
   run(prompt: string, options: RunOptions): Promise<string>;
 };
+
+export function withSystem(prompt: string, options: RunOptions): string {
+  return options.system ? `${options.system}\n\n${prompt}` : prompt;
+}
