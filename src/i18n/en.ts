@@ -119,7 +119,8 @@ export const en = {
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",
-  "next.unblock": "Unblock or finish the tasks above, or run replan.",
+  "next.unblock":
+    "Fix what a task that needs review says in its file and set its status to pending, unblock or finish the other tasks above, or run replan.",
   "verify.commands": "Verification",
   "verify.confirm": "Run these verification commands now?",
   "verify.declined": "Verification was not run; the task stays in progress.",
@@ -223,6 +224,24 @@ export const en = {
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
   "status.blockedReason": "{{id}} is blocked: {{reason}}",
+  "opencode.model": "opencode will use {{model}} (from {{source}}).",
+  "opencode.weakModel":
+    'opencode will use {{model}} (from {{source}}), which looks like a free or small model. A plan needs a strong model: pass --backend claude, or set a stronger "model" in opencode.json.',
+  "opencode.noModel":
+    'opencode has no "model" in opencode.json, so it will use its own default, which may be a free model. A plan needs a strong model: pass --backend claude, or set "model" in opencode.json.',
+  "plan.notAPlan":
+    "The answer ({{chars}} characters) has no plan files, so it is not a plan; asking again with the full prompt. The answer is saved in {{path}}.",
+  "plan.needsReviewWarn":
+    "{{count}} task(s) still have a Verification the CLI cannot accept: {{ids}}. They are written with status needs_review, and next will not run them until they are fixed.",
+  "plan.needsReview":
+    "{{count}} task(s) need review before next can run them: {{ids}}. Each file's review_note says what to fix in its Verification; then set its status to pending.",
+  "verification.retrying":
+    "{{count}} task(s) have a Verification the CLI cannot accept: {{kinds}}. Asking the analyst to fix only those. Details in {{report}}.",
+  "verification.fixing": "The analyst is fixing the Verification of those tasks",
+  "verification.fixed": "Every Verification is fixed.",
+  "verification.retryFailed": "The request to fix the Verification failed: {{details}}",
+  "status.reviewReason": "{{id}} needs review: {{reason}}",
+  "next.needsReview": "needs review: {{note}}",
   "status.metrics": "Local metrics",
   "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
   "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",

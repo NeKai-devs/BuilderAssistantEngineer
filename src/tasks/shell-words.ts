@@ -105,7 +105,12 @@ export function program(command: SimpleCommand): { name: string; args: string[] 
 }
 
 export function heredocEnd(line: string): string | undefined {
-  return HEREDOC.exec(unquoted(line))?.[2];
+  const masked = line
+    .replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (quoted) => "_".repeat(quoted.length))
+    .replace(/(^|\s)#.*$/, "$1");
+  const operator = /(?<!<)<<-?(?!<)/.exec(masked);
+  if (!operator) return undefined;
+  return HEREDOC.exec(line.slice(operator.index))?.[2];
 }
 
 export function openQuote(text: string, start?: "'" | '"'): "'" | '"' | undefined {

@@ -65,6 +65,7 @@ Each fixture gets `prompt.md` (the exact prompt), `cli-output.txt`, `output/` (e
 | Continuations, format retries | how often the answer was cut off or malformed |
 | Local repairs | format slips fixed without asking the model again |
 | Evidence retries, unverified after retry | how often cited paths had to be fixed, and how many stayed unverified |
+| Not a plan, Verification fixes, Needs review | answers with no FILE block that were asked again, targeted fixes of Verification blocks, and tasks written with `status: needs_review` |
 | Commands | project commands saved to `.bae/config.json` (out of test, lint, typecheck, build) |
 | tests: required, Empty Log | tasks that require tests, and tasks that end with an empty `## Log` |
 | Minutes, cost | wall time, and cost when the backend reports it (claude) |

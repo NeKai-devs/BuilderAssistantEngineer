@@ -1,6 +1,7 @@
 import { join, relative } from "node:path";
 import { buildAnalystPrompt } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
+import { noteOpencodeModel } from "../backends/opencode-model.js";
 import type { Backend, RunOptions } from "../backends/types.js";
 import type { CommandContext } from "../commands/context.js";
 import { isAgentBackend } from "../commands/shared.js";
@@ -14,11 +15,18 @@ import { truncateText } from "../digest/format.js";
 import { buildDigest } from "../digest/index.js";
 import { scanFiles } from "../digest/walk.js";
 import { t } from "../i18n/index.js";
+import { setFrontmatterFields } from "../tasks/frontmatter.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
 import { describeUnverified, findUnverified, type Unverified } from "./evidence.js";
 import { type ParsedPlan, PLAN_FORMAT, parseFileBlocks, parsePlan, renderPlan } from "./parser.js";
 import { repairPlan } from "./repair.js";
-import { newPlanStats, type PlanStats, recordInfo, writePlanReport } from "./report.js";
+import {
+  newPlanStats,
+  PLAN_REPORT,
+  type PlanStats,
+  recordInfo,
+  writePlanReport,
+} from "./report.js";
 
 export type PlanRequest = { priorPlan: string; knownTaskIds: string[] };
 
@@ -27,6 +35,8 @@ type Ending = { truncated?: boolean };
 
 const MAX_CONTINUATIONS = 3;
 const REJECTED_PLAN = "rejected-plan.md";
+const NON_PLAN = "non-plan-answer.md";
+const FILE_MARKER = /<<<\s*FILE\s*:/i;
 const MAX_REPO_FILES_CHARS = 20_000;
 
 export async function generatePlan(
@@ -53,6 +63,7 @@ export async function generatePlan(
     ctx.print(`${prompt}\n`);
     return undefined;
   }
+  if (config.backend === "opencode") await noteOpencodeModel(ctx);
   const stats = newPlanStats(config.backend);
   const backend = ctx.createBackend(config.backend);
   const requireReviewer = config.targets.some(
@@ -63,8 +74,9 @@ export async function generatePlan(
   try {
     const parsed = await requestPlan(ctx, backend, parse, prompt, stats);
     const checked = await checkEvidence(ctx, backend, parsed, parse, stats, config.mode);
-    await writePlanReport(ctx.cwd, stats, checked);
-    return checked;
+    const reviewed = await reviewVerification(ctx, backend, checked, parse, stats);
+    await writePlanReport(ctx.cwd, stats, reviewed);
+    return reviewed;
   } catch (error) {
     await writePlanReport(ctx.cwd, stats, undefined, error);
     throw error;
@@ -102,8 +114,141 @@ async function requestPlan(
         ctx.prompter.warn(t("format.retrying"));
       },
       complete: (text) => continueTruncated(ctx, backend, { prompt, text, options, stats, repair }),
+      retryPrompt: (first) => askForPlan(ctx, first, prompt, stats),
     });
   });
+}
+
+async function askForPlan(
+  ctx: CommandContext,
+  answer: string,
+  prompt: string,
+  stats: PlanStats,
+): Promise<string | undefined> {
+  if (FILE_MARKER.test(answer)) return undefined;
+  stats.nonPlanAnswers++;
+  const path = join(baePaths(ctx.cwd).tmp, NON_PLAN);
+  await writeText(path, answer);
+  const chars = answer.trim().length;
+  ctx.prompter.warn(t("plan.notAPlan", { chars, path: shown(ctx.cwd, path) }));
+  return `${prompt}\n\n---\n\nNote: your previous answer (${chars} characters) contained no <<<FILE: …>>> blocks, so it was not a plan. Answer again with the complete plan, in the output format described above.`;
+}
+
+async function reviewVerification(
+  ctx: CommandContext,
+  backend: Backend,
+  plan: ParsedPlan,
+  parse: Parse,
+  stats: PlanStats,
+): Promise<ParsedPlan> {
+  if (plan.reviews.length === 0) return plan;
+  stats.verificationRetries++;
+  ctx.prompter.warn(
+    t("verification.retrying", {
+      count: plan.reviews.length,
+      kinds: describeReviews(plan.reviews),
+      report: shown(ctx.cwd, join(baePaths(ctx.cwd).tmp, PLAN_REPORT)),
+    }),
+  );
+  const fixed = await ctx.prompter.spinner(t("verification.fixing"), () =>
+    fixVerification(ctx, backend, plan, parse, stats),
+  );
+  const current = fixed ?? plan;
+  if (current.reviews.length === 0) {
+    ctx.prompter.success(t("verification.fixed"));
+    return current;
+  }
+  return markForReview(ctx, current, parse, stats);
+}
+
+async function fixVerification(
+  ctx: CommandContext,
+  backend: Backend,
+  plan: ParsedPlan,
+  parse: Parse,
+  stats: PlanStats,
+): Promise<ParsedPlan | undefined> {
+  const paths = new Set(plan.reviews.map((review) => review.path));
+  const prompt = renderPrompt(await loadPrompt("fix-verification", ctx.cwd), {
+    problems: plan.reviews
+      .flatMap((review) => review.notes.map((note) => `- ${review.path}: ${note}`))
+      .join("\n"),
+    files: plan.files
+      .filter((file) => paths.has(file.path))
+      .map((file) => `<<<FILE: ${file.path}>>>\n${file.content.trimEnd()}\n<<<END FILE>>>`)
+      .join("\n\n"),
+  });
+  let reply: string;
+  try {
+    reply = await backend.run(prompt, {
+      cwd: ctx.cwd,
+      access: "read",
+      onInfo: (info) => recordInfo(stats, info),
+    });
+  } catch (error) {
+    if (!(error instanceof UserError)) throw error;
+    ctx.prompter.warn(t("verification.retryFailed", { details: error.message }));
+    return undefined;
+  }
+  return mergeFiles(plan, reply, paths, parse);
+}
+
+function markForReview(
+  ctx: CommandContext,
+  plan: ParsedPlan,
+  parse: Parse,
+  stats: PlanStats,
+): ParsedPlan {
+  const notes = new Map(plan.reviews.map((review) => [review.path, review.notes.join(" ")]));
+  const files = plan.files.map((file) => {
+    const note = notes.get(file.path);
+    if (note === undefined) return file;
+    const fields = { status: "needs_review", review_note: JSON.stringify(note) };
+    return { ...file, content: setFrontmatterFields(file.content, fields) };
+  });
+  const ids = plan.reviews.map((review) => review.id);
+  stats.needsReview = ids;
+  ctx.prompter.warn(t("plan.needsReviewWarn", { count: ids.length, ids: ids.join(", ") }));
+  const marked = { ...parse(renderPlan({ ...plan, files })), warnings: plan.warnings };
+  const line = t("plan.needsReview", { count: ids.length, ids: ids.join(", ") });
+  return { ...marked, summary: `${marked.summary}\n\n${line}` };
+}
+
+function describeReviews(reviews: ParsedPlan["reviews"]): string {
+  const byKind = new Map<string, string[]>();
+  for (const review of reviews) {
+    for (const note of review.notes) {
+      const kind = note.split(": ")[0] ?? note;
+      const ids = byKind.get(kind) ?? [];
+      if (!ids.includes(review.id)) byKind.set(kind, [...ids, review.id]);
+    }
+  }
+  return [...byKind].map(([kind, ids]) => `${kind} (${ids.join(", ")})`).join("; ");
+}
+
+function mergeFiles(
+  plan: ParsedPlan,
+  reply: string,
+  paths: Set<string>,
+  parse: Parse,
+): ParsedPlan | undefined {
+  const replaced = new Map(
+    parseFileBlocks(repairPlan(reply, undefined).text)
+      .filter((file) => paths.has(file.path))
+      .map((file) => [file.path, file]),
+  );
+  if (replaced.size === 0) return undefined;
+  const files = plan.files.map((file) => replaced.get(file.path) ?? file);
+  try {
+    return { ...parse(renderPlan({ ...plan, files })), warnings: plan.warnings };
+  } catch (error) {
+    if (error instanceof FormatError) return undefined;
+    throw error;
+  }
+}
+
+function shown(cwd: string, path: string): string {
+  return relative(cwd, path).split("\\").join("/");
 }
 
 function repairAnswer(ctx: CommandContext, text: string, ending: Ending, stats: PlanStats) {
@@ -211,19 +356,7 @@ async function fixPaths(
     ctx.prompter.warn(t("evidence.retryFailed", { details: error.message }));
     return undefined;
   }
-  const replaced = new Map(
-    parseFileBlocks(repairPlan(reply, undefined).text)
-      .filter((file) => sources.has(file.path))
-      .map((file) => [file.path, file]),
-  );
-  if (replaced.size === 0) return undefined;
-  const files = parsed.files.map((file) => replaced.get(file.path) ?? file);
-  try {
-    return { ...parse(renderPlan({ ...parsed, files })), warnings: parsed.warnings };
-  } catch (error) {
-    if (error instanceof FormatError) return undefined;
-    throw error;
-  }
+  return mergeFiles(parsed, reply, sources, parse);
 }
 
 async function repoFiles(cwd: string): Promise<string> {

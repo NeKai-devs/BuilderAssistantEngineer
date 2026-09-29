@@ -4,7 +4,7 @@ import { trivialityProblems } from "./checks.js";
 import { splitFrontmatter } from "./frontmatter.js";
 import { logicalLines } from "./shell-words.js";
 
-export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked"] as const;
+export const TASK_STATUSES = ["pending", "in_progress", "done", "blocked", "needs_review"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const TEST_POLICIES = ["required", "optional", "fix"] as const;
 export const COMMIT_TYPES = ["feat", "fix", "refactor", "test", "docs", "chore"] as const;
@@ -28,6 +28,7 @@ export const taskMetaSchema = z.object({
   risk: z.enum(["low", "medium", "high"]),
   tests: z.enum(TEST_POLICIES).default("optional"),
   type: z.enum(COMMIT_TYPES).default("chore"),
+  review_note: z.string().optional(),
 });
 
 export type TaskMeta = z.output<typeof taskMetaSchema>;
@@ -68,17 +69,28 @@ export function parseTask(path: string, text: string): Task {
 }
 
 export function taskProblems(task: Task): string[] {
-  const missing = (Object.keys(SECTIONS) as SectionKey[]).filter(
-    (key) => sectionText(task.body, key) === undefined,
-  );
-  const problems = missing.map((key) => `${task.path}: missing section "${SECTIONS[key][0]}"`);
-  if (!missing.includes("verification") && verificationCommands(task.body).length === 0) {
-    problems.push(`${task.path}: Verification needs at least one command in a \`\`\`sh block`);
-  }
+  return [
+    ...sectionProblems(task),
+    ...verificationNotes(task).map((note) => `${task.path}: ${note}`),
+  ];
+}
+
+export function sectionProblems(task: Task): string[] {
+  return (Object.keys(SECTIONS) as SectionKey[])
+    .filter((key) => sectionText(task.body, key) === undefined)
+    .map((key) => `${task.path}: missing section "${SECTIONS[key][0]}"`);
+}
+
+export function verificationNotes(task: Task): string[] {
+  if (sectionText(task.body, "verification") === undefined) return [];
+  const notes =
+    verificationCommands(task.body).length === 0
+      ? ["Verification needs at least one command in a ```sh block"]
+      : [];
   for (const problem of trivialityProblems(verificationScript(task.body))) {
-    problems.push(`${task.path}: Verification ${TRIVIALITY[problem.reason]}: ${problem.command}`);
+    notes.push(`Verification ${TRIVIALITY[problem.reason]}: ${problem.command}`);
   }
-  return problems;
+  return notes;
 }
 
 export function sectionText(body: string, key: SectionKey): string | undefined {

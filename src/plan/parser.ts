@@ -5,7 +5,13 @@ import { FormatError } from "../core/errors.js";
 import { splitFrontmatter } from "../tasks/frontmatter.js";
 import { findCycle } from "../tasks/graph.js";
 import { withLogSection } from "../tasks/handoff.js";
-import { parseTask, TASK_PATH, type Task, taskProblems } from "../tasks/schema.js";
+import {
+  parseTask,
+  sectionProblems,
+  TASK_PATH,
+  type Task,
+  verificationNotes,
+} from "../tasks/schema.js";
 
 export type PlanFile = { path: string; content: string };
 
@@ -36,7 +42,10 @@ export type ParsedPlan = {
   files: PlanFile[];
   tasks: Task[];
   warnings: string[];
+  reviews: TaskReview[];
 };
+
+export type TaskReview = { path: string; id: string; notes: string[] };
 
 export type ParseOptions = { knownTaskIds?: string[]; requireReviewer?: boolean };
 
@@ -94,8 +103,14 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
   const tasks = validateTasks(files, options.knownTaskIds ?? [], problems);
   warnings.push(...missingTestPolicies(files));
   validateAgents(files, options.requireReviewer ?? false, problems);
-  if (problems.length > 0) throw new FormatError(problems.slice(0, MAX_PROBLEMS).join("\n"));
-  return { summary, questions, commands, files, tasks, warnings };
+  if (problems.length > 0) {
+    throw new FormatError(groupProblems(problems).slice(0, MAX_PROBLEMS).join("\n"));
+  }
+  const reviews = tasks.flatMap((task) => {
+    const notes = verificationNotes(task);
+    return notes.length > 0 ? [{ path: task.path, id: task.meta.id, notes }] : [];
+  });
+  return { summary, questions, commands, files, tasks, warnings, reviews };
 }
 
 export function parseFileBlocks(text: string): PlanFile[] {
@@ -254,7 +269,7 @@ function validateTasks(files: PlanFile[], knownIds: string[], problems: string[]
       const task = parseTask(file.path, file.content);
       if (task.meta.id !== fileId)
         problems.push(`${file.path}: frontmatter id ${task.meta.id} does not match the file name`);
-      problems.push(...taskProblems(task));
+      problems.push(...sectionProblems(task));
       tasks.push(task);
     } catch (error) {
       if (!(error instanceof FormatError)) throw error;
@@ -311,4 +326,21 @@ function safeFrontmatter(text: string) {
 
 function stripEdges(text: string): string {
   return text.replace(/^[ \t]*\r?\n/, "").replace(/\r?\n[ \t]*$/, "");
+}
+
+export function groupProblems(problems: string[]): string[] {
+  const byMessage = new Map<string, string[]>();
+  const order: string[] = [];
+  for (const problem of problems) {
+    const split = /^(docs\/plan\/tasks\/[^:]+\.md): (.*)$/s.exec(problem);
+    const key = split ? (split[2] ?? "") : problem;
+    if (!byMessage.has(key)) order.push(key);
+    byMessage.set(key, [...(byMessage.get(key) ?? []), ...(split?.[1] ? [split[1]] : [])]);
+  }
+  return order.map((message) => {
+    const paths = byMessage.get(message) ?? [];
+    if (paths.length === 0) return message;
+    if (paths.length === 1) return `${paths[0]}: ${message}`;
+    return `${message} (${paths.length} tasks: ${paths.join(", ")})`;
+  });
 }

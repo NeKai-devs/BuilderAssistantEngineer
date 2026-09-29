@@ -17,6 +17,7 @@ const SYMBOLS: Record<TaskStatus, string> = {
   in_progress: pc.yellow("▶"),
   pending: pc.dim("○"),
   blocked: pc.red("✖"),
+  needs_review: pc.yellow("?"),
 };
 
 export async function runStatus(ctx: CommandContext): Promise<void> {
@@ -75,9 +76,16 @@ export function renderStatus(
   const why = [...reasons]
     .filter(([, reason]) => reason !== "")
     .map(([id, reason]) => `${SYMBOLS.blocked} ${t("status.blockedReason", { id, reason })}`);
+  const review = tasks
+    .filter((task) => task.meta.status === "needs_review")
+    .map(
+      (task) =>
+        `${SYMBOLS.needs_review} ${t("status.reviewReason", { id: task.meta.id, reason: task.meta.review_note ?? "" })}`,
+    );
   return [
     ...blocks,
     ...(why.length > 0 ? [why.join("\n")] : []),
+    ...(review.length > 0 ? [review.join("\n")] : []),
     ...(invalid.length > 0 ? [invalid.join("\n")] : []),
     summary(tasks),
     ...(metrics && metrics.attempts > 0 ? [renderMetrics(metrics)] : []),

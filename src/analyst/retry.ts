@@ -15,6 +15,7 @@ export type FormatRequest<T> = {
   fixPrompt?: Prompt;
   onRetry?: (error: FormatError) => void;
   complete?: (text: string) => Promise<string>;
+  retryPrompt?: (first: string, error: FormatError) => Promise<string | undefined>;
 };
 
 export async function runWithFormatRetry<T>(request: FormatRequest<T>): Promise<T> {
@@ -25,12 +26,15 @@ export async function runWithFormatRetry<T>(request: FormatRequest<T>): Promise<
     return parse(first);
   } catch (error) {
     if (!(error instanceof FormatError)) throw error;
-    request.onRetry?.(error);
-    const fix = renderPrompt(request.fixPrompt ?? (await loadPrompt("fix-format", options.cwd)), {
-      error: error.message,
-      format: request.format,
-      previous_response: first,
-    });
+    const instead = await request.retryPrompt?.(first, error);
+    if (!instead) request.onRetry?.(error);
+    const fix =
+      instead ??
+      renderPrompt(request.fixPrompt ?? (await loadPrompt("fix-format", options.cwd)), {
+        error: error.message,
+        format: request.format,
+        previous_response: first,
+      });
     return parseOrReport(await complete(await backend.run(fix, options)), parse, options.cwd);
   }
 }

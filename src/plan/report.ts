@@ -14,6 +14,9 @@ export type PlanStats = {
   evidenceRetries: number;
   unverifiedPaths: string[];
   repairs: string[];
+  nonPlanAnswers: number;
+  verificationRetries: number;
+  needsReview: string[];
 };
 
 export type PlanReport = PlanStats & {
@@ -38,6 +41,9 @@ export function newPlanStats(backend: string): PlanStats {
     evidenceRetries: 0,
     unverifiedPaths: [],
     repairs: [],
+    nonPlanAnswers: 0,
+    verificationRetries: 0,
+    needsReview: [],
   };
 }
 

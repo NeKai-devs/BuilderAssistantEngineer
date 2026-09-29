@@ -140,7 +140,7 @@ Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly wh
 | Backend | Runs | `plan` and `review` | `next` | Needs |
 | --- | --- | --- | --- | --- |
 | `claude` | `claude -p` | read-only tools (`Read`, `Grep`, `Glob`) | interactive session; `--headless` uses `--permission-mode acceptEdits` and `--allowedTools` for the task's commands | [Claude Code](https://code.claude.com) |
-| `opencode` | `opencode run` | `plan` agent (no edits) | interactive TUI; `--headless` uses the default build agent | [opencode](https://opencode.ai) |
+| `opencode` | `opencode run` | `plan` agent (no edits); `init` and `plan` show the model from `opencode.json` and warn when it looks free or small, or when none is set | interactive TUI; `--headless` uses the default build agent | [opencode](https://opencode.ai) |
 | `codex` | `codex exec` | `--sandbox read-only` | interactive session; `--headless` uses `--sandbox workspace-write` | [Codex CLI](https://github.com/openai/codex) |
 | `gemini` | `gemini -p` | `--approval-mode plan` | `gemini -i`; `--headless` uses `--approval-mode auto_edit` and `--allowed-tools` for the task's commands | [Gemini CLI](https://github.com/google-gemini/gemini-cli) |
 | `api` | HTTPS | single request with the digest | copy-and-paste flow, since an API cannot edit your repo | an API key |
@@ -171,7 +171,7 @@ A headless agent cannot ask you before it runs a command, so bae tells it which 
 
 ## How `next` works
 
-1. Picks the task in progress that still has attempts left, then the first pending task whose `depends_on` are all done, ordered by phase and id. A task in progress that used its attempts goes after the ready ones.
+1. Picks the task in progress that still has attempts left, then the first pending task whose `depends_on` are all done, ordered by phase and id. A task in progress that used its attempts goes after the ready ones. A task with `status: needs_review` is skipped until you fix what its `review_note` says and set it back to `pending`.
 2. Checks that the task can be verified at all. If its Verification is missing, trivial or refused, the task is marked `blocked` with the reason, and no agent is launched.
 3. Works on the run's branch. The first `next` asks before it creates `bae/<date>-<time>` from the branch you are on and switches to it, and shows the name (`--yes` creates it without asking); later runs continue there. If you say no, you stay on your branch and finished tasks are not committed. If you are on another branch than the run's, `next` stops and says so; `--new-run` starts a new branch from where you are, for example after merging the previous one.
 4. When the regression gate is `full`, runs the project's lint, typecheck, build and test commands to record a baseline. Then it marks the task `in_progress` and takes the capture: the current commit, the files that were already uncommitted, the ignore rules, the config, the task, the prompts, the reviewer and every file that defines the checks.
@@ -257,7 +257,7 @@ The prompts live in [`src/prompts`](src/prompts). To change one for a project, c
 | `continue.md` | `prompt`, `partial`, `next_marker` |
 | `lesson.md` | `reason`, `task`, `failures`, `agents_md`, `output_language` |
 
-The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>`, `<<<CONFIG>>>` and `<<<FILE: path>>>` blocks). Known slips are repaired locally first: markers with extra spaces or in lowercase, and a missing `<<<END FILE>>>` on the last block when the backend reports that the answer ended normally. If the answer is cut off by the model's output limit, the CLI asks it to continue from the unfinished block (up to three times). If the answer is still malformed, the CLI asks once to fix only the format; if it is still wrong, the raw answer is saved to `.bae/tmp/last-response.md`. Repairs, retries and unverified paths are recorded in `.bae/tmp/plan-report.json`.
+The analyst answers in a strict format (`<<<SUMMARY>>>`, `<<<QUESTIONS>>>`, `<<<CONFIG>>>` and `<<<FILE: path>>>` blocks). Known slips are repaired locally first: markers with extra spaces or in lowercase, and a missing `<<<END FILE>>>` on the last block when the backend reports that the answer ended normally. If the answer is cut off by the model's output limit, the CLI asks it to continue from the unfinished block (up to three times). An answer with no `<<<FILE: path>>>` block at all is not a plan: the CLI saves it to `.bae/tmp/non-plan-answer.md` and sends the original prompt again with a note. If the answer is still malformed, the CLI asks once to fix only the format; if it is still wrong, the raw answer is saved to `.bae/tmp/last-response.md`. A Verification block the CLI cannot accept never throws the plan away: the CLI asks the analyst to fix only those task files, merges only them, and if one still fails, writes it with `status: needs_review` and a `review_note` that says what to change. The summary says so in one line, and `next` does not run the task until you fix it and set its status back to `pending`. Repairs, retries, answers that were not a plan and tasks that need review are recorded in `.bae/tmp/plan-report.json`.
 
 ## Files and safety
 
