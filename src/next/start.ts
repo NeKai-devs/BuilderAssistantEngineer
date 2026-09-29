@@ -66,7 +66,7 @@ export async function recoverInterrupted(
   const contract = await enforceContract(ctx, capture, acceptance);
   await setTaskStatus(ctx.cwd, capturedTask(capture), "in_progress");
   await clearActive(ctx.cwd);
-  if (contract.blocked) ctx.prompter.warn(t("contract.recovered", { id }));
+  ctx.prompter.warn(t(contract.blocked ? "contract.recovered" : "next.interrupted", { id }));
 }
 
 export async function withSuiteCommands(ctx: CommandContext, config: Config): Promise<Config> {

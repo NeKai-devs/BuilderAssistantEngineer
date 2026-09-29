@@ -79,11 +79,55 @@ export const en = {
   "digest.reading": "Reading the repository…",
   "plan.intro": "builder-assistant-engineer · plan",
   "plan.noInterview": "No interview in .bae/interview.md; planning from the repository alone.",
-  "plan.analyzing": "The analyst is building the plan (this can take several minutes)",
-  "plan.progress": "Receiving the plan… {{chars}} characters",
+  "plan.analyzing": "{{backend}} is writing the plan; this usually takes 10–40 minutes",
+  "plan.progressStep": "{{backend}} is writing the plan (10–40 min) · {{step}}",
+  "plan.progressFiles":
+    "{{backend}} is writing the plan (10–40 min) · {{count}} file(s) · {{file}}",
+  "usage.summary": "Took {{time}} · AI cost {{cost}}",
+  "usage.notReported": "not reported by {{names}}",
+  "usage.partlyReported": "{{cost}}, plus calls to {{names}} that do not report their cost",
+  "next.attemptUsage": "This attempt took {{time}} · AI cost {{cost}}",
+  "next.costUnknown": "not reported (an interactive session or a backend that does not report it)",
+  "template.next":
+    "---\ndescription: Hand the next task of the plan to bae\n---\nDo not work on a task from this command. bae picks the next task, opens the agent on it, then runs its checks and the review and commits it; a task done any other way skips those checks.\n\nTell the user to exit this session and run, in a terminal at the repository root:\n\n    {{cli}} next\n\nNever change `status:` in a task file.",
+  "template.status":
+    "---\ndescription: Show the plan's progress\n---\nRun `{{cli}} status` from the repository root and show its output as it is. Change nothing.",
+  "template.review":
+    "---\ndescription: Review a task with bae's reviewer\n---\nDo not review or change files from this command. Tell the user to run, in a terminal at the repository root:\n\n    {{cli}} review $ARGUMENTS\n\n(a task id such as T-003, or nothing for the task in progress). Never change `status:` in a task file.",
+  "progress.writing": "writing the answer",
+  "ui.interrupted": "Interrupted. Nothing was written; run the same command again to start over.",
+  "lock.busy":
+    "Another bae command ({{command}}, process {{pid}}) is running in this repository. Wait for it to finish, then run this one again.",
+  "next.noCommits":
+    "This repository has no commits yet, so bae has nothing to compare the task with. Commit your files first: git add -A && git commit -m init",
+  "next.interrupted":
+    "The previous run of {{id}} stopped before its checks finished; bae restored the files that define its checks and starts it again.",
+  "config.unknownKeys":
+    "Ignoring settings bae does not know in .bae/config.json (check their spelling): {{keys}}",
+  "init.badConfig":
+    "The existing .bae/config.json cannot be read, so setup starts from the defaults and rewrites it: {{details}}",
+  "init.noGit":
+    "This folder is not a git repository. bae needs git to check each task and commit it: run git init, commit your files, then run {{cli}} plan.",
+  "init.notRoot":
+    "Setting up bae in this folder, not at the repository root ({{root}}). Commands run from any folder below it use this setup.",
+  "option.allowDirty": "start a task although files outside the plan have uncommitted changes",
+  "next.dirtyTitle": "Uncommitted changes outside the plan",
+  "next.dirtyConfirm":
+    "Start the task anyway? These files stay out of its commit unless the agent changes them too.",
+  "next.dirtyStop":
+    "Nothing was run. Commit or stash these changes, then run {{command}} again (or add --allow-dirty to start anyway).",
+  "next.planUncommitted":
+    '{{count}} plan file(s) are not committed (docs/plan, AGENTS.md or .bae/config.json), so the task commits will not include them. Commit them first: git add docs/plan AGENTS.md CLAUDE.md .bae && git commit -m "chore(bae): plan"',
+  "progress.thinking": "thinking",
+  "progress.read": "reading {{detail}}",
+  "progress.search": "searching {{detail}}",
+  "progress.run": "running {{detail}}",
+  "progress.edit": "editing {{detail}}",
+  "progress.tool": "{{tool}} {{detail}}",
   "plan.existingPlan":
     "A plan already exists in docs/plan/tasks. Regenerate it from scratch? (replan keeps progress)",
-  "plan.useReplan": "Nothing changed. Use replan to update the plan and keep finished work.",
+  "plan.useReplan":
+    "Nothing changed. Use {{cli}} replan to update the plan and keep finished work.",
   "plan.dryRunDone":
     "Dry run: the prompt above is exactly what would be sent. Nothing was written.",
   "plan.continuing":
@@ -140,7 +184,7 @@ export const en = {
   "next.allDone": "Every task is done.",
   "next.nothingReady": "No task is ready",
   "next.unblock":
-    "Fix what a task that needs review says in its file and set its status to pending, unblock or finish the other tasks above, or run replan.",
+    "Fix what a task that needs review says in its file and set its status to pending, unblock or finish the other tasks above, or run {{cli}} replan.",
   "verify.commands": "Verification",
   "verify.confirm": "Run these verification commands now?",
   "verify.declined": "Verification was not run; the task stays in progress.",
@@ -223,7 +267,7 @@ export const en = {
   "mechanical.outOfScope": "Changed outside the task's Scope: {{files}}",
   "mechanical.failed": "The automatic checks failed, so the reviewer was not run.",
   "plan.openQuestions":
-    "Open questions, saved to .bae/interview.md; answer them there and run replan when you can",
+    "Open questions, saved to .bae/interview.md; answer them there and run {{cli}} replan when you can",
   "plan.questionsSaved": "{{count}} question(s) saved to .bae/interview.md.",
   "plan.rerun": "You answered blocking questions. Run the plan again now with your answers?",
   "plan.rerunning": "Running the plan again with your answers.",
@@ -255,13 +299,13 @@ export const en = {
   "plan.notAPlan":
     "The answer ({{chars}} characters) has no plan files, so it is not a plan; asking again with the full prompt. The answer is saved in {{path}}.",
   "plan.needsReviewWarn":
-    "{{count}} task(s) still have a Verification the CLI cannot accept: {{ids}}. They are written with status needs_review, and next will not run them until they are fixed.",
+    "{{count}} task(s) still have a Verification the CLI cannot accept: {{ids}}. They are written with status needs_review, and {{cli}} next will not run them until they are fixed.",
   "plan.needsReview":
-    "{{count}} task(s) need review before next can run them: {{ids}}. Each file's review_note says what to fix in its Verification; then set its status to pending.",
+    "{{count}} task(s) need review before {{cli}} next can run them: {{ids}}. Each file's review_note says what to fix in its Verification; then set its status to pending.",
   "verification.commandsRetrying":
     "Some project commands in the plan are ones bae does not run when nobody confirms them; asking the analyst to fix only those:\n{{notes}}",
   "verification.commandsKept":
-    "These project commands stay in .bae/config.json, but next --headless and next --yes will refuse them until you change them or add their first words to verify.allow in .bae/config.json:\n{{notes}}",
+    "These project commands stay in .bae/config.json, but {{cli}} next --headless and {{cli}} next --yes will refuse them until you change them or add their first words to verify.allow in .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} task(s) have a Verification the CLI cannot accept: {{kinds}}. Asking the analyst to fix only those. Details in {{report}}.",
   "verification.fixing": "The analyst is fixing the Verification of those tasks",
@@ -273,6 +317,8 @@ export const en = {
   "status.attempts": "attempts: {{attempts}} over {{tasks}} task(s), {{average}} per task",
   "status.firstAttempt": "done on the first attempt: {{count}}/{{tasks}} ({{percent}}%)",
   "status.regressions": "regressions caught: {{count}}",
+  "status.cost":
+    "AI cost: {{cost}} over the {{priced}} of {{attempts}} attempt(s) that reported it",
   "status.time": "time per done task: {{average}} on average, {{total}} in total",
   "status.taskRuns": "{{attempts}} attempt(s), {{time}}",
   "format.repaired": "Repaired the answer locally: {{repairs}}.",
@@ -284,7 +330,8 @@ export const en = {
     "accept one finding by its id (repeatable); only secrets, and contract or test findings on files the task's Scope lists",
   "review.noBase":
     "Review failed: the commit recorded when the task started no longer exists, so the task's changes cannot be isolated.",
-  "review.noCapture": "{{id}} has no capture from next; reviewing it against the current HEAD.",
+  "review.noCapture":
+    "{{id}} has no capture from {{cli}} next; reviewing it against the current HEAD.",
   "contract.title": "Contract",
   "contract.failed":
     "The task changed files that define its own checks; they were restored from the state captured before the task.",
@@ -316,7 +363,7 @@ export const en = {
   "regression.noToolchain":
     "No toolchain yet: the repository has no code or project manifest, so there is no baseline to record. {{id}} sets it up, and the project's lint and test commands must pass after it.",
   "regression.notFound":
-    "`{{command}}` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run next again.",
+    "`{{command}}` could not find a program it runs (exit 127), so there is no baseline. Install the project's dependencies (for example `npm install`) and run {{cli}} next again.",
   "regression.unusable":
     "`{{command}}` gives no usable baseline (exit {{code}}): it did not finish, or it fails with no counts to compare. The task could not be done while it stays red.",
   "review.noVerdict": "The reviewer gave no verdict.",
@@ -324,9 +371,9 @@ export const en = {
   "skip.used": "Going on without this check because of --allow-skip: {{what}}",
   "skip.title": "Skipped with --allow-skip",
   "skip.stopped":
-    "Nothing was launched. Fix the cause, or run next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
+    "Nothing was launched. Fix the cause, or run {{cli}} next again with --allow-skip to go on without that check; the skip is recorded in the run log.",
   "env.denied":
-    "{{agent}} was not allowed to run {{commands}}, so another attempt would fail the same way. bae lets the agent run the task's checks and install dependencies; allow the rest in {{agent}}'s own permissions (for Claude Code, a rule such as `Bash({{first}} *)` in .claude/settings.json of a folder you trust), or run next without --headless and approve it yourself.",
+    "{{agent}} was not allowed to run {{commands}}, so another attempt would fail the same way. bae lets the agent run the task's checks and install dependencies; allow the rest in {{agent}}'s own permissions (for Claude Code, a rule such as `Bash({{first}} *)` in .claude/settings.json of a folder you trust), or run {{cli}} next without --headless and approve it yourself.",
   "env.alsoDenied": "{{agent}} was also not allowed to run {{commands}}.",
   "env.moreDenied": "and {{count}} more",
   "env.notFound":
@@ -355,7 +402,7 @@ export const en = {
   "verify.trivial":
     "Verification runs nothing that checks the task:\n{{command}}\nUse the project's test runner, a linter, or a check with an expected result (test -f, grep -q, curl -f).",
   "verify.notAllowed":
-    "`{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json, or run next without --yes and --headless and confirm it yourself.",
+    "`{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json, or run {{cli}} next without --yes and --headless and confirm it yourself.",
   "regression.notAllowed":
     "The project command `{{command}}` is not on the list of commands bae runs when nobody confirms them ({{why}}). Add a prefix to verify.allow in .bae/config.json.",
   "verify.dynamic": "it runs code that is built at run time or in another shell",
@@ -364,7 +411,7 @@ export const en = {
   "verify.onlyExcused":
     "Verification only runs commands that already failed before the task, so it checks nothing about this task.",
   "evidence.linesFailed":
-    "The plan cites lines that do not exist, even after asking the analyst to fix them:\n{{list}}\nThe plan was not written; the rejected answer is in {{path}}. Run plan again.",
+    "The plan cites lines that do not exist, even after asking the analyst to fix them:\n{{list}}\nThe plan was not written; the rejected answer is in {{path}}. Run {{cli}} plan again.",
   "state.tampered":
     "Code run for this task changed bae's own state outside the repository ({{files}}); it was restored and the attempt fails.",
   "review.gitError":
@@ -402,7 +449,7 @@ export const en = {
   "contract.weakerRunner": "It adds settings that leave tests out ({{keys}}).",
   "contract.weakerToolchain":
     "It adds a setting that changes how the package manager or the test runner starts.",
-  "review.noEvidence": "(none: this review was not run right after next's checks)",
+  "review.noEvidence": "(none: this review was not run right after the checks of {{cli}} next)",
   "integrity.scoped":
     "The task's Scope lists this file, so the reviewer must say why this change is correct.",
   "review.unjustified":
@@ -427,7 +474,7 @@ export const en = {
     "This run's tasks are committed on {{branch}}, and you are on {{current}}. Switch back with `git switch {{branch}}` before replanning, so the new plan lands next to them.",
   "run.confirm": "Create the branch {{branch}} from {{from}} and commit each finished task there?",
   "run.declined":
-    "Staying on {{current}}. Finished tasks are not committed; the next run of next asks again, and --yes creates the branch without asking.",
+    "Staying on {{current}}. Finished tasks are not committed; the next run of {{cli}} next asks again, and --yes creates the branch without asking.",
   "run.finished": "Every task is done on {{branch}}. Open a pull request with:",
   "run.switchFailed": "Could not create the branch {{branch}}: {{details}}",
   "run.stopped": "Nothing was changed.",
@@ -437,7 +484,7 @@ export const en = {
   "commit.replan": "Committed the new plan as {{sha}} on {{branch}}.",
   "commit.plan": "Committed the plan as {{sha}} on {{branch}}.",
   "commit.planFailed": "Could not commit the plan: {{details}}. Commit its files yourself.",
-  "plan.commitConfirm": "Commit the plan files now, so next starts from them?",
+  "plan.commitConfirm": "Commit the plan files now, so {{cli}} next starts from them?",
   "status.run": "Branch {{branch}}, created from {{from}}",
   "status.runElsewhere": "This run's tasks are committed on {{branch}}; you are on {{current}}.",
   "status.noCommits": "no commits yet",

@@ -1,6 +1,6 @@
-import { mkdtemp, readdir, readFile, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
+import { dropScratch, scratchDir } from "../core/scratch.js";
 import type { Counts } from "./results.js";
 import { type Direct, directRunner, expandCommand, type Sources, testRunners } from "./runners.js";
 
@@ -89,11 +89,11 @@ async function argumentProbe(
   if (runner === "dotnet" && args.some((arg) => arg === "--" || arg === "--results-directory")) {
     return undefined;
   }
-  const dir = await mkdtemp(join(tmpdir(), "bae-report-"));
+  const dir = await scratchDir("bae-report-");
   const file = slashed(join(dir, "report.json"));
   const extra = extraArgs(runner, slashed(dir), file);
   if (!extra) {
-    await rm(dir, { recursive: true, force: true });
+    await dropScratch(dir);
     return undefined;
   }
   const roots = await rootsOf(cwd);
@@ -108,7 +108,7 @@ async function argumentProbe(
             roots,
             runner === "vitest" ? "vitest-json" : "jest-json",
           ),
-    dispose: () => rm(dir, { recursive: true, force: true }),
+    dispose: () => dropScratch(dir),
   };
 }
 
@@ -121,7 +121,7 @@ function extraArgs(runner: Direct["runner"], dir: string, file: string): string[
 }
 
 async function nodeProbe(cwd: string, command: string): Promise<Probe> {
-  const dir = await mkdtemp(join(tmpdir(), "bae-report-"));
+  const dir = await scratchDir("bae-report-");
   const file = slashed(join(dir, "junit.xml"));
   const existing = process.env.NODE_OPTIONS ?? "";
   const reporters = `--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination="${file}"`;
@@ -130,19 +130,19 @@ async function nodeProbe(cwd: string, command: string): Promise<Probe> {
     command,
     env: { NODE_OPTIONS: `${existing} ${reporters}`.trim() },
     collect: async () => junitReport(await readText(file), "node-junit", roots),
-    dispose: () => rm(dir, { recursive: true, force: true }),
+    dispose: () => dropScratch(dir),
   };
 }
 
 async function pytestProbe(command: string): Promise<Probe> {
-  const dir = await mkdtemp(join(tmpdir(), "bae-report-"));
+  const dir = await scratchDir("bae-report-");
   const file = slashed(join(dir, "junit.xml"));
   const existing = process.env.PYTEST_ADDOPTS ?? "";
   return {
     command,
     env: { PYTEST_ADDOPTS: `${existing} --junitxml="${file}"`.trim() },
     collect: async () => junitReport(await readText(file)),
-    dispose: () => rm(dir, { recursive: true, force: true }),
+    dispose: () => dropScratch(dir),
   };
 }
 

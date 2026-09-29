@@ -12,28 +12,52 @@ import { BACKENDS } from "./config/schema.js";
 import { type GlobalFlags, resolveSettings } from "./config/settings.js";
 import { readConfig } from "./config/store.js";
 import { ExitCode, UserError } from "./core/errors.js";
+import { withLock } from "./core/lock.js";
+import { projectRoot } from "./core/root.js";
+import { formatCost, metered, newUsage, type Usage } from "./core/usage.js";
 import { isLang, LANGS, type Lang, setLang, t } from "./i18n/index.js";
 import { ONLY_GROUPS } from "./plan/filter.js";
+import { formatDuration } from "./tasks/metrics.js";
 
 export async function main(
   argv: string[],
   cwd: string,
   deps: Partial<CommandDeps> = {},
 ): Promise<number> {
-  const config = await readConfig(cwd).catch(() => undefined);
+  const root = await projectRoot(cwd);
+  const config = await readConfig(root).catch(() => undefined);
   setLang(resolveSettings({ lang: scanLang(argv) }, config).lang);
+  const merged = { ...defaultDeps(), ...deps };
+  const usage = merged.usage ?? newUsage();
+  const run = { ...merged, usage, createBackend: metered(merged.createBackend, usage) };
   try {
-    await buildProgram({ ...defaultDeps(), ...deps }, cwd).parseAsync(argv);
+    await buildProgram(run, root, cwd).parseAsync(argv);
+    printUsage(run.print, usage);
     return 0;
   } catch (error) {
-    return report(error);
+    const code = report(error);
+    printUsage(run.print, usage);
+    return code;
   }
 }
 
-export function buildProgram(deps: CommandDeps, cwd: string): Command {
-  const context = (command: Command): CommandContext => ({
+function printUsage(print: (text: string) => void, usage: Usage): void {
+  if (usage.priced + usage.unpriced === 0) return;
+  const time = formatDuration(Date.now() - usage.startedAt);
+  const names = usage.unpricedBy.join(", ");
+  const cost =
+    usage.unpriced === 0
+      ? formatCost(usage.costUsd)
+      : usage.priced === 0
+        ? t("usage.notReported", { names })
+        : t("usage.partlyReported", { cost: formatCost(usage.costUsd), names });
+  print(`${pc.dim(t("usage.summary", { time, cost }))}\n`);
+}
+
+export function buildProgram(deps: CommandDeps, root: string, cwd = root): Command {
+  const context = (command: Command, at = root): CommandContext => ({
     ...deps,
-    cwd,
+    cwd: at,
     flags: command.optsWithGlobals() as GlobalFlags,
   });
   const program = new Command("builder-assistant-engineer")
@@ -51,22 +75,27 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("init")
     .description(t("command.init"))
     .option("--brief <paths>", t("option.brief"))
-    .action((options: InitOptions, command: Command) => runInit(context(command), options));
+    .action((options: InitOptions, command: Command) => runInit(context(command, cwd), options));
   program
     .command("plan")
     .description(t("command.plan"))
     .addOption(new Option("--only <group>", t("option.only")).choices(ONLY_GROUPS))
     .option("--no-verify", t("option.noVerify"))
-    .action((options: PlanOptions, command: Command) => runPlan(context(command), options));
+    .action((options: PlanOptions, command: Command) =>
+      withLock(root, "plan", () => runPlan(context(command), options)),
+    );
   program
     .command("next")
     .description(t("command.next"))
     .option("--headless", t("option.headless"))
     .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
     .option("--allow-skip", t("option.allowSkip"))
+    .option("--allow-dirty", t("option.allowDirty"))
     .option("--new-run", t("option.newRun"))
     .option("--no-verify", t("option.noVerify"))
-    .action((options: NextOptions, command: Command) => runNext(context(command), options));
+    .action((options: NextOptions, command: Command) =>
+      withLock(root, "next", () => runNext(context(command), options)),
+    );
   program
     .command("status")
     .description(t("command.status"))
@@ -75,7 +104,9 @@ export function buildProgram(deps: CommandDeps, cwd: string): Command {
     .command("replan")
     .description(t("command.replan"))
     .option("--no-verify", t("option.noVerify"))
-    .action((options: ReplanOptions, command: Command) => runReplan(context(command), options));
+    .action((options: ReplanOptions, command: Command) =>
+      withLock(root, "replan", () => runReplan(context(command), options)),
+    );
   program
     .command("review")
     .description(t("command.review"))

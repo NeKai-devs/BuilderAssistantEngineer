@@ -1,5 +1,5 @@
 import { join, relative } from "node:path";
-import { buildAnalystPrompt } from "../analyst/prompt.js";
+import { type AnalystPrompt, buildAnalystPrompt, wholePrompt } from "../analyst/prompt.js";
 import { runWithFormatRetry } from "../analyst/retry.js";
 import { noteOpencodeModel } from "../backends/opencode-model.js";
 import type { Backend, RunOptions } from "../backends/types.js";
@@ -26,6 +26,7 @@ import {
   parsePlan,
   renderPlan,
 } from "./parser.js";
+import { planProgress } from "./progress.js";
 import { repairPlan } from "./repair.js";
 import {
   newPlanStats,
@@ -41,6 +42,8 @@ type Parse = (text: string) => ParsedPlan;
 type Ending = { truncated?: boolean };
 
 const MAX_CONTINUATIONS = 3;
+const PLAN_TIMEOUT_MS = 60 * 60_000;
+const FIX_TIMEOUT_MS = 30 * 60_000;
 const REJECTED_PLAN = "rejected-plan.md";
 const NON_PLAN = "non-plan-answer.md";
 const FILE_MARKER = /<<<\s*FILE\s*:/i;
@@ -67,7 +70,7 @@ export async function generatePlan(
     priorPlan: request.priorPlan,
   });
   if (ctx.flags.dryRun) {
-    ctx.print(`${prompt}\n`);
+    ctx.print(`${wholePrompt(prompt)}\n`);
     return undefined;
   }
   if (config.backend === "opencode") await noteOpencodeModel(ctx);
@@ -95,15 +98,20 @@ async function requestPlan(
   ctx: CommandContext,
   backend: Backend,
   parse: Parse,
-  prompt: string,
+  analyst: AnalystPrompt,
   stats: PlanStats,
 ): Promise<ParsedPlan> {
-  return ctx.prompter.spinner(t("plan.analyzing"), (update) => {
+  const prompt = analyst.request;
+  return ctx.prompter.spinner(t("plan.analyzing", { backend: backend.name }), (update) => {
     const ending: Ending = {};
+    const tracker = planProgress(backend.name, update);
     const options: RunOptions = {
       cwd: ctx.cwd,
       access: "read",
-      stream: progress(update),
+      system: analyst.system,
+      timeoutMs: PLAN_TIMEOUT_MS,
+      stream: tracker.stream,
+      onProgress: tracker.onProgress,
       onInfo: (info) => {
         recordInfo(stats, info);
         if (info.truncated !== undefined) ending.truncated = info.truncated;
@@ -208,6 +216,7 @@ async function fixVerification(
     reply = await backend.run(prompt, {
       cwd: ctx.cwd,
       access: "read",
+      timeoutMs: FIX_TIMEOUT_MS,
       onInfo: (info) => recordInfo(stats, info),
     });
   } catch (error) {
@@ -377,6 +386,7 @@ async function fixPaths(
     reply = await backend.run(prompt, {
       cwd: ctx.cwd,
       access: "read",
+      timeoutMs: FIX_TIMEOUT_MS,
       onInfo: (info) => recordInfo(stats, info),
     });
   } catch (error) {
@@ -391,12 +401,4 @@ async function repoFiles(cwd: string): Promise<string> {
   const { files } = await scanFiles(cwd);
   const list = files.map((file) => file.path).join("\n");
   return truncateText(list || "(no files)", MAX_REPO_FILES_CHARS);
-}
-
-function progress(update: (message: string) => void) {
-  let received = 0;
-  return (chunk: string) => {
-    received += chunk.length;
-    update(t("plan.progress", { chars: received.toLocaleString() }));
-  };
 }

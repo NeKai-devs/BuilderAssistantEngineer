@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { readConfig } from "../../src/config/store.js";
+import { CLI } from "../../src/core/invoked.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
 import { copyFixture, tempDir, writeFiles } from "../helpers.js";
 
@@ -51,6 +52,9 @@ describe("init", () => {
     expect(interview).toContain("- Modo: greenfield");
     expect(interview).toContain("A habit tracker for small teams.");
     expect(await read(cwd, ".gitignore")).toBe(".bae/tmp/\n");
+    expect(ui.log.at(-1)).toBe(
+      `outro: Configuración guardada en .bae/. Siguiente paso: ${CLI} plan`,
+    );
   });
 
   it("runs the full interview with an adaptive follow-up on a brownfield repo", async () => {

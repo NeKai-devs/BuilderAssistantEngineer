@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig, writeInterview } from "../../src/config/store.js";
+import { CLI } from "../../src/core/invoked.js";
 import { fakeBackend, fakePrompter } from "../fakes.js";
 import { copyFixture, gitCommitAll, tempDir, writeFiles } from "../helpers.js";
 import { planOutput, taskFile } from "../plan-sample.js";
 
 const sh = (cwd: string, command: string) => execSync(command, { cwd }).toString().trim();
 const committed = (cwd: string) => sh(cwd, "git show --name-only --format= HEAD").split("\n");
-const CONFIRM = "Commit the plan files now, so next starts from them?";
+const CONFIRM = `Commit the plan files now, so ${CLI} next starts from them?`;
 
 async function configure(cwd: string): Promise<void> {
   await writeConfig(cwd, {

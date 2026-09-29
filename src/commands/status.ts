@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { formatCost } from "../core/usage.js";
 import { t } from "../i18n/index.js";
 import { branchExists, currentBranch, readRun, runCommits } from "../next/branch.js";
 import { blockedReason, lastStop } from "../tasks/attempts.js";
@@ -149,6 +150,15 @@ function renderMetrics(metrics: RunMetrics): string {
     }),
     t("status.regressions", { count: metrics.regressionsCaught }),
   ];
+  if (metrics.priced > 0) {
+    lines.push(
+      t("status.cost", {
+        cost: formatCost(metrics.costUsd),
+        priced: metrics.priced,
+        attempts: metrics.attempts,
+      }),
+    );
+  }
   if (metrics.done > 0) {
     lines.push(
       t("status.time", {

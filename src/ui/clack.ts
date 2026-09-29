@@ -3,6 +3,10 @@ import { UserError } from "../core/errors.js";
 import { t } from "../i18n/index.js";
 import type { Choice, Prompter } from "./prompter.js";
 
+const INTERRUPTED = 130;
+const SPINNER_FRAME = 16;
+const MIN_ROOM = 20;
+
 export function createClackPrompter(): Prompter {
   return {
     intro: (title) => clack.intro(title),
@@ -28,18 +32,30 @@ export function createClackPrompter(): Prompter {
     canAsk: () => Boolean(process.stdin.isTTY),
     spinner: async (message, task) => {
       if (!process.stdout.isTTY) return staticSpinner(message, task);
-      const spin = clack.spinner({ indicator: "timer" });
-      spin.start(message);
+      const spin = clack.spinner({ indicator: "timer", cancelMessage: t("ui.interrupted") });
+      const interrupted = () => {
+        process.exitCode = INTERRUPTED;
+      };
+      process.on("exit", interrupted);
+      const fit = (text: string) => fitLine(text, process.stdout.columns ?? 80);
+      spin.start(fit(message));
       try {
-        const result = await task((update) => spin.message(update));
+        const result = await task((update) => spin.message(fit(update)));
         spin.stop(message);
         return result;
       } catch (error) {
         spin.error(message);
         throw error;
+      } finally {
+        process.removeListener("exit", interrupted);
       }
     },
   };
+}
+
+export function fitLine(text: string, columns: number): string {
+  const room = Math.max(columns - SPINNER_FRAME, MIN_ROOM);
+  return text.length > room ? `${text.slice(0, room - 1)}…` : text;
 }
 
 function unwrap<T>(value: T): Exclude<T, symbol> {

@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { wholePrompt } from "../analyst/prompt.js";
 import type { AgentName } from "../backends/agent-cli.js";
 import { hasApiCredentials } from "../backends/api.js";
 import { noteOpencodeModel } from "../backends/opencode-model.js";
@@ -15,6 +17,7 @@ import {
 import { readConfig, readInterview, writeConfig, writeInterview } from "../config/store.js";
 import { UserError } from "../core/errors.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { gitTop } from "../core/root.js";
 import { AGENT_BACKENDS, detectInstalledAgents, pickDefaultBackend } from "../detect/agents.js";
 import { detectProjectMode } from "../detect/mode.js";
 import { buildDigest } from "../digest/index.js";
@@ -25,10 +28,9 @@ import { BASE_QUESTIONS, OBJECTIVE_LABELS, OBJECTIVES } from "../interview/quest
 import { type InterviewData, renderInterview } from "../interview/render.js";
 import type { Choice } from "../ui/prompter.js";
 import type { CommandContext } from "./context.js";
+import { CLI } from "./shared.js";
 
 export type InitOptions = { brief?: string };
-
-export const NEXT_COMMAND = "npx builder-assistant-engineer plan";
 
 const BACKEND_LABELS: Record<AgentName, string> = {
   claude: "Claude Code",
@@ -52,8 +54,15 @@ const TARGET_FOR: Record<AgentName, Target> = {
 };
 
 export async function runInit(ctx: CommandContext, options: InitOptions): Promise<void> {
-  const existing = await readConfig(ctx.cwd);
   ctx.prompter.intro(t("init.intro"));
+  const existing = await readConfig(ctx.cwd).catch((error: unknown) => {
+    if (!(error instanceof UserError)) throw error;
+    ctx.prompter.warn(t("init.badConfig", { details: error.message }));
+    return undefined;
+  });
+  const top = await gitTop(ctx.cwd);
+  if (!top) ctx.prompter.warn(t("init.noGit"));
+  else if (resolve(top) !== resolve(ctx.cwd)) ctx.prompter.warn(t("init.notRoot", { root: top }));
   const lang = await chooseLang(ctx, existing);
   setLang(lang);
   const mode = await chooseMode(ctx, await detectProjectMode(ctx.cwd));
@@ -77,7 +86,7 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
   await writeConfig(ctx.cwd, config);
   await writeInterview(ctx.cwd, interview);
   await ensureGitignore(ctx.cwd);
-  ctx.prompter.outro(t("init.done", { command: NEXT_COMMAND }));
+  ctx.prompter.outro(t("init.done", { command: `${CLI} plan` }));
 }
 
 async function chooseLang(ctx: CommandContext, existing: Config | undefined): Promise<Lang> {
@@ -168,6 +177,7 @@ async function interviewFor(
     ctx.prompter.info(t("interview.adaptiveManual"));
   }
   if (!adaptive) return ctx.flags.dryRun ? finishDryRun(ctx) : renderInterview(data);
+  if (!ctx.flags.dryRun) await ensureGitignore(ctx.cwd);
   const digest = await ctx.prompter.spinner(t("digest.reading"), async () => {
     return (await buildDigest(ctx.cwd, { maxChars: config.digest.maxChars })).text;
   });
@@ -180,7 +190,7 @@ async function interviewFor(
     canExplore: AGENT_BACKENDS.some((name) => name === config.backend),
   };
   if (ctx.flags.dryRun) {
-    ctx.print(`${await interviewPrompt(base, data)}\n`);
+    ctx.print(`${wholePrompt(await interviewPrompt(base, data))}\n`);
     ctx.prompter.outro(t("init.dryRunDone"));
     return undefined;
   }

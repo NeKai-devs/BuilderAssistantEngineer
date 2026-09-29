@@ -83,11 +83,55 @@ export const es: Messages = {
   "plan.intro": "builder-assistant-engineer · plan",
   "plan.noInterview":
     "No hay entrevista en .bae/interview.md; se planifica solo a partir del repositorio.",
-  "plan.analyzing": "El analista está construyendo el plan (puede tardar varios minutos)",
-  "plan.progress": "Recibiendo el plan… {{chars}} caracteres",
+  "plan.analyzing": "{{backend}} está escribiendo el plan; suele tardar 10–40 minutos",
+  "plan.progressStep": "{{backend}} está escribiendo el plan (10–40 min) · {{step}}",
+  "plan.progressFiles":
+    "{{backend}} está escribiendo el plan (10–40 min) · {{count}} archivo(s) · {{file}}",
+  "usage.summary": "Tardó {{time}} · coste de IA {{cost}}",
+  "usage.notReported": "no lo informa {{names}}",
+  "usage.partlyReported": "{{cost}}, más llamadas a {{names}} que no informan su coste",
+  "next.attemptUsage": "Este intento tardó {{time}} · coste de IA {{cost}}",
+  "next.costUnknown": "no informado (una sesión interactiva o un backend que no lo informa)",
+  "template.next":
+    "---\ndescription: Pasa la siguiente tarea del plan a bae\n---\nNo trabajes en ninguna tarea desde este comando. bae elige la siguiente tarea, abre el agente con ella, ejecuta sus comprobaciones y la revisión y hace commit; una tarea hecha de otra forma se salta esas comprobaciones.\n\nDile al usuario que salga de esta sesión y ejecute, en una terminal en la raíz del repositorio:\n\n    {{cli}} next\n\nNunca cambies `status:` en un archivo de tarea.",
+  "template.status":
+    "---\ndescription: Muestra el avance del plan\n---\nEjecuta `{{cli}} status` en la raíz del repositorio y muestra su salida tal cual. No cambies nada.",
+  "template.review":
+    "---\ndescription: Revisa una tarea con el revisor de bae\n---\nNo revises ni cambies archivos desde este comando. Dile al usuario que ejecute, en una terminal en la raíz del repositorio:\n\n    {{cli}} review $ARGUMENTS\n\n(un id de tarea como T-003, o nada para la tarea en curso). Nunca cambies `status:` en un archivo de tarea.",
+  "progress.writing": "escribiendo la respuesta",
+  "ui.interrupted":
+    "Interrumpido. No se escribió nada; vuelve a ejecutar el mismo comando para empezar de nuevo.",
+  "lock.busy":
+    "Otro comando de bae ({{command}}, proceso {{pid}}) se está ejecutando en este repositorio. Espera a que termine y vuelve a ejecutar este.",
+  "next.noCommits":
+    "Este repositorio todavía no tiene commits, así que bae no tiene con qué comparar la tarea. Haz primero commit de tus archivos: git add -A && git commit -m init",
+  "next.interrupted":
+    "La ejecución anterior de {{id}} se detuvo antes de terminar sus comprobaciones; bae restauró los archivos que las definen y la empieza de nuevo.",
+  "config.unknownKeys":
+    "Se ignoran ajustes que bae no conoce en .bae/config.json (revisa cómo están escritos): {{keys}}",
+  "init.badConfig":
+    "No se puede leer el .bae/config.json existente, así que la configuración empieza con los valores por defecto y lo reescribe: {{details}}",
+  "init.noGit":
+    "Esta carpeta no es un repositorio git. bae necesita git para comprobar cada tarea y hacer commit: ejecuta git init, haz commit de tus archivos y luego ejecuta {{cli}} plan.",
+  "init.notRoot":
+    "Configurando bae en esta carpeta, no en la raíz del repositorio ({{root}}). Los comandos ejecutados desde cualquier carpeta por debajo usan esta configuración.",
+  "option.allowDirty": "empieza una tarea aunque haya cambios sin commit fuera del plan",
+  "next.dirtyTitle": "Cambios sin commit fuera del plan",
+  "next.dirtyConfirm":
+    "¿Empezar la tarea igualmente? Estos archivos quedan fuera de su commit salvo que el agente también los cambie.",
+  "next.dirtyStop":
+    "No se ejecutó nada. Haz commit o stash de estos cambios y vuelve a ejecutar {{command}} (o añade --allow-dirty para empezar igualmente).",
+  "next.planUncommitted":
+    '{{count}} archivo(s) del plan no tienen commit (docs/plan, AGENTS.md o .bae/config.json), así que los commits de las tareas no los incluirán. Haz commit antes: git add docs/plan AGENTS.md CLAUDE.md .bae && git commit -m "chore(bae): plan"',
+  "progress.thinking": "pensando",
+  "progress.read": "leyendo {{detail}}",
+  "progress.search": "buscando {{detail}}",
+  "progress.run": "ejecutando {{detail}}",
+  "progress.edit": "editando {{detail}}",
+  "progress.tool": "{{tool}} {{detail}}",
   "plan.existingPlan":
     "Ya existe un plan en docs/plan/tasks. ¿Regenerarlo desde cero? (replan conserva el progreso)",
-  "plan.useReplan": "Sin cambios. Usa replan para actualizar el plan conservando lo hecho.",
+  "plan.useReplan": "Sin cambios. Usa {{cli}} replan para actualizar el plan conservando lo hecho.",
   "plan.dryRunDone":
     "Dry run: el prompt de arriba es exactamente lo que se enviaría. No se escribió nada.",
   "plan.continuing":
@@ -152,13 +196,13 @@ export const es: Messages = {
   "plan.notAPlan":
     "La respuesta ({{chars}} caracteres) no trae archivos del plan, así que no es un plan; se pide de nuevo con el prompt completo. La respuesta queda en {{path}}.",
   "plan.needsReviewWarn":
-    "{{count}} tarea(s) aún tienen una Verification que la CLI no acepta: {{ids}}. Se escriben con status needs_review, y next no las correrá hasta que se corrijan.",
+    "{{count}} tarea(s) aún tienen una Verification que la CLI no acepta: {{ids}}. Se escriben con status needs_review, y {{cli}} next no las correrá hasta que se corrijan.",
   "plan.needsReview":
-    "{{count}} tarea(s) necesitan revisión antes de que next pueda correrlas: {{ids}}. El review_note de cada archivo dice qué corregir en su Verification; luego pon su status en pending.",
+    "{{count}} tarea(s) necesitan revisión antes de que {{cli}} next pueda correrlas: {{ids}}. El review_note de cada archivo dice qué corregir en su Verification; luego pon su status en pending.",
   "verification.commandsRetrying":
     "Algunos comandos del proyecto en el plan son de los que bae no ejecuta sin que alguien los confirme; se pide al analista que corrija solo esos:\n{{notes}}",
   "verification.commandsKept":
-    "Estos comandos del proyecto se quedan en .bae/config.json, pero next --headless y next --yes los rechazarán hasta que los cambies o añadas su comienzo a verify.allow en .bae/config.json:\n{{notes}}",
+    "Estos comandos del proyecto se quedan en .bae/config.json, pero {{cli}} next --headless y {{cli}} next --yes los rechazarán hasta que los cambies o añadas su comienzo a verify.allow en .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} tarea(s) tienen una Verification que la CLI no acepta: {{kinds}}. Se le pide al analista que corrija solo esas. Detalles en {{report}}.",
   "verification.fixing": "El analista está corrigiendo la Verification de esas tareas",
@@ -167,7 +211,7 @@ export const es: Messages = {
   "status.reviewReason": "{{id}} necesita revisión: {{reason}}",
   "next.needsReview": "necesita revisión: {{note}}",
   "next.unblock":
-    "Corrige lo que dice en su archivo una tarea que necesita revisión y pon su status en pending, desbloquea o termina las demás tareas de arriba, o ejecuta replan.",
+    "Corrige lo que dice en su archivo una tarea que necesita revisión y pon su status en pending, desbloquea o termina las demás tareas de arriba, o ejecuta {{cli}} replan.",
   "verify.commands": "Verificación",
   "verify.confirm": "¿Ejecutar ahora estos comandos de verificación?",
   "verify.declined": "No se ejecutó la verificación; la tarea sigue en curso.",
@@ -250,7 +294,7 @@ export const es: Messages = {
   "mechanical.outOfScope": "Cambios fuera del Scope de la tarea: {{files}}",
   "mechanical.failed": "Los chequeos automáticos fallaron, así que no se lanzó el revisor.",
   "plan.openQuestions":
-    "Preguntas abiertas, guardadas en .bae/interview.md; respóndelas allí y ejecuta replan cuando puedas",
+    "Preguntas abiertas, guardadas en .bae/interview.md; respóndelas allí y ejecuta {{cli}} replan cuando puedas",
   "plan.questionsSaved": "{{count}} pregunta(s) guardadas en .bae/interview.md.",
   "plan.rerun":
     "Respondiste preguntas bloqueantes. ¿Volver a generar el plan ahora con tus respuestas?",
@@ -280,6 +324,8 @@ export const es: Messages = {
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
   "status.regressions": "regresiones atrapadas: {{count}}",
+  "status.cost":
+    "coste de IA: {{cost}} en los {{priced}} de {{attempts}} intento(s) que lo informaron",
   "status.time": "tiempo por tarea hecha: {{average}} de media, {{total}} en total",
   "status.taskRuns": "{{attempts}} intento(s), {{time}}",
   "format.repaired": "Respuesta reparada localmente: {{repairs}}.",
@@ -291,7 +337,7 @@ export const es: Messages = {
     "acepta un hallazgo por su id (repetible); solo secretos, y hallazgos de contrato o de tests en archivos que el Alcance de la tarea lista",
   "review.noBase":
     "Revisión fallida: el commit registrado al empezar la tarea ya no existe, así que no se pueden aislar sus cambios.",
-  "review.noCapture": "{{id}} no tiene captura de next; se revisa contra el HEAD actual.",
+  "review.noCapture": "{{id}} no tiene captura de {{cli}} next; se revisa contra el HEAD actual.",
   "contract.title": "Contrato",
   "contract.failed":
     "La tarea cambió archivos que definen sus propios chequeos; se restauraron desde el estado capturado antes de la tarea.",
@@ -325,7 +371,7 @@ export const es: Messages = {
   "regression.noToolchain":
     "Todavía no hay toolchain: el repositorio no tiene código ni manifiesto de proyecto, así que no hay baseline que registrar. {{id}} la crea, y los comandos de lint y tests del proyecto deben pasar después.",
   "regression.notFound":
-    "`{{command}}` no encontró un programa que ejecuta (exit 127), así que no hay baseline. Instala las dependencias del proyecto (por ejemplo `npm install`) y vuelve a correr next.",
+    "`{{command}}` no encontró un programa que ejecuta (exit 127), así que no hay baseline. Instala las dependencias del proyecto (por ejemplo `npm install`) y vuelve a correr {{cli}} next.",
   "regression.unusable":
     "`{{command}}` no da una línea base usable (exit {{code}}): no terminó, o falla sin conteos que comparar. La tarea no podría completarse mientras siga en rojo.",
   "review.noVerdict": "El revisor no dio veredicto.",
@@ -333,9 +379,9 @@ export const es: Messages = {
   "skip.used": "Se continúa sin este chequeo por --allow-skip: {{what}}",
   "skip.title": "Omitido con --allow-skip",
   "skip.stopped":
-    "No se lanzó nada. Corrige la causa, o vuelve a correr next con --allow-skip para seguir sin ese chequeo; la omisión queda en el log de la ejecución.",
+    "No se lanzó nada. Corrige la causa, o vuelve a correr {{cli}} next con --allow-skip para seguir sin ese chequeo; la omisión queda en el log de la ejecución.",
   "env.denied":
-    "{{agent}} no tuvo permiso para ejecutar {{commands}}, así que otro intento fallaría igual. bae deja al agente correr los chequeos de la tarea e instalar dependencias; permite lo demás en los permisos del propio {{agent}} (en Claude Code, una regla como `Bash({{first}} *)` en .claude/settings.json de una carpeta de confianza), o corre next sin --headless y apruébalo tú.",
+    "{{agent}} no tuvo permiso para ejecutar {{commands}}, así que otro intento fallaría igual. bae deja al agente correr los chequeos de la tarea e instalar dependencias; permite lo demás en los permisos del propio {{agent}} (en Claude Code, una regla como `Bash({{first}} *)` en .claude/settings.json de una carpeta de confianza), o corre {{cli}} next sin --headless y apruébalo tú.",
   "env.alsoDenied": "Tampoco se le permitió a {{agent}} ejecutar {{commands}}.",
   "env.moreDenied": "y {{count}} más",
   "env.notFound":
@@ -366,7 +412,7 @@ export const es: Messages = {
   "verify.trivial":
     "La Verificación no ejecuta nada que compruebe la tarea:\n{{command}}\nUsa el runner de tests del proyecto, un linter o un chequeo con resultado esperado (test -f, grep -q, curl -f).",
   "verify.notAllowed":
-    "`{{command}}` no está en la lista de comandos que bae corre cuando nadie los confirma ({{why}}). Añade un prefijo a verify.allow en .bae/config.json, o corre next sin --yes ni --headless y confírmalo tú.",
+    "`{{command}}` no está en la lista de comandos que bae corre cuando nadie los confirma ({{why}}). Añade un prefijo a verify.allow en .bae/config.json, o corre {{cli}} next sin --yes ni --headless y confírmalo tú.",
   "regression.notAllowed":
     "El comando del proyecto `{{command}}` no está en la lista de comandos que bae corre cuando nadie los confirma ({{why}}). Añade un prefijo a verify.allow en .bae/config.json.",
   "verify.dynamic": "ejecuta código que se arma en tiempo de ejecución o en otro shell",
@@ -375,7 +421,7 @@ export const es: Messages = {
   "verify.onlyExcused":
     "La Verificación solo ejecuta comandos que ya fallaban antes de la tarea, así que no comprueba nada de esta tarea.",
   "evidence.linesFailed":
-    "El plan cita líneas que no existen, incluso después de pedir al analista que las corrija:\n{{list}}\nEl plan no se escribió; la respuesta rechazada está en {{path}}. Vuelve a correr plan.",
+    "El plan cita líneas que no existen, incluso después de pedir al analista que las corrija:\n{{list}}\nEl plan no se escribió; la respuesta rechazada está en {{path}}. Vuelve a correr {{cli}} plan.",
   "state.tampered":
     "Código ejecutado para esta tarea cambió el estado propio de bae fuera del repositorio ({{files}}); se restauró y el intento falla.",
   "review.gitError":
@@ -415,7 +461,7 @@ export const es: Messages = {
   "contract.weakerToolchain":
     "Añade un ajuste que cambia cómo arranca el gestor de paquetes o el runner de tests.",
   "review.noEvidence":
-    "(ninguna: esta revisión no se corrió justo después de los chequeos de next)",
+    "(ninguna: esta revisión no se corrió justo después de los chequeos de {{cli}} next)",
   "integrity.scoped":
     "El Scope de la tarea lista este archivo, así que el revisor debe decir por qué este cambio es correcto.",
   "review.unjustified":
@@ -440,7 +486,7 @@ export const es: Messages = {
     "Las tareas de esta run se commitean en {{branch}}, y estás en {{current}}. Vuelve con `git switch {{branch}}` antes de replanificar, para que el plan nuevo quede junto a ellas.",
   "run.confirm": "¿Crear la rama {{branch}} desde {{from}} y commitear ahí cada tarea terminada?",
   "run.declined":
-    "Sigues en {{current}}. Las tareas terminadas no se commitean; el próximo next vuelve a preguntar, y --yes crea la rama sin preguntar.",
+    "Sigues en {{current}}. Las tareas terminadas no se commitean; el próximo {{cli}} next vuelve a preguntar, y --yes crea la rama sin preguntar.",
   "run.finished": "Todas las tareas están hechas en {{branch}}. Abre el pull request con:",
   "run.switchFailed": "No se pudo crear la rama {{branch}}: {{details}}",
   "run.stopped": "No se cambió nada.",
@@ -450,7 +496,8 @@ export const es: Messages = {
   "commit.replan": "Plan nuevo commiteado como {{sha}} en {{branch}}.",
   "commit.plan": "Plan commiteado como {{sha}} en {{branch}}.",
   "commit.planFailed": "No se pudo commitear el plan: {{details}}. Commitea sus archivos a mano.",
-  "plan.commitConfirm": "¿Commitear ahora los archivos del plan, para que next parta de ellos?",
+  "plan.commitConfirm":
+    "¿Commitear ahora los archivos del plan, para que {{cli}} next parta de ellos?",
   "status.run": "Rama {{branch}}, creada desde {{from}}",
   "status.runElsewhere": "Las tareas de esta run se commitean en {{branch}}; estás en {{current}}.",
   "status.noCommits": "todavía sin commits",

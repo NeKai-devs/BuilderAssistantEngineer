@@ -21,6 +21,7 @@ export type AttemptOutcome = "done" | "failed" | "blocked";
 export type Attempt = {
   startedAt: string;
   durationMs: number;
+  costUsd?: number;
   headless: boolean;
   outcome: AttemptOutcome;
   stage?: GateStage;
@@ -82,6 +83,7 @@ function toAttempt(line: string): Attempt | undefined {
   return {
     startedAt: data.startedAt,
     durationMs: typeof data.durationMs === "number" ? data.durationMs : 0,
+    ...(typeof data.costUsd === "number" ? { costUsd: data.costUsd } : {}),
     headless: data.headless === true,
     outcome: data.outcome as AttemptOutcome,
     ...(stage ? { stage } : {}),

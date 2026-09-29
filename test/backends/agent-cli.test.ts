@@ -49,6 +49,7 @@ describe("agent CLI backends", () => {
           "--output-format",
           "stream-json",
           "--verbose",
+          "--include-partial-messages",
           "--no-session-persistence",
           "--permission-prompts",
           "none",
@@ -275,5 +276,25 @@ describe("agent CLI backends", () => {
     const edit = fakeRunner();
     await createBackend("claude", { runner: edit.runner }).run("P", { cwd, access: "edit" });
     expect(edit.calls[0]?.args).not.toContain("--strict-mcp-config");
+  });
+
+  it("sends the stable instructions as claude's system prompt, where they are cached between calls", async () => {
+    const cwd = await tempDir();
+    const claude = fakeRunner();
+    await createBackend("claude", { runner: claude.runner }).run("REQUEST", {
+      cwd,
+      system: "INSTRUCTIONS AND DIGEST",
+    });
+    const args = claude.calls[0]?.args ?? [];
+    const flag = args.indexOf("--append-system-prompt-file");
+    expect(flag).toBeGreaterThan(-1);
+    expect(await readFile(args[flag + 1] ?? "", "utf8")).toBe("INSTRUCTIONS AND DIGEST");
+    expect(claude.calls[0]?.input).toBe("REQUEST");
+    const opencode = fakeRunner();
+    await createBackend("opencode", { runner: opencode.runner }).run("REQUEST", {
+      cwd,
+      system: "INSTRUCTIONS AND DIGEST",
+    });
+    expect(opencode.calls[0]?.input).toBe("INSTRUCTIONS AND DIGEST\n\nREQUEST");
   });
 });

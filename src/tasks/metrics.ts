@@ -16,6 +16,8 @@ export type RunMetrics = {
   regressionsCaught: number;
   done: number;
   doneDurationMs: number;
+  costUsd: number;
+  priced: number;
 };
 
 export async function readMetrics(cwd: string, ids: string[]): Promise<RunMetrics> {
@@ -37,6 +39,8 @@ export async function readMetrics(cwd: string, ids: string[]): Promise<RunMetric
     regressionsCaught: all.filter((attempt) => attempt.stage === "regression").length,
     done: finished.length,
     doneDurationMs: finished.reduce((total, task) => total + task.durationMs, 0),
+    costUsd: all.reduce((total, attempt) => total + (attempt.costUsd ?? 0), 0),
+    priced: all.filter((attempt) => attempt.costUsd !== undefined).length,
   };
 }
 

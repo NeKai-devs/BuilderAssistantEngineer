@@ -1,4 +1,4 @@
-import type { Backend, RunOptions } from "../src/backends/types.js";
+import { type Backend, type RunOptions, withSystem } from "../src/backends/types.js";
 import type { Backend as BackendName } from "../src/config/schema.js";
 import { t } from "../src/i18n/index.js";
 import type { Prompter } from "../src/ui/prompter.js";
@@ -29,7 +29,7 @@ export function fakePrompter(answers: unknown[]) {
     multiselect: async (message) => next(message) as never,
     text: async (message) => String(next(message) ?? ""),
     confirm: async (message) => Boolean(next(message)),
-    spinner: async (_message, task) => task(() => {}),
+    spinner: async (_message, task) => task((update) => log.push(`spin: ${update}`)),
   };
   return { prompter, log, asked, remaining: () => queue.length };
 }
@@ -39,8 +39,8 @@ export function fakeBackend(replies: string[], name: BackendName = "claude") {
   const prompts: string[] = [];
   const backend: Backend = {
     name,
-    run: async (prompt) => {
-      prompts.push(prompt);
+    run: async (prompt, options) => {
+      prompts.push(withSystem(prompt, options));
       const reply = queue.shift();
       if (reply === undefined) throw new Error("no scripted reply");
       return reply;

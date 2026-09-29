@@ -1,4 +1,5 @@
 import { execa } from "execa";
+import { superviseGroup } from "./group.js";
 import { findExecutable } from "./which.js";
 
 const SHELL_TIMEOUT_MS = 15 * 60_000;
@@ -24,23 +25,27 @@ export async function runCommand(
   options: CommandOptions,
 ): Promise<CommandResult> {
   if (!(await findExecutable(file))) return missing(file);
+  const group = process.platform !== "win32";
   const subprocess = execa(file, args, {
     cwd: options.cwd,
     input: options.input,
-    timeout: options.timeoutMs,
     reject: false,
+    detached: group,
+    ...(group ? {} : { timeout: options.timeoutMs }),
     env: { PWD: options.cwd },
   });
   const { onStdout } = options;
   if (onStdout) subprocess.stdout?.on("data", (chunk: Buffer) => onStdout(chunk.toString()));
-  const result = await subprocess;
+  const supervised = superviseGroup(subprocess, options.timeoutMs, group);
+  const result = await subprocess.finally(supervised.release);
   const notFound = "code" in result && result.code === "ENOENT";
+  const timedOut = Boolean(result.timedOut) || supervised.timedOut();
   return {
     exitCode: result.exitCode ?? -1,
     stdout: result.stdout ?? "",
     stderr: result.exitCode === undefined ? (result.message ?? "") : (result.stderr ?? ""),
     notFound,
-    ...(result.timedOut ? { timedOut: true } : {}),
+    ...(timedOut ? { timedOut: true } : {}),
   };
 }
 

@@ -6,7 +6,7 @@ import { UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { baePaths } from "../core/paths.js";
 import { t } from "../i18n/index.js";
-import type { Backend } from "./types.js";
+import { type Backend, withSystem } from "./types.js";
 
 export type ManualIo = {
   input: NodeJS.ReadableStream;
@@ -24,7 +24,8 @@ export function createManualBackend(overrides: Partial<ManualIo> = {}): Backend 
   const io = { ...defaultIo, ...overrides };
   return {
     name: "manual",
-    run: async (prompt, options) => {
+    run: async (request, options) => {
+      const prompt = withSystem(request, options);
       const tmp = baePaths(options.cwd).tmp;
       const promptFile = join(tmp, "prompt.md");
       const responseFile = join(tmp, "response.md");

@@ -46,6 +46,7 @@ async function greenfield(command: string, lint: string): Promise<string> {
     lang: "en",
     commands: { lint },
     gates: { regression: "full" },
+    verify: { allow: ["node -e"] },
   });
   await gitCommitAll(cwd, "plan");
   return cwd;
@@ -64,7 +65,7 @@ describe("next --headless and the agent's environment", () => {
     expect(run.calls[0]?.prompt).toContain("`git status`");
   });
 
-  it("repeats the allowed commands in the retry prompt, and leaves them out of an interactive one", async () => {
+  it("repeats the allowed commands in the retry prompt", async () => {
     const needsOk = `node -e "process.exit(require('fs').existsSync('src/ok.ts') ? 0 : 1)"`;
     const cwd = await bypassRepo({ task: { command: needsOk, scope: "- `src/`" } });
     const retried = await next(cwd, HEADLESS, [
@@ -74,6 +75,9 @@ describe("next --headless and the agent's environment", () => {
     ]);
     expect(retried.calls[1]?.prompt).toContain("The previous attempt did not pass");
     expect(retried.calls[1]?.prompt).toContain("This run is unattended");
+  });
+
+  it("leaves the allowed commands out of an interactive run's prompt", async () => {
     const interactive = await bypassRepo();
     const run = await next(
       interactive,

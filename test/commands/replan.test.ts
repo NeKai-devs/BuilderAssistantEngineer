@@ -111,4 +111,40 @@ describe("replan", () => {
       "outro: There is no plan to update. Run npx builder-assistant-engineer plan first.",
     );
   });
+
+  it("sets a blocked task back to pending when replan rewrites it, and leaves an untouched one blocked (audit A1)", async () => {
+    const cwd = await tempDir();
+    await writeConfig(cwd, {
+      version: 1,
+      mode: "brownfield",
+      backend: "claude",
+      targets: ["codex"],
+      lang: "en",
+    });
+    const blocked = (id: string, command: string) => taskFile(id, { status: "blocked", command });
+    await writeFiles(cwd, {
+      "docs/plan/tasks/T-001-a.md": blocked("T-001", "./check.sh"),
+      "docs/plan/tasks/T-002-b.md": blocked("T-002", "npm test"),
+    });
+    const reply = planOutput({
+      files: {
+        "AGENTS.md": "# Project",
+        "docs/plan/CHANGELOG.md": "## Replan\n\nT-001 runs its check with sh.",
+        "docs/plan/tasks/T-001-a.md": taskFile("T-001", {
+          status: "blocked",
+          command: "sh check.sh",
+        }),
+        "docs/plan/tasks/T-002-b.md": blocked("T-002", "npm test"),
+      },
+    });
+    const code = await main(["node", "bae", "replan", "--yes"], cwd, {
+      prompter: fakePrompter([]).prompter,
+      createBackend: () => fakeBackend([reply]).backend,
+      env: {},
+      print: () => {},
+    });
+    expect(code).toBe(0);
+    expect(await read(cwd, "docs/plan/tasks/T-001-a.md")).toContain("status: pending");
+    expect(await read(cwd, "docs/plan/tasks/T-002-b.md")).toContain("status: blocked");
+  });
 });

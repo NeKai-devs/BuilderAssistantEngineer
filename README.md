@@ -11,12 +11,12 @@ It acts as your tech lead and architect. It interviews you, analyzes the reposit
 
 ## Quickstart (60 seconds)
 
-You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash.
+You need Node.js 20.12 or newer, git, and an agent CLI you already use and are logged in to: [Claude Code](https://code.claude.com), [opencode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) (an API key or copy and paste also work, see [Backends](#backends)). On Windows, run the commands in Git Bash; agent sessions on Windows are not verified yet (see [Platform support](#platform-support)).
 
 ```sh
 cd your-project                       # new idea? mkdir my-idea && cd my-idea && git init
 npx builder-assistant-engineer init   # pick language, project type, AI and agents; answer the interview (Enter skips)
-npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes), then offers to commit them
+npx builder-assistant-engineer plan   # writes AGENTS.md, docs/plan/ and one file per task (10 to 40 minutes, naming each file as it arrives), then offers to commit them
 npx builder-assistant-engineer next   # creates a bae/ branch and opens your agent on the first task
 ```
 
@@ -36,8 +36,8 @@ docs/plan/03-decisions/ADR-001-*.md
 docs/plan/04-roadmap.md           phases, demo criteria, dependency graph, task index
 docs/plan/tasks/T-001-*.md        one self-contained prompt per task
 .claude/agents/*.md               subagents in Claude Code's format, including a reviewer
-.opencode/agent/*.md              the same subagents in opencode's format
-.claude/commands/*.md             next, review and status commands (and .opencode/command/*.md)
+.opencode/agent/*.md              the same subagents in opencode's format, converted by bae
+.claude/commands/*.md             next, review and status commands from bae's templates (and .opencode/command/*.md); /next sends you to bae next and never marks a task done
 ```
 
 Every task works as a prompt on its own:
@@ -128,12 +128,14 @@ Two things came out of it. The analyst now keeps every acceptance criterion with
 | --- | --- |
 | `init` | Detects greenfield or brownfield, lets you choose the backend, target agents (multi-select) and language, runs the interview and saves `.bae/config.json` and `.bae/interview.md`. `--brief <files>` loads a written brief. |
 | `plan` | Builds the repository digest, runs the analyst, checks the paths it cites and writes every artifact. `--only plan\|agents\|memory` writes one group. Shows a diff and asks before writing. At the end it offers to commit what it wrote, with `.bae/config.json` and `.bae/interview.md`, as `chore(bae): plan` (`--yes` commits without asking; `--no-verify` skips the pre-commit and commit-msg hooks). |
-| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes, then commits it on the run's `bae/` branch. `--new-run` starts a new branch from the current one. `--no-verify` commits without the pre-commit and commit-msg hooks. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--accept-finding <id>` accepts one finding by its id (repeatable). |
-| `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught and time per task. |
+| `next` | Takes the first task in progress, or the first pending task whose dependencies are done. Hands it to the agent and marks it done only when every [gate](#gates) passes, then commits it on the run's `bae/` branch. `--new-run` starts a new branch from the current one. `--no-verify` commits without the pre-commit and commit-msg hooks. `--headless` runs the agent without a session. `--allow-skip` goes on when a check cannot run and records the skip. `--allow-dirty` starts a task although tracked files outside the plan have uncommitted changes; without it, an unattended run stops and an interactive one asks. `--accept-finding <id>` accepts one finding by its id (repeatable). |
+| `status` | The run's branch and its commits, then phases, tasks, progress and local metrics: attempts per task, tasks done on the first attempt, regressions caught, time per task and the AI cost the attempts reported. |
 | `replan` | Re-analyzes the repository with the finished work. Keeps done tasks, updates or removes pending ones, never reuses ids, and prepends an entry to `docs/plan/CHANGELOG.md`. During a run it must be on the run's branch, and commits the new plan there as `chore(bae): replan` (`--no-verify` skips the hooks). |
 | `review [task]` | Runs the mechanical checks and then the generated reviewer, read-only, on a task's diff against its acceptance criteria and `AGENTS.md`. Exits with 1 when the review fails. Defaults to the task in progress. Takes `--accept-finding <id>` too. |
 
 Global flags: `--backend <name>`, `--lang en|es`, `--dry-run` (prints exactly what would be sent to the AI and changes nothing) and `-y, --yes` (accepts every confirmation).
+
+Every command that calls the AI ends with the time it took and what the AI cost, as the backend reports it (claude reports it for `claude -p` calls; an interactive session and some backends do not, and the line says so). With claude, `plan`, `review` and `next --headless` also show what the AI is doing while it works: the files it reads, the commands it runs and, in `plan`, each file of the plan as it arrives. The analyst's instructions and the repository digest go to claude as a system prompt, which the provider caches between the interview's follow-up questions, the plan and its retries.
 
 ## Backends
 
@@ -176,7 +178,7 @@ A headless agent cannot ask you before it runs a command, so bae tells it which 
 3. Works on the run's branch. The first `next` asks before it creates `bae/<date>-<time>` from the branch you are on and switches to it, and shows the name (`--yes` creates it without asking); later runs continue there. The branch is created only when the task is about to run: after its checks were accepted and the baseline recorded, so a stop before the agent leaves you on your branch. If you say no, you stay on your branch and finished tasks are not committed. If you are on another branch than the run's, `next` stops and says so; `--new-run` starts a new branch from where you are, for example after merging the previous one.
 4. When the regression gate is `full`, runs the project's lint, typecheck, build and test commands to record a baseline. Then it marks the task `in_progress` and takes the capture: the current commit, the files that were already uncommitted, the ignore rules, the config, the task, the prompts, the reviewer and every file that defines the checks.
 5. Hands it to the agent. The prompt opens with where the plan stands, the project commands and the handoff notes of the last three finished tasks. By default it opens an interactive session with the task as the first prompt; exit the session when you are done. With `--headless` the agent runs on its own with edits accepted, and stops after `agent.timeoutMinutes`.
-6. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run, including the ones in the repository's own virtualenv (`.venv/bin/python -m pytest`) and after leading `VAR=value` assignments (see `verify.allow`). `plan` applies the same list, so a plan never asks for a command `next` would refuse.
+6. Runs the gates below, always in the repository root. In an interactive run the commands are shown and you confirm them, with a warning for anything that looks dangerous. When nobody confirms (`--headless` or `--yes`), only known runners and checks run, including the ones in the repository's own virtualenv (`.venv/bin/python -m pytest`) and after leading `VAR=value` assignments (see `verify.allow`). Inline code (`node -e`, `python -c`, `ruby -e`…) and `curl` sending data (`-d`, `--data`, `-F`, `-T`, `--json`) to anything but 127.0.0.1 or localhost are refused unless `verify.allow` lists them. `plan` applies the same list, so a plan never asks for a command `next` would refuse.
 7. If the agent exits with an error (for example the folder-trust question answered No, or a logged-out CLI) or changes no files, the gates do not run: the task stays `in_progress` with the reason. If a gate fails, the task stays `in_progress` and you see why. If every gate passes, the task is marked `done` and committed as a [conventional commit](https://www.conventionalcommits.org): `<type>: <title> (T-NNN)` with a `Bae-Task: T-NNN` trailer, where `type` comes from the task's frontmatter (`feat`, `fix`, `refactor`, `test`, `docs` or `chore`, the default). The title's first letter is lowercased when the next one is lowercase, so `Add the login page` becomes `add the login page` while acronyms such as `API` stay as written, and the header stays within 100 characters. The analyst starts every title with a verb, so commitlint's conventional config accepts the message; a title that starts with an acronym fails its `subject-case` rule (see [docs/limits.md](docs/limits.md#task-commits)). The commit holds the task file and the files the task changed, not the files that were already uncommitted before it. Your git hooks run as usual; `--no-verify` skips the pre-commit and commit-msg hooks. If a hook fails or git cannot commit, the task stays done, the commit stays pending and you see why. After the last task of the plan, `next` prints the command to open the pull request, `gh pr create --base <your branch> --head bae/<run>`, without running it.
 8. With `--headless`, a failed attempt is retried with the task plus the failure output, unless the cause is the environment: the agent CLI missing, logged out or exiting with an error, a check that cannot find its program (exit 127), a command the agent was denied, or a reviewer that cannot answer. Another attempt would fail the same way, so the run stops at once with the cause; the task stays `in_progress`, and the stop neither counts as an attempt nor writes a lesson. A task gets three attempts in total, counted across runs of `next`, including attempts that timed out or changed no files; a task refused before the agent (see [Gates](#gates)) is blocked without spending one. After that the task is marked `blocked` with the reason, and the logs stay in the state directory (see [Files and safety](#files-and-safety)).
 
@@ -248,7 +250,7 @@ The prompts live in [`src/prompts`](src/prompts). To change one for a project, c
 
 | Prompt | Variables |
 | --- | --- |
-| `analyst.md` | `mode`, `project_type`, `output_language`, `target_agents`, `interview`, `repo_digest`, `can_explore_repo`, `prior_plan` |
+| `analyst.md` | `mode`, `project_type`, `output_language`, `target_agents`, `interview`, `repo_digest`, `can_explore_repo`, `prior_plan`, `cli` |
 | `task.md` | `context`, `task`, `task_path`, `max_log_lines`, `suite` (what `next` hands to the agent) |
 | `review.md` | `reviewer`, `agents_md`, `task`, `diff`, `checks`, `output_language` |
 | `retry.md` | `task`, `failure`, `attempt`, `task_path`, `max_log_lines` |
@@ -277,6 +279,13 @@ bae status
 ```
 
 `bae` is a short alias that only exists after a global install. Do not run `npx bae`: that is a different npm package.
+
+## Platform support
+
+- **Linux and macOS**: the CLI, the digest, the gates and the test suite are verified in CI; agent sessions have been run for real on Linux.
+- **Windows (Git Bash)**: the CLI, the digest, the gates and the test suite are verified in CI. Agent sessions on Windows are not verified.
+
+CI runs lint, typecheck, every test (the gate bypass tests included) and the build on the three systems with Node 20 and 24; six tests that depend on POSIX behavior (process groups, file modes, file names with `*` or `?`, a Unix virtualenv layout, a missing program's exit code) are skipped on Windows. This section is updated when someone runs bae on a real Windows machine: if you do, tell us with the [First impression](https://github.com/NeKai-devs/BuilderAssistantEngineer/issues/new?template=first-impression.yml) form.
 
 ## Contributing
 

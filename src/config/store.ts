@@ -21,6 +21,31 @@ export function parseConfig(text: string, displayPath: string): Config {
   );
 }
 
+export async function unknownConfigKeys(cwd: string): Promise<string[]> {
+  const text = await readTextIfExists(baePaths(cwd).config);
+  if (text === undefined) return [];
+  try {
+    const raw: unknown = JSON.parse(text);
+    const parsed = configSchema.safeParse(raw);
+    return parsed.success ? extraKeys(raw, parsed.data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function extraKeys(raw: unknown, known: unknown, prefix = ""): string[] {
+  if (!isPlain(raw) || !isPlain(known)) return [];
+  return Object.keys(raw).flatMap((key) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (!Object.hasOwn(known, key)) return [path];
+    return extraKeys(raw[key], known[key], path);
+  });
+}
+
+function isPlain(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export async function writeConfig(cwd: string, config: ConfigInput): Promise<void> {
   await writeText(baePaths(cwd).config, `${JSON.stringify(config, null, 2)}\n`);
 }

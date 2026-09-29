@@ -1,4 +1,5 @@
 import { git, isGitRepo, lines } from "../core/git.js";
+import { userChanges } from "../core/gitignore.js";
 import { redact } from "./redact.js";
 
 export type GitInfo = { branch: string; branches: string[]; commits: string[]; changes: number };
@@ -17,6 +18,6 @@ export async function readGitInfo(cwd: string): Promise<GitInfo | undefined> {
     branch: (branch ?? "").trim(),
     branches: lines(branches),
     commits: lines(commits).map(redact),
-    changes: lines(status).length,
+    changes: (await userChanges(cwd, status ?? "", [".bae/"])).length,
   };
 }

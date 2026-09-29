@@ -4,14 +4,21 @@ export type Access = "read" | "edit";
 
 export type RunInfo = { model?: string; costUsd?: number; truncated?: boolean; denied?: string[] };
 
+export type Progress =
+  | { type: "thinking" }
+  | { type: "text"; text: string }
+  | { type: "tool"; tool: string; detail: string };
+
 export type RunOptions = {
   cwd: string;
+  system?: string;
   stream?: (chunk: string) => void;
   interactive?: boolean;
   access?: Access;
   timeoutMs?: number;
   allow?: string[];
   onInfo?: (info: RunInfo) => void;
+  onProgress?: (progress: Progress) => void;
 };
 
 export type Backend = {
@@ -19,3 +26,7 @@ export type Backend = {
   available?(): Promise<boolean>;
   run(prompt: string, options: RunOptions): Promise<string>;
 };
+
+export function withSystem(prompt: string, options: RunOptions): string {
+  return options.system ? `${options.system}\n\n${prompt}` : prompt;
+}

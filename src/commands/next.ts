@@ -1,8 +1,12 @@
+import { join } from "node:path";
 import { AGENT_SPECS, type AgentName } from "../backends/agent-cli.js";
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
+import { readTextIfExists } from "../core/fs.js";
+import { git, gitPaths, headCommit, isGitRepo } from "../core/git.js";
+import { userChanges } from "../core/gitignore.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
-import type { Capture } from "../gates/capture.js";
+import { type Capture, readCapture } from "../gates/capture.js";
 import { newAcceptance } from "../gates/findings.js";
 import type { Checks, GateRun } from "../gates/gate.js";
 import { suiteCommands } from "../gates/regression.js";
@@ -22,6 +26,7 @@ import { CLI, isAgentBackend, loadValidTasks, requireConfig } from "./shared.js"
 
 export type NextOptions = {
   headless?: boolean;
+  allowDirty?: boolean;
   acceptFinding?: string[];
   allowSkip?: boolean;
   newRun?: boolean;
@@ -52,8 +57,19 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   const allowSkip = Boolean(options.allowSkip);
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   const unattended = headless || Boolean(ctx.flags.yes);
+  if ((await isGitRepo(ctx.cwd)) && !(await headCommit(ctx.cwd))) {
+    ctx.prompter.warn(t("next.noCommits"));
+    ctx.prompter.outro(t("next.nothingRun", { command: `${CLI} next` }));
+    throw new ExitCode(1);
+  }
   await preflight(ctx, config.backend);
   await requireTrust(ctx, config, tasks);
+  const previous = await readCapture(ctx.cwd, task.meta.id);
+  const resumed = previous !== undefined && !previous.finished;
+  if (task.meta.status === "pending" && !resumed) {
+    await checkClean(ctx, unattended, options.allowDirty);
+    await warnUncommittedPlan(ctx);
+  }
   const enter = () => useRunBranch(ctx, Boolean(options.newRun));
   const capture = await start(ctx, config, task, { allowSkip, unattended, enter });
   if (!capture) throw new ExitCode(1);
@@ -73,6 +89,37 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     ? await headlessLoop(ctx, run, prompt)
     : await attemptOnce(ctx, run, prompt);
   if (!done) throw new ExitCode(1);
+}
+
+const OWN_PATHS = [".bae/", "docs/plan/tasks/"];
+
+async function checkClean(
+  ctx: CommandContext,
+  unattended: boolean,
+  allowed = false,
+): Promise<void> {
+  const status = (await git(ctx.cwd, ["status", "--porcelain", "--untracked-files=no"])) ?? "";
+  const others = await userChanges(ctx.cwd, status, OWN_PATHS);
+  if (others.length === 0 || allowed) return;
+  ctx.prompter.note(others.map((path) => `  ${path}`).join("\n"), t("next.dirtyTitle"));
+  if (!unattended && (await ctx.prompter.confirm(t("next.dirtyConfirm"), false))) return;
+  ctx.prompter.outro(t("next.dirtyStop", { command: `${CLI} next` }));
+  throw new ExitCode(1);
+}
+
+const PLAN_PATHS = ["docs/plan", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".bae/config.json"];
+
+async function warnUncommittedPlan(ctx: CommandContext): Promise<void> {
+  const loose = await gitPaths(ctx.cwd, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ...PLAN_PATHS,
+  ]);
+  if (loose && loose.length > 0) {
+    ctx.prompter.warn(t("next.planUncommitted", { count: loose.length }));
+  }
 }
 
 async function preflight(ctx: CommandContext, name: Config["backend"]): Promise<void> {
@@ -135,7 +182,7 @@ function describeTask(task: Task, checks: Checks): string {
 function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
   if (tasks.length === 0) {
     ctx.prompter.outro(t("next.noPlan", { command: `${CLI} plan` }));
-    return;
+    throw new ExitCode(1);
   }
   if (tasks.every((task) => task.meta.status === "done")) {
     ctx.prompter.outro(t("next.allDone"));
@@ -155,4 +202,5 @@ function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
     });
   ctx.prompter.note(stuck.join("\n"), t("next.nothingReady"));
   ctx.prompter.outro(t("next.unblock"));
+  throw new ExitCode(1);
 }

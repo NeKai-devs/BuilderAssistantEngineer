@@ -9,6 +9,8 @@ import { MAX_FOLLOW_UPS } from "./questions.js";
 import { type Answer, type InterviewData, renderInterview } from "./render.js";
 import { INTERVIEW_FORMAT, type InterviewReply, parseInterviewReply } from "./reply.js";
 
+const QUESTION_TIMEOUT_MS = 10 * 60_000;
+
 export type AdaptiveContext = {
   cwd: string;
   backend: Backend;
@@ -63,8 +65,13 @@ async function nextReply(context: AdaptiveContext, data: InterviewData): Promise
   return context.prompter.spinner(t("interview.thinking"), () =>
     runWithFormatRetry({
       backend: context.backend,
-      prompt,
-      options: { cwd: context.cwd, access: "read" },
+      prompt: prompt.request,
+      options: {
+        cwd: context.cwd,
+        access: "read",
+        system: prompt.system,
+        timeoutMs: QUESTION_TIMEOUT_MS,
+      },
       parse: parseInterviewReply,
       format: INTERVIEW_FORMAT,
       onRetry: () => context.prompter.warn(t("format.retrying")),

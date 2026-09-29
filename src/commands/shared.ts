@@ -1,19 +1,22 @@
 import { fillCommands, proposeCommands } from "../config/commands.js";
 import { COMMAND_KEYS, type Commands, type Config } from "../config/schema.js";
-import { readConfig, writeConfig } from "../config/store.js";
+import { readConfig, unknownConfigKeys, writeConfig } from "../config/store.js";
 import { UserError } from "../core/errors.js";
 import { ensureGitignore } from "../core/gitignore.js";
+import { CLI } from "../core/invoked.js";
 import { t } from "../i18n/index.js";
 import { loadTaskFiles } from "../tasks/load.js";
 import type { Task } from "../tasks/schema.js";
 import type { CommandContext } from "./context.js";
 
-export const CLI = "npx builder-assistant-engineer";
+export { CLI };
 
 export async function requireConfig(ctx: CommandContext): Promise<Config> {
   const config = await readConfig(ctx.cwd);
   if (!config) throw new UserError(t("config.missing", { command: `${CLI} init` }));
   if (!ctx.flags.dryRun) await ensureGitignore(ctx.cwd);
+  const unknown = await unknownConfigKeys(ctx.cwd);
+  if (unknown.length > 0) ctx.prompter.warn(t("config.unknownKeys", { keys: unknown.join(", ") }));
   return {
     ...config,
     backend: ctx.flags.backend ?? config.backend,
