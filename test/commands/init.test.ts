@@ -52,7 +52,9 @@ describe("init", () => {
     expect(interview).toContain("- Modo: greenfield");
     expect(interview).toContain("A habit tracker for small teams.");
     expect(await read(cwd, ".gitignore")).toBe(".bae/tmp/\n");
-    expect(ui.log.at(-1)).toBe(`outro: Configuración guardada en .bae/. Siguiente paso: ${CLI} plan`);
+    expect(ui.log.at(-1)).toBe(
+      `outro: Configuración guardada en .bae/. Siguiente paso: ${CLI} plan`,
+    );
   });
 
   it("runs the full interview with an adaptive follow-up on a brownfield repo", async () => {
