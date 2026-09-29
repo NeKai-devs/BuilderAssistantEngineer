@@ -27,6 +27,7 @@ type Parsed = { text: string; info: RunInfo };
 export type ProcessRunner = {
   run: typeof runCommand;
   interactive: typeof runInteractive;
+  available?: (command: string) => Promise<boolean>;
 };
 
 const STDIN_INSTRUCTION = "Follow the instructions above exactly.";
@@ -112,12 +113,16 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
   },
 };
 
-export const defaultRunner: ProcessRunner = { run: runCommand, interactive: runInteractive };
+export const defaultRunner: ProcessRunner = {
+  run: runCommand,
+  interactive: runInteractive,
+  available: async (command) => (await findExecutable(command)) !== undefined,
+};
 
 export function createAgentBackend(spec: AgentSpec, runner = defaultRunner): Backend {
   return {
     name: spec.name,
-    available: async () => (await findExecutable(spec.command)) !== undefined,
+    available: async () => (await runner.available?.(spec.command)) ?? true,
     run: (prompt, options) =>
       options.interactive
         ? runSession(spec, runner, prompt, options)
