@@ -69,7 +69,64 @@ const INLINE: Record<string, RegExp> = {
   perl: /^-[A-Za-z]*[eE]/,
   php: /^-[A-Za-z]*r/,
 };
-const UPLOAD = /^-[A-Za-z]*[dFT]|^--(data|data-[a-z]+|form|form-string|upload-file|json)(=|$)/;
+const CURL_VALUE_SHORT = "AbcCdDeEFHKmoPQrtTuUwxXyYz";
+const CURL_UPLOAD_SHORT = "dFT";
+const CURL_UPLOAD_LONG =
+  /^--(data|data-ascii|data-binary|data-raw|data-urlencode|json|form|form-string|upload-file)$/;
+const CURL_VALUE_LONG = new Set([
+  "--data",
+  "--data-ascii",
+  "--data-binary",
+  "--data-raw",
+  "--data-urlencode",
+  "--json",
+  "--form",
+  "--form-string",
+  "--upload-file",
+  "--url",
+  "--config",
+  "--output",
+  "--output-dir",
+  "--header",
+  "--request",
+  "--user",
+  "--user-agent",
+  "--referer",
+  "--cookie",
+  "--cookie-jar",
+  "--dump-header",
+  "--write-out",
+  "--max-time",
+  "--connect-timeout",
+  "--retry",
+  "--retry-delay",
+  "--retry-max-time",
+  "--max-redirs",
+  "--proxy",
+  "--proxy-user",
+  "--resolve",
+  "--connect-to",
+  "--cacert",
+  "--capath",
+  "--cert",
+  "--key",
+  "--range",
+  "--continue-at",
+  "--limit-rate",
+  "--unix-socket",
+  "--interface",
+  "--stderr",
+  "--trace",
+  "--trace-ascii",
+  "--url-query",
+  "--oauth2-bearer",
+  "--variable",
+  "--expect100-timeout",
+  "--speed-limit",
+  "--speed-time",
+  "--time-cond",
+]);
+const CURL_UNSEEN_TARGET = "(a config file)";
 const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])$/i;
 const VENV_TOOL = /^(\.\/)?\.?venv\/(bin|Scripts)\/[^/\\]+$/;
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
@@ -201,7 +258,10 @@ function allowed(command: SimpleCommand, downloads: boolean, jobs: Set<string>):
   if (base === "trap") return stopsOwnJob(args, jobs);
   if (base === "git") return GIT_READ.has(args[0] ?? "");
   if (runsInline(base, args)) return false;
-  if (base === "curl") return !args.some((arg) => UPLOAD.test(arg)) || urls(args).every(local);
+  if (base === "curl") {
+    const request = curlRequest(args);
+    return !request.uploads || request.targets.every(local);
+  }
   if (base === "jq") return true;
   if (
     !TRIVIAL.has(base) &&
@@ -227,8 +287,42 @@ function firstOperand(args: string[]): number {
   return index === -1 ? args.length : index;
 }
 
-function urls(args: string[]): string[] {
-  return args.filter((arg) => /^[a-z]+:\/\//i.test(arg) || /^[\w.-]+(:\d+)?\//.test(arg));
+type CurlRequest = { uploads: boolean; targets: string[] };
+
+function curlRequest(args: string[]): CurlRequest {
+  const request: CurlRequest = { uploads: false, targets: [] };
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index] ?? "";
+    if (arg === "--") {
+      request.targets.push(...args.slice(index + 1));
+      break;
+    }
+    if (arg.startsWith("--")) index = curlLongOption(args, index, request);
+    else if (arg.startsWith("-") && arg.length > 1) index = curlShortOptions(args, index, request);
+    else request.targets.push(arg);
+  }
+  return request;
+}
+
+function curlLongOption(args: string[], index: number, request: CurlRequest): number {
+  const arg = args[index] ?? "";
+  const equals = arg.indexOf("=");
+  const name = equals === -1 ? arg : arg.slice(0, equals);
+  const takesNext = equals === -1 && CURL_VALUE_LONG.has(name);
+  const value = equals === -1 ? (takesNext ? args[index + 1] : undefined) : arg.slice(equals + 1);
+  if (CURL_UPLOAD_LONG.test(name)) request.uploads = true;
+  if (name === "--url" && value !== undefined) request.targets.push(value);
+  if (name === "--config") request.targets.push(CURL_UNSEEN_TARGET);
+  return takesNext ? index + 1 : index;
+}
+
+function curlShortOptions(args: string[], index: number, request: CurlRequest): number {
+  const flags = (args[index] ?? "").slice(1);
+  const at = [...flags].findIndex((flag) => CURL_VALUE_SHORT.includes(flag));
+  const used = at === -1 ? flags : flags.slice(0, at + 1);
+  if ([...used].some((flag) => CURL_UPLOAD_SHORT.includes(flag))) request.uploads = true;
+  if (used.endsWith("K")) request.targets.push(CURL_UNSEEN_TARGET);
+  return at !== -1 && at === flags.length - 1 ? index + 1 : index;
 }
 
 function local(url: string): boolean {
