@@ -120,6 +120,11 @@ export const en = {
   "trust.allowed": "Also allowed when nobody confirms (verify.allow in .bae/config.json):",
   "trust.confirm":
     "bae has not run anything in this repository on this machine yet. It will run the commands above with your permissions, also under --yes and --headless, which do not answer this question. Do you trust them?",
+  "trust.changedTitle": "Commands that are new or changed since you approved this repository",
+  "trust.confirmChanged":
+    "These commands are new or changed since you last approved this repository's commands, for example after a pull or a replan. bae will run them with your permissions, also under --yes and --headless, which do not answer this question. Do you trust them?",
+  "trust.agentLoads":
+    "The agent will also load these from the repository when it starts (bae does not run them itself; check them before you go on):",
   "trust.declined":
     "Nothing was run. Read .bae/config.json and the ## Verification blocks in docs/plan/tasks, then run {{command}} again.",
   "trust.noTerminal":

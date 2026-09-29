@@ -3,9 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig, writeInterview } from "../../src/config/store.js";
-import { recordTrust } from "../../src/next/trust.js";
 import { splitFrontmatter } from "../../src/tasks/frontmatter.js";
-import { fakeBackend, fakePrompter, scriptedBackend } from "../fakes.js";
+import { fakeBackend, fakePrompter, scriptedBackend, trusting } from "../fakes.js";
 import { tempDir } from "../helpers.js";
 import { defaultFiles, planOutput, taskFile } from "../plan-sample.js";
 
@@ -109,9 +108,8 @@ describe("plan and a Verification the CLI cannot accept", () => {
     );
     const ui = fakePrompter([]);
     const ai = scriptedBackend([]);
-    await recordTrust(cwd);
     const code = await main(["node", "bae", "next", "--yes"], cwd, {
-      prompter: ui.prompter,
+      prompter: trusting(ui.prompter),
       createBackend: () => ai.backend,
       env: {},
       print: () => {},

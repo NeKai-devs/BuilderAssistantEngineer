@@ -3,10 +3,9 @@ import { join } from "node:path";
 import { main } from "../../../src/cli.js";
 import type { Config } from "../../../src/config/schema.js";
 import { writeConfig } from "../../../src/config/store.js";
-import { recordTrust } from "../../../src/next/trust.js";
 import { splitFrontmatter } from "../../../src/tasks/frontmatter.js";
 import { FAKE_FILES, vitest } from "../../fake-vitest.js";
-import { fakePrompter, type Step, scriptedBackend } from "../../fakes.js";
+import { fakePrompter, type Step, scriptedBackend, trusting } from "../../fakes.js";
 import { gitCommitAll, runFile, tempDir, writeFiles } from "../../helpers.js";
 import { type TaskOptions, taskFile } from "../../plan-sample.js";
 
@@ -77,12 +76,11 @@ export async function next(
   answers: unknown[] = [],
   trusted = true,
 ) {
-  if (trusted) await recordTrust(cwd);
   const ui = fakePrompter(answers);
   const ai = scriptedBackend(steps);
   const printed: string[] = [];
   const code = await main(["node", "bae", "next", ...args], cwd, {
-    prompter: ui.prompter,
+    prompter: trusted ? trusting(ui.prompter) : ui.prompter,
     createBackend: () => ai.backend,
     env: {},
     print: (text) => printed.push(text),

@@ -6,8 +6,7 @@ import { main } from "../../../src/cli.js";
 import { EnvironmentError } from "../../../src/core/errors.js";
 import { git } from "../../../src/core/git.js";
 import type { CommandResult } from "../../../src/core/process.js";
-import { recordTrust } from "../../../src/next/trust.js";
-import { fakePrompter } from "../../fakes.js";
+import { fakePrompter, trusting } from "../../fakes.js";
 import {
   agent,
   attempts,
@@ -32,11 +31,10 @@ function exits(result: CommandResult): ProcessRunner {
 }
 
 async function nextWith(cwd: string, args: string[], backend: (name: string) => Backend) {
-  await recordTrust(cwd);
   const ui = fakePrompter([]);
   const printed: string[] = [];
   const code = await main(["node", "bae", "next", ...args], cwd, {
-    prompter: ui.prompter,
+    prompter: trusting(ui.prompter),
     createBackend: (name) => backend(name),
     env: {},
     print: (text) => printed.push(text),

@@ -124,6 +124,11 @@ export const es: Messages = {
   "trust.allowed": "También permitidos sin confirmación (verify.allow en .bae/config.json):",
   "trust.confirm":
     "bae todavía no ha ejecutado nada en este repositorio en esta máquina. Ejecutará los comandos de arriba con tus permisos, también con --yes y --headless, que no responden esta pregunta. ¿Confías en ellos?",
+  "trust.changedTitle": "Comandos nuevos o cambiados desde que aprobaste este repositorio",
+  "trust.confirmChanged":
+    "Estos comandos son nuevos o cambiaron desde la última vez que aprobaste los comandos de este repositorio, por ejemplo tras un pull o un replan. bae los ejecutará con tus permisos, también con --yes y --headless, que no responden esta pregunta. ¿Confías en ellos?",
+  "trust.agentLoads":
+    "El agente también cargará esto del repositorio al arrancar (bae no lo ejecuta; revísalo antes de seguir):",
   "trust.declined":
     "No se ejecutó nada. Revisa .bae/config.json y los bloques ## Verification de docs/plan/tasks, y vuelve a ejecutar {{command}}.",
   "trust.noTerminal":
