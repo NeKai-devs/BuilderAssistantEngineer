@@ -4,7 +4,7 @@ import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
 import { git, gitPaths, headCommit, isGitRepo } from "../core/git.js";
-import { BAE_IGNORED } from "../core/gitignore.js";
+import { userChanges } from "../core/gitignore.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { type Capture, readCapture } from "../gates/capture.js";
 import { newAcceptance } from "../gates/findings.js";
@@ -99,12 +99,7 @@ async function checkClean(
   allowed = false,
 ): Promise<void> {
   const status = (await git(ctx.cwd, ["status", "--porcelain", "--untracked-files=no"])) ?? "";
-  const dirty = status
-    .split("\n")
-    .map((line) => line.slice(3).replace(/^"|"$/g, ""))
-    .filter((path) => path && !OWN_PATHS.some((own) => path.startsWith(own)));
-  const ours = dirty.includes(".gitignore") && (await onlyBaeIgnored(ctx.cwd));
-  const others = ours ? dirty.filter((path) => path !== ".gitignore") : dirty;
+  const others = await userChanges(ctx.cwd, status, OWN_PATHS);
   if (others.length === 0 || allowed) return;
   ctx.prompter.note(others.map((path) => `  ${path}`).join("\n"), t("next.dirtyTitle"));
   if (!unattended && (await ctx.prompter.confirm(t("next.dirtyConfirm"), false))) return;
@@ -125,19 +120,6 @@ async function warnUncommittedPlan(ctx: CommandContext): Promise<void> {
   if (loose && loose.length > 0) {
     ctx.prompter.warn(t("next.planUncommitted", { count: loose.length }));
   }
-}
-
-async function onlyBaeIgnored(cwd: string): Promise<boolean> {
-  const diff = (await git(cwd, ["diff", "--no-ext-diff", "-U0", "HEAD", "--", ".gitignore"])) ?? "";
-  const tracked = diff.trim() !== "";
-  const changes = tracked
-    ? diff.split("\n").filter((line) => /^[+-](?![+-]{2} )/.test(line))
-    : ((await readTextIfExists(join(cwd, ".gitignore"))) ?? "")
-        .split("\n")
-        .map((line) => `+${line}`);
-  return changes.every(
-    (line) => line === "+" || (line.startsWith("+") && BAE_IGNORED.includes(line.slice(1).trim())),
-  );
 }
 
 async function preflight(ctx: CommandContext, name: Config["backend"]): Promise<void> {

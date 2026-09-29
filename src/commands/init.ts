@@ -177,6 +177,7 @@ async function interviewFor(
     ctx.prompter.info(t("interview.adaptiveManual"));
   }
   if (!adaptive) return ctx.flags.dryRun ? finishDryRun(ctx) : renderInterview(data);
+  if (!ctx.flags.dryRun) await ensureGitignore(ctx.cwd);
   const digest = await ctx.prompter.spinner(t("digest.reading"), async () => {
     return (await buildDigest(ctx.cwd, { maxChars: config.digest.maxChars })).text;
   });
