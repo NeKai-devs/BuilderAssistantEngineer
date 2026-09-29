@@ -176,17 +176,24 @@ async function recordBaseline(
     throw new ExitCode(1);
   }
   const found = unusableBaseline(results, task.meta.tests === "fix");
-  const absent = options.fresh
-    ? found.filter((result) => result.key === "test" && result.exitCode !== -1)
+  const missing = results.filter((result) => result.absent);
+  const untested = options.fresh
+    ? found.filter(
+        (result) => result.key === "test" && result.exitCode !== -1 && !missing.includes(result),
+      )
     : [];
+  const absent = [...missing, ...untested];
   const unusable = found.filter((result) => !absent.includes(result));
   for (const result of results.filter((item) => item.exitCode !== 0)) {
-    if (unusable.includes(result)) continue;
+    if (unusable.includes(result) || absent.includes(result)) continue;
     ctx.prompter.warn(
       t("regression.preexisting", { command: result.command, code: result.exitCode }),
     );
   }
-  for (const result of absent) {
+  for (const result of missing) {
+    ctx.prompter.info(t("regression.notYetCreated", { command: result.command }));
+  }
+  for (const result of untested) {
     ctx.prompter.info(t("regression.noTestsYet", { command: result.command }));
   }
   for (const result of unusable) allowOrStop(ctx, options, skips, unusableMessage(result));

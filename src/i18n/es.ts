@@ -140,6 +140,10 @@ export const es: Messages = {
     "{{count}} tarea(s) aún tienen una Verification que la CLI no acepta: {{ids}}. Se escriben con status needs_review, y next no las correrá hasta que se corrijan.",
   "plan.needsReview":
     "{{count}} tarea(s) necesitan revisión antes de que next pueda correrlas: {{ids}}. El review_note de cada archivo dice qué corregir en su Verification; luego pon su status en pending.",
+  "verification.commandsRetrying":
+    "Algunos comandos del proyecto en el plan son de los que bae no ejecuta sin que alguien los confirme; se pide al analista que corrija solo esos:\n{{notes}}",
+  "verification.commandsKept":
+    "Estos comandos del proyecto se quedan en .bae/config.json, pero next --headless y next --yes los rechazarán hasta que los cambies o añadas su comienzo a verify.allow en .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} tarea(s) tienen una Verification que la CLI no acepta: {{kinds}}. Se le pide al analista que corrija solo esas. Detalles en {{report}}.",
   "verification.fixing": "El analista está corrigiendo la Verification de esas tareas",
@@ -403,6 +407,10 @@ export const es: Messages = {
     "Un commit hecho durante la tarea añade algo que parece una credencial ({{kind}}). Se queda en el historial de git aunque el archivo ya no lo tenga, así que reescribe esos commits.",
   "mechanical.secretFileHistory":
     "Un commit hecho durante la tarea añade un archivo de secretos. Se queda en el historial de git aunque el archivo ya no exista, así que reescribe esos commits.",
+  "regression.notYetCreated":
+    "`{{command}}` todavía no existe (su herramienta o script no está instalado o escrito), así que ahora no se compara; cuando una tarea lo cree, deberá pasar.",
+  "regression.stillAbsent":
+    "`{{command}}` sigue sin existir; la tarea que lo cree deberá hacer que pase.",
   "regression.noTestsYet":
     "`{{command}}` todavía no tiene tests que correr, así que no hay línea base; después de la tarea debe pasar y decir cuántos tests corrieron.",
   "integrity.planned":

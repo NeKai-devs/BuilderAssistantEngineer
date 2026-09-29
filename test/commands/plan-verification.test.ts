@@ -132,4 +132,53 @@ describe("plan and a Verification the CLI cannot accept", () => {
     expect(run.ai.prompts).toHaveLength(1);
     expect(await meta(cwd, T2)).toMatchObject({ status: "pending" });
   });
+
+  it("asks for a fix of a Verification that next would refuse when nobody confirms it (audit A1)", async () => {
+    const cwd = await setup();
+    const byPath = taskFile("T-002", { dependsOn: ["T-001"], command: "./scripts/check.sh" });
+    const bySh = taskFile("T-002", { dependsOn: ["T-001"], command: "sh scripts/check.sh" });
+    const run = await plan(cwd, [withTask(byPath), fileBlock(T2, bySh)]);
+    expect(run.code).toBe(0);
+    expect(run.ai.prompts[1]).toContain(
+      `- ${T2}: Verification runs a command that bae does not run when nobody confirms it`,
+    );
+    expect(run.ai.prompts[1]).toContain("./scripts/check.sh");
+    expect(await read(cwd, T2)).toContain("sh scripts/check.sh");
+    expect(await meta(cwd, T2)).toMatchObject({ status: "pending" });
+  });
+
+  it("accepts the repository's virtualenv and a leading VAR=value without asking for a fix", async () => {
+    const cwd = await setup();
+    const venv = taskFile("T-002", {
+      dependsOn: ["T-001"],
+      command:
+        "NOTES_DB_PATH=/tmp/notes.db .venv/bin/python -m uvicorn app.main:app --port 8765 &\ntrap 'kill $!' EXIT\nsleep 2\ncurl -sf http://127.0.0.1:8765/health\n.venv/bin/python -m pytest -q",
+    });
+    const config = JSON.stringify({ commands: { test: ".venv/bin/python -m pytest -q" } });
+    const run = await plan(cwd, [planOutput({ config, files: { ...defaultFiles(), [T2]: venv } })]);
+    expect(run.code).toBe(0);
+    expect(run.ai.prompts).toHaveLength(1);
+    expect(await meta(cwd, T2)).toMatchObject({ status: "pending" });
+  });
+
+  it("asks for a fix of a project command next would refuse, and saves the fixed one", async () => {
+    const cwd = await setup();
+    const refused = JSON.stringify({ commands: { lint: "./bin/lint" } });
+    const reply = '<<<CONFIG>>>\n{"commands": {"lint": "sh bin/lint"}}\n<<<END CONFIG>>>';
+    const run = await plan(cwd, [planOutput({ config: refused }), reply]);
+    expect(run.code).toBe(0);
+    expect(run.ai.prompts[1]).toContain("- CONFIG: lint runs a command that bae does not run");
+    expect(run.ai.prompts[1]).toContain('<<<CONFIG>>>\n{"commands":{"lint":"./bin/lint"}}');
+    const config = JSON.parse(await read(cwd, ".bae/config.json"));
+    expect(config.commands.lint).toBe("sh bin/lint");
+  });
+
+  it("keeps a project command it could not fix and says how to allow it", async () => {
+    const cwd = await setup();
+    const refused = JSON.stringify({ commands: { lint: "./bin/lint" } });
+    const run = await plan(cwd, [planOutput({ config: refused }), "No."]);
+    expect(run.code).toBe(0);
+    expect(run.log).toContain("next --headless and next --yes will refuse them");
+    expect(run.log).toContain("verify.allow");
+  });
 });

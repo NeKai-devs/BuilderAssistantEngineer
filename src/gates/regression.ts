@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Config } from "../config/schema.js";
 import { bashPath, runScript } from "../core/bash.js";
 import type { ShellResult } from "../core/process.js";
+import { missingTool } from "./absent.js";
 import { goText, probeFor, REPORT_SOURCES } from "./reports.js";
 import {
   type Counts,
@@ -26,6 +27,7 @@ export type SuiteResult = SuiteCommand &
     unrecognized?: boolean;
     units?: string[];
     errors?: string[];
+    absent?: boolean;
   };
 
 export const commandBaselineSchema = z.object({
@@ -47,6 +49,7 @@ export type SuiteBaseline = z.output<typeof suiteBaselineSchema>;
 
 export type Verdict =
   | "passed"
+  | "absent"
   | "preexisting"
   | "regression"
   | "unfinished"
@@ -76,6 +79,8 @@ const BLOCKING = new Set<Verdict>([
 ]);
 const VERDICTS: Record<Verdict, string> = {
   passed: "passed",
+  absent:
+    "not there yet: the tool or script it runs did not exist before the task and still does not; once a task creates it, it must pass",
   preexisting: "preexisting: it already failed before the task and the task did not make it worse",
   regression: "regression: it passed before the task, or more checks fail than before",
   unfinished: "regression: it did not finish (timeout or could not start)",
@@ -149,12 +154,14 @@ async function runOne(
     const output = view ? goText(result.output) : result.output;
     const read = (await probe?.collect(result.stdout)) ?? textRead(output, hint, test);
     const errors = !test && result.exitCode !== 0 ? errorLines(output) : [];
+    const absent = result.exitCode > 0 && missingTool(item.command, output);
     return {
       ...item,
       exitCode: result.exitCode,
       output,
       ...read,
       ...(errors.length > 0 ? { errors } : {}),
+      ...(absent ? { absent } : {}),
       ...(test && hint.length === 0 ? { unrecognized: true } : {}),
     };
   } finally {
@@ -221,6 +228,7 @@ export function verdictOf(
   const red = result.exitCode !== 0 || (result.counts?.failed ?? 0) > 0;
   if (result.key === "test" && !red && unread(result, before)) return "unknown";
   if (fix && result.key === "test") return red ? "mustPass" : "passed";
+  if (before?.absent && result.absent) return "absent";
   if (!before) return red ? "noBaseline" : "passed";
   const wasRed = before.exitCode !== 0 || (before.counts?.failed ?? 0) > 0;
   if (!wasRed) return red ? "regression" : "passed";

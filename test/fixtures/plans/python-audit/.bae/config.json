@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "mode": "brownfield",
+  "backend": "claude",
+  "targets": [
+    "claude-code",
+    "opencode"
+  ],
+  "lang": "en",
+  "digest": {
+    "maxChars": 100000
+  },
+  "commands": {
+    "test": ".venv/bin/python -m pytest -q",
+    "lint": ".venv/bin/python -m ruff check .",
+    "typecheck": ".venv/bin/python -m mypy"
+  },
+  "gates": {
+    "regression": "full",
+    "timeoutMinutes": 15
+  },
+  "verify": {
+    "allow": []
+  },
+  "secrets": {
+    "allow": []
+  },
+  "agent": {
+    "timeoutMinutes": 45
+  }
+}

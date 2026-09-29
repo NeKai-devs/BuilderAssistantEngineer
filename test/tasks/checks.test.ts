@@ -74,6 +74,11 @@ describe("allowlistProblems", () => {
     ["timeout 600 npm test"],
     ["xvfb-run -a npx playwright test"],
     ["bash -e scripts/check.sh --strict"],
+    [".venv/bin/python -m pytest -q"],
+    ["./.venv/bin/ruff check ."],
+    ["venv/bin/mypy app"],
+    [".venv/Scripts/python.exe -m pytest"],
+    ["NOTES_DB_PATH=/tmp/notes-$$.db .venv/bin/python -m uvicorn app.main:app --port 8765 &"],
   ])("allows %s", (line) => {
     expect(allowlistProblems([line], [])).toEqual([]);
   });
@@ -91,8 +96,21 @@ describe("allowlistProblems", () => {
     ["bash -lc 'make test'", "dynamic"],
     ["sh ../outside.sh", "dynamic"],
     ["sh", "dynamic"],
+    ["/usr/bin/python -m pytest", "notAllowed"],
+    ["../.venv/bin/python -m pytest", "notAllowed"],
+    ["tools/bin/pytest", "notAllowed"],
+    [".venv/bin/deploy --prod", "notAllowed"],
+    ["X=$(cat token) .venv/bin/python -m pytest", "dynamic"],
   ])("rejects %s when nobody confirms", (line, reason) => {
     expect(allowlistProblems([line], []).map((problem) => problem.reason)).toEqual([reason]);
+  });
+
+  it("matches verify.allow after leading VAR=value assignments", () => {
+    const line = "APP_ENV=test ./scripts/smoke.sh --fast";
+    expect(allowlistProblems([line], [])).toHaveLength(1);
+    expect(allowlistProblems([line], ["./scripts/smoke.sh"])).toEqual([]);
+    expect(allowlistProblems(["./scripts/smoke.sh"], ["./scripts/smoke.sh"])).toEqual([]);
+    expect(allowlistProblems(["APP_ENV=test"], ["APP_ENV=test"])).toEqual([]);
   });
 
   it("only lets kill and trap stop the script's own background job", () => {

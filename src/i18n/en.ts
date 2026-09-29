@@ -243,6 +243,10 @@ export const en = {
     "{{count}} task(s) still have a Verification the CLI cannot accept: {{ids}}. They are written with status needs_review, and next will not run them until they are fixed.",
   "plan.needsReview":
     "{{count}} task(s) need review before next can run them: {{ids}}. Each file's review_note says what to fix in its Verification; then set its status to pending.",
+  "verification.commandsRetrying":
+    "Some project commands in the plan are ones bae does not run when nobody confirms them; asking the analyst to fix only those:\n{{notes}}",
+  "verification.commandsKept":
+    "These project commands stay in .bae/config.json, but next --headless and next --yes will refuse them until you change them or add their first words to verify.allow in .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} task(s) have a Verification the CLI cannot accept: {{kinds}}. Asking the analyst to fix only those. Details in {{report}}.",
   "verification.fixing": "The analyst is fixing the Verification of those tasks",
@@ -390,6 +394,10 @@ export const en = {
     "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
   "mechanical.secretFileHistory":
     "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
+  "regression.notYetCreated":
+    "`{{command}}` does not exist yet (its tool or script is not installed or written), so it is not compared now; once a task creates it, it must pass.",
+  "regression.stillAbsent":
+    "`{{command}}` still does not exist; the task that creates it must make it pass.",
   "regression.noTestsYet":
     "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
   "integrity.planned":

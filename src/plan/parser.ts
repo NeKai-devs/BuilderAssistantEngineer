@@ -5,11 +5,13 @@ import { FormatError } from "../core/errors.js";
 import { splitFrontmatter } from "../tasks/frontmatter.js";
 import { findCycle } from "../tasks/graph.js";
 import { withLogSection } from "../tasks/handoff.js";
+import { allowlistProblems } from "../tasks/checks.js";
 import {
   parseTask,
   sectionProblems,
   TASK_PATH,
   type Task,
+  unattendedNote,
   verificationNotes,
 } from "../tasks/schema.js";
 
@@ -43,11 +45,16 @@ export type ParsedPlan = {
   tasks: Task[];
   warnings: string[];
   reviews: TaskReview[];
+  configNotes: string[];
 };
 
 export type TaskReview = { path: string; id: string; notes: string[] };
 
-export type ParseOptions = { knownTaskIds?: string[]; requireReviewer?: boolean };
+export type ParseOptions = {
+  knownTaskIds?: string[];
+  requireReviewer?: boolean;
+  allow?: string[];
+};
 
 type Block = { kind: "SUMMARY" | "QUESTIONS" | "CONFIG" | "FILE"; path: string; body: string };
 
@@ -107,10 +114,25 @@ export function parsePlan(text: string, options: ParseOptions = {}): ParsedPlan 
     throw new FormatError(groupProblems(problems).slice(0, MAX_PROBLEMS).join("\n"));
   }
   const reviews = tasks.flatMap((task) => {
-    const notes = verificationNotes(task);
+    const notes = verificationNotes(task, options.allow);
     return notes.length > 0 ? [{ path: task.path, id: task.meta.id, notes }] : [];
   });
-  return { summary, questions, commands, files, tasks, warnings, reviews };
+  const configNotes = options.allow ? commandNotes(commands, options.allow) : [];
+  return { summary, questions, commands, files, tasks, warnings, reviews, configNotes };
+}
+
+export function commandNotes(commands: Commands, allow: string[]): string[] {
+  return Object.entries(commands).flatMap(([key, command]) =>
+    command
+      ? allowlistProblems([command], allow).map((problem) => `${key} ${unattendedNote(problem)}`)
+      : [],
+  );
+}
+
+export function parseConfigBlock(text: string): Commands | undefined {
+  const ignored: string[] = [];
+  const blocks = tokenize(text, ignored, ignored);
+  return blocks.some((block) => block.kind === "CONFIG") ? parseConfig(blocks, ignored) : undefined;
 }
 
 export function parseFileBlocks(text: string): PlanFile[] {
@@ -118,7 +140,9 @@ export function parseFileBlocks(text: string): PlanFile[] {
   return collectFiles(tokenize(text, ignored, ignored), ignored);
 }
 
-export function renderPlan(plan: Omit<ParsedPlan, "tasks" | "warnings">): string {
+export function renderPlan(
+  plan: Omit<ParsedPlan, "tasks" | "warnings" | "reviews" | "configNotes">,
+): string {
   return [
     "<<<SUMMARY>>>",
     plan.summary,

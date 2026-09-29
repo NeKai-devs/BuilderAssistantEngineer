@@ -286,6 +286,9 @@ async function regressionStage(
   for (const item of check.preexisting) {
     ctx.prompter.info(t("regression.stillFailing", { command: item.command, code: item.exitCode }));
   }
+  for (const item of check.checks.filter((entry) => entry.verdict === "absent")) {
+    ctx.prompter.info(t("regression.stillAbsent", { command: item.command }));
+  }
   if (check.passed) ctx.prompter.success(t("regression.passed"));
   return check;
 }
