@@ -28,10 +28,9 @@ import { BASE_QUESTIONS, OBJECTIVE_LABELS, OBJECTIVES } from "../interview/quest
 import { type InterviewData, renderInterview } from "../interview/render.js";
 import type { Choice } from "../ui/prompter.js";
 import type { CommandContext } from "./context.js";
+import { CLI } from "./shared.js";
 
 export type InitOptions = { brief?: string };
-
-export const NEXT_COMMAND = "npx builder-assistant-engineer plan";
 
 const BACKEND_LABELS: Record<AgentName, string> = {
   claude: "Claude Code",
@@ -87,7 +86,7 @@ export async function runInit(ctx: CommandContext, options: InitOptions): Promis
   await writeConfig(ctx.cwd, config);
   await writeInterview(ctx.cwd, interview);
   await ensureGitignore(ctx.cwd);
-  ctx.prompter.outro(t("init.done", { command: NEXT_COMMAND }));
+  ctx.prompter.outro(t("init.done", { command: `${CLI} plan` }));
 }
 
 async function chooseLang(ctx: CommandContext, existing: Config | undefined): Promise<Lang> {
