@@ -1,8 +1,9 @@
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execa } from "execa";
+import { superviseGroup } from "./group.js";
 import type { ShellResult } from "./process.js";
+import { dropScratch, scratchDir } from "./scratch.js";
 import { type Env, findExecutable } from "./which.js";
 
 const SCRIPT_TIMEOUT_MS = 15 * 60_000;
@@ -44,7 +45,7 @@ export async function runScript(
   script: string,
   options: ScriptOptions,
 ): Promise<ShellResult & { stdout: string }> {
-  const dir = await mkdtemp(join(tmpdir(), "bae-script-"));
+  const dir = await scratchDir("bae-script-");
   const file = join(dir, "script.sh");
   await writeFile(file, script, "utf8");
   const group = process.platform !== "win32";
@@ -60,34 +61,9 @@ export async function runScript(
     });
     const { onOutput } = options;
     if (onOutput) subprocess.all?.on("data", (chunk: Buffer) => onOutput(chunk.toString()));
-    let timedOut = false;
-    const stop = (signal: NodeJS.Signals) => {
-      if (group && subprocess.pid) killGroup(subprocess.pid, signal);
-    };
-    const timer = group
-      ? setTimeout(() => {
-          timedOut = true;
-          stop("SIGTERM");
-          setTimeout(() => stop("SIGKILL"), 3_000).unref();
-        }, limit)
-      : undefined;
-    subprocess.on("exit", () => stop("SIGKILL"));
-    const forward = (signal: NodeJS.Signals) => {
-      stop(signal);
-      release();
-      process.kill(process.pid, signal);
-    };
-    const release = () => {
-      process.off("SIGINT", forward);
-      process.off("SIGTERM", forward);
-    };
-    if (group) {
-      process.once("SIGINT", forward);
-      process.once("SIGTERM", forward);
-    }
-    const result = await subprocess.finally(release);
-    if (timer) clearTimeout(timer);
-    if (timedOut) {
+    const supervised = superviseGroup(subprocess, limit, group);
+    const result = await subprocess.finally(supervised.release);
+    if (supervised.timedOut()) {
       return {
         exitCode: -1,
         output: result.all ?? "",
@@ -100,14 +76,8 @@ export async function runScript(
       stdout: typeof result.stdout === "string" ? result.stdout : "",
     };
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await dropScratch(dir);
   }
-}
-
-function killGroup(pid: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-pid, signal);
-  } catch {}
 }
 
 async function isFile(path: string): Promise<boolean> {
