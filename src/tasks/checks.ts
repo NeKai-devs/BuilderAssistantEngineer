@@ -57,6 +57,20 @@ const RELEASING: Record<string, string[]> = {
   flutter: ["pub"],
 };
 const WRAPPERS = new Set(["timeout", "nice", "xvfb-run", "nohup", "time"]);
+const INLINE: Record<string, RegExp> = {
+  node: /^(-[A-Za-z]*[ep]|--eval|--print)(=|$)/,
+  bun: /^(-e|--eval|-p|--print)(=|$)/,
+  tsx: /^(-e|--eval|-p|--print)(=|$)/,
+  deno: /^eval$/,
+  python: /^-[A-Za-z]*c/,
+  python3: /^-[A-Za-z]*c/,
+  py: /^-[A-Za-z]*c/,
+  ruby: /^-[A-Za-z]*e/,
+  perl: /^-[A-Za-z]*[eE]/,
+  php: /^-[A-Za-z]*r/,
+};
+const UPLOAD = /^-[A-Za-z]*[dFT]|^--(data|data-[a-z]+|form|form-string|upload-file|json)(=|$)/;
+const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])$/i;
 const VENV_TOOL = /^(\.\/)?\.?venv\/(bin|Scripts)\/[^/\\]+$/;
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const HEADERS = new Set(["for", "case", "select", "in"]);
@@ -112,7 +126,12 @@ function listed(command: SimpleCommand, allow: string[]): boolean {
   const words = [...command.words];
   while (ASSIGNMENT.test(words[0] ?? "") && words.length > 1) words.shift();
   const bare = words.join(" ");
-  return allow.some((prefix) => command.text.startsWith(prefix) || bare.startsWith(prefix));
+  const { name, args } = unwrap(program(command));
+  const inner = [name, ...args].join(" ");
+  return allow.some(
+    (prefix) =>
+      command.text.startsWith(prefix) || bare.startsWith(prefix) || inner.startsWith(prefix),
+  );
 }
 
 function masksWithOperators(line: string): boolean {
@@ -181,7 +200,9 @@ function allowed(command: SimpleCommand, downloads: boolean, jobs: Set<string>):
   if (base === "kill") return killsOwnJob(args, jobs);
   if (base === "trap") return stopsOwnJob(args, jobs);
   if (base === "git") return GIT_READ.has(args[0] ?? "");
-  if (base === "curl" || base === "jq") return true;
+  if (runsInline(base, args)) return false;
+  if (base === "curl") return !args.some((arg) => UPLOAD.test(arg)) || urls(args).every(local);
+  if (base === "jq") return true;
   if (
     !TRIVIAL.has(base) &&
     name.includes("/") &&
@@ -192,6 +213,28 @@ function allowed(command: SimpleCommand, downloads: boolean, jobs: Set<string>):
     return false;
   }
   return RUNNERS.has(base) || CHECKS.has(base) || HELPERS.has(base);
+}
+
+function runsInline(base: string, args: string[]): boolean {
+  const pattern = INLINE[base];
+  if (!pattern) return false;
+  const options = base === "deno" ? args.slice(0, 1) : args.slice(0, firstOperand(args));
+  return options.some((arg) => pattern.test(arg));
+}
+
+function firstOperand(args: string[]): number {
+  const index = args.findIndex((arg) => !arg.startsWith("-"));
+  return index === -1 ? args.length : index;
+}
+
+function urls(args: string[]): string[] {
+  return args.filter((arg) => /^[a-z]+:\/\//i.test(arg) || /^[\w.-]+(:\d+)?\//.test(arg));
+}
+
+function local(url: string): boolean {
+  const host = url.replace(/^[a-z]+:\/\//i, "").split(/[/?#]/)[0] ?? "";
+  const name = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+  return LOOPBACK.test(name ?? "");
 }
 
 function jobVariables(lines: string[]): Set<string> {

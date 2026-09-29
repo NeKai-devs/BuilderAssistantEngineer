@@ -46,6 +46,7 @@ async function greenfield(command: string, lint: string): Promise<string> {
     lang: "en",
     commands: { lint },
     gates: { regression: "full" },
+    verify: { allow: ["node -e"] },
   });
   await gitCommitAll(cwd, "plan");
   return cwd;

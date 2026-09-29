@@ -54,6 +54,7 @@ async function repo(command: string, options: RepoOptions = {}) {
     digest: { maxChars: 20_000 },
     commands: options.commands ?? {},
     gates: { regression: options.regression ?? "full" },
+    verify: { allow: ["node -e"] },
   });
   if (options.git !== false) await gitCommitAll(cwd, "plan");
   return cwd;

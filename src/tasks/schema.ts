@@ -55,7 +55,7 @@ const TRIVIALITY: Record<string, string> = {
 };
 
 const UNATTENDED =
-  "runs a command that bae does not run when nobody confirms it; use a known runner or check (package managers, language toolchains and the repository's .venv, test runners, linters, make, read-only git, test, grep, diff, curl, jq), run project scripts with `sh script.sh` or `node script.js` rather than by path, and avoid `$( )`, `eval` and nested shells";
+  "runs a command that bae does not run when nobody confirms it; use a known runner or check (package managers, language toolchains and the repository's .venv, test runners, linters, make, read-only git, test, grep, diff, curl, jq), run project scripts with `sh script.sh` or `node script.js` rather than by path, send data with curl only to a local server, and avoid inline code (`node -e`, `python -c`), `$( )`, `eval` and nested shells";
 
 const COMMAND_BLOCK = /```(?:sh|bash|shell|console)[^\n]*\n([\s\S]*?)```/g;
 

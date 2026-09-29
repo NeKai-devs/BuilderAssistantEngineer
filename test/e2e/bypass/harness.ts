@@ -11,6 +11,7 @@ import { type TaskOptions, taskFile } from "../../plan-sample.js";
 
 export const TASK = "docs/plan/tasks/T-001-first.md";
 export const PASS = 'node -e "process.exit(0)"';
+export const INLINE_CHECKS = "node -e";
 export const REVIEW_PASS: Step = () => '{"verdict": "pass", "findings": []}';
 export const BREAKS_WITH = (file: string) =>
   `node -e "process.exit(require('fs').existsSync('${file}') ? 1 : 0)"`;
@@ -48,6 +49,7 @@ export async function bypassRepo(options: RepoOptions = {}): Promise<string> {
     commands: {},
     gates: { regression: "full" },
     ...options.config,
+    verify: { allow: [INLINE_CHECKS, ...(options.config?.verify?.allow ?? [])] },
   });
   if (options.git !== false) await gitCommitAll(cwd, "plan");
   return cwd;
