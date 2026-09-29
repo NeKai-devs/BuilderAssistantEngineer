@@ -118,6 +118,27 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
+  "trust.title": "Comandos que este repositorio hace ejecutar a bae",
+  "trust.suite": "Comandos del proyecto, antes y después de cada tarea:",
+  "trust.checks": "Comprobaciones de las tareas (## Verification):",
+  "trust.allowed": "También permitidos sin confirmación (verify.allow en .bae/config.json):",
+  "trust.confirm":
+    "bae todavía no ha ejecutado nada en este repositorio en esta máquina. Ejecutará los comandos de arriba con tus permisos, también con --yes y --headless, que no responden esta pregunta. ¿Confías en ellos?",
+  "trust.changedTitle": "Comandos nuevos o cambiados desde que aprobaste este repositorio",
+  "trust.confirmChanged":
+    "Estos comandos son nuevos o cambiaron desde la última vez que aprobaste los comandos de este repositorio, por ejemplo tras un pull o un replan. bae los ejecutará con tus permisos, también con --yes y --headless, que no responden esta pregunta. ¿Confías en ellos?",
+  "trust.agentLoads":
+    "El agente también cargará esto del repositorio al arrancar (bae no lo ejecuta; revísalo antes de seguir):",
+  "trust.declined":
+    "No se ejecutó nada. Revisa .bae/config.json y los bloques ## Verification de docs/plan/tasks, y vuelve a ejecutar {{command}}.",
+  "trust.noTerminal":
+    "Antes de que bae ejecute por primera vez los comandos de este repositorio, una persona debe aprobarlos, y no hay terminal donde preguntar. Ejecuta {{command}} una vez en una terminal para aprobarlos.",
+  "next.noChanges":
+    "El agente no cambió ningún archivo para {{id}}, así que bae no ejecutó sus comprobaciones.",
+  "next.stopped":
+    "{{reason}}\n{{id}} sigue en curso, y esta ejecución no cuenta como uno de sus intentos. Corrige la causa y vuelve a ejecutar {{command}}.",
+  "next.stoppedTitle": "Parada antes de las comprobaciones (no cuenta como intento)",
+  "next.nothingRun": "No se ejecutó nada. Corrige la causa y vuelve a ejecutar {{command}}.",
   "next.blocked":
     "{{id}} queda bloqueada: {{reason}} Logs: {{path}}. Para reintentar, corrige la causa, pon `status: pending` en {{task}} y corre {{command}}.",
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
@@ -134,6 +155,10 @@ export const es: Messages = {
     "{{count}} tarea(s) aún tienen una Verification que la CLI no acepta: {{ids}}. Se escriben con status needs_review, y next no las correrá hasta que se corrijan.",
   "plan.needsReview":
     "{{count}} tarea(s) necesitan revisión antes de que next pueda correrlas: {{ids}}. El review_note de cada archivo dice qué corregir en su Verification; luego pon su status en pending.",
+  "verification.commandsRetrying":
+    "Algunos comandos del proyecto en el plan son de los que bae no ejecuta sin que alguien los confirme; se pide al analista que corrija solo esos:\n{{notes}}",
+  "verification.commandsKept":
+    "Estos comandos del proyecto se quedan en .bae/config.json, pero next --headless y next --yes los rechazarán hasta que los cambies o añadas su comienzo a verify.allow en .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} tarea(s) tienen una Verification que la CLI no acepta: {{kinds}}. Se le pide al analista que corrija solo esas. Detalles en {{report}}.",
   "verification.fixing": "El analista está corrigiendo la Verification de esas tareas",
@@ -183,6 +208,8 @@ export const es: Messages = {
   "backend.timedOut":
     "`{{command}}` no terminó en {{minutes}} minutos y se detuvo (agent.timeoutMinutes en .bae/config.json).",
   "backend.failed": "`{{command}}` terminó con código {{code}}:\n{{details}}",
+  "backend.sessionFailed":
+    "`{{command}}` terminó con código {{code}} antes de acabar la tarea (por ejemplo, se respondió No a la pregunta de confianza en la carpeta, la CLI no tiene sesión iniciada o falló), así que bae no ejecutó ninguna comprobación.",
   "backend.apiNotConfigured":
     "El backend api necesita ANTHROPIC_API_KEY, u OPENAI_BASE_URL/OPENAI_API_KEY para un endpoint compatible con OpenAI.",
   "backend.apiModelRequired": "Define BAE_MODEL con el modelo a usar en {{baseUrl}}.",
@@ -248,6 +275,7 @@ export const es: Messages = {
   "lesson.skipped": "Regla no añadida; queda en {{path}}.",
   "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
   "status.blockedReason": "{{id}} está bloqueada: {{reason}}",
+  "status.stoppedReason": "{{id}} se detuvo: {{reason}}",
   "status.metrics": "Métricas locales",
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
@@ -278,6 +306,8 @@ export const es: Messages = {
   "contract.scripts": "Cambió {{detail}}, que los chequeos ejecutan.",
   "contract.runner": "Cambió la configuración del runner de tests.",
   "contract.restored": "Restaurado.",
+  "contract.sealed":
+    "bae solo guarda una huella de este archivo, porque puede contener credenciales, así que no pudo restaurarlo: revísalo y devuélvelo a su estado tú.",
   "contract.removed": "Eliminado.",
   "findings.accepted": "Aceptado con --accept-finding.",
   "findings.acceptedTitle": "Hallazgos aceptados",
@@ -312,7 +342,7 @@ export const es: Messages = {
     "`{{command}}` no encontró un programa que ejecuta (exit 127): faltan las dependencias del proyecto o una herramienta. Otro intento fallaría igual; instálalas (por ejemplo `npm install`).",
   "next.budgetUsed": "La tarea ya usó sus {{max}} intentos automáticos.",
   "next.refusedBlocked":
-    "{{id}} queda bloqueada antes de lanzar el agente, porque sus chequeos no pueden correr. Corrige la Verificación de la tarea o los comandos de .bae/config.json y vuelve a ponerla en pending.",
+    "{{id}} queda bloqueada antes de lanzar el agente, porque sus comprobaciones no pueden ejecutarse; no se ejecutó nada y no cuenta como intento. Corrige su bloque ## Verification o los comandos de .bae/config.json y pon `status: pending` en {{task}}.",
   "capture.lateStop":
     "{{id}} está en curso sin una captura de antes de que corriera su agente, así que sus chequeos no tienen un punto de partida fiable. Vuelve a ponerla en pending, o corre con --allow-skip.",
   "capture.noGit":
@@ -394,6 +424,10 @@ export const es: Messages = {
     "Un commit hecho durante la tarea añade algo que parece una credencial ({{kind}}). Se queda en el historial de git aunque el archivo ya no lo tenga, así que reescribe esos commits.",
   "mechanical.secretFileHistory":
     "Un commit hecho durante la tarea añade un archivo de secretos. Se queda en el historial de git aunque el archivo ya no exista, así que reescribe esos commits.",
+  "regression.notYetCreated":
+    "`{{command}}` todavía no existe (su herramienta o script no está instalado o escrito), así que ahora no se compara; cuando una tarea lo cree, deberá pasar.",
+  "regression.stillAbsent":
+    "`{{command}}` sigue sin existir; la tarea que lo cree deberá hacer que pase.",
   "regression.noTestsYet":
     "`{{command}}` todavía no tiene tests que correr, así que no hay línea base; después de la tarea debe pasar y decir cuántos tests corrieron.",
   "integrity.planned":

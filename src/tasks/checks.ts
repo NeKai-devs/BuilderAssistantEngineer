@@ -57,6 +57,8 @@ const RELEASING: Record<string, string[]> = {
   flutter: ["pub"],
 };
 const WRAPPERS = new Set(["timeout", "nice", "xvfb-run", "nohup", "time"]);
+const VENV_TOOL = /^(\.\/)?\.?venv\/(bin|Scripts)\/[^/\\]+$/;
+const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const HEADERS = new Set(["for", "case", "select", "in"]);
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd"]);
 const SCRIPT_SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
@@ -97,15 +99,20 @@ export function allowlistProblems(lines: string[], allow: string[]): CheckProble
       DOWNLOADERS.has(baseName(program(command).name)),
     );
     const bad = parsed.commands.find(
-      (command) =>
-        !allow.some((prefix) => command.text.startsWith(prefix)) &&
-        !allowed(command, downloads, jobs),
+      (command) => !listed(command, allow) && !allowed(command, downloads, jobs),
     );
     if (!bad) return [];
     const { name } = program(bad);
     const dynamic = DYNAMIC.has(name) || SHELLS.has(name);
     return [{ command: line, reason: dynamic ? ("dynamic" as const) : ("notAllowed" as const) }];
   });
+}
+
+function listed(command: SimpleCommand, allow: string[]): boolean {
+  const words = [...command.words];
+  while (ASSIGNMENT.test(words[0] ?? "") && words.length > 1) words.shift();
+  const bare = words.join(" ");
+  return allow.some((prefix) => command.text.startsWith(prefix) || bare.startsWith(prefix));
 }
 
 function masksWithOperators(line: string): boolean {
@@ -179,7 +186,8 @@ function allowed(command: SimpleCommand, downloads: boolean, jobs: Set<string>):
     !TRIVIAL.has(base) &&
     name.includes("/") &&
     !/(^|\/)node_modules\/\.bin\/|(^|\/)vendor\/bin\//.test(name) &&
-    !/^\.\/(gradlew|mvnw)$/.test(name)
+    !/^\.\/(gradlew|mvnw)$/.test(name) &&
+    !VENV_TOOL.test(name)
   ) {
     return false;
   }

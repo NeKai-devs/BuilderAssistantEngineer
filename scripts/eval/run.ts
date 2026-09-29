@@ -223,8 +223,8 @@ function summary(results: Result[]): string {
     `- Language: ${values.lang}; targets: ${values.targets}`,
     `- analyst.md sha256: ${analystSha}; tool commit: ${toolCommit}; date: ${new Date().toISOString().slice(0, 10)}`,
     "",
-    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Existence claims verified | Questions (blocking) | Continuations | Format retries | Local repairs | Evidence retries | Unverified after retry | Not a plan | Verification fixes | Needs review | Commands | tests: required | Empty Log | Minutes | Cost USD |",
-    `|${" --- |".repeat(23)}`,
+    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Existence claims verified | Questions (blocking) | Continuations | Format retries | Local repairs | Evidence retries | Unverified after retry | Not a plan | Verification fixes | Needs review | Runs unattended | Commands | tests: required | Empty Log | Minutes | Cost USD |",
+    `|${" --- |".repeat(24)}`,
   ];
   return `${[...header, ...results.map(row), totals(results)].join("\n")}\n`;
 }
@@ -250,6 +250,7 @@ function row(result: Result): string {
     String(report.nonPlanAnswers ?? 0),
     String(report.verificationRetries ?? 0),
     String(report.needsReview?.length ?? 0),
+    formatRatio(result.unattended),
     `${result.commands}/4`,
     formatRatio(result.testsRequired),
     formatRatio(result.tasksWithLog),
@@ -283,6 +284,7 @@ function totals(results: Result[]): string {
     String(sum((result) => result.report.nonPlanAnswers ?? 0)),
     String(sum((result) => result.report.verificationRetries ?? 0)),
     String(sum((result) => result.report.needsReview?.length ?? 0)),
+    formatRatio(sumRatios(results.map((result) => result.unattended))),
     `${sum((result) => result.commands)}/${results.length * 4}`,
     formatRatio(sumRatios(results.map((result) => result.testsRequired))),
     formatRatio(sumRatios(results.map((result) => result.tasksWithLog))),

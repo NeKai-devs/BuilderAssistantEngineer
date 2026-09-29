@@ -1,7 +1,7 @@
 import pc from "picocolors";
 import { t } from "../i18n/index.js";
 import { branchExists, currentBranch, readRun, runCommits } from "../next/branch.js";
-import { blockedReason } from "../tasks/attempts.js";
+import { blockedReason, lastStop } from "../tasks/attempts.js";
 import { type LoadedTask, loadTaskFiles } from "../tasks/load.js";
 import { formatDuration, type RunMetrics, readMetrics } from "../tasks/metrics.js";
 import type { Task, TaskStatus } from "../tasks/schema.js";
@@ -38,8 +38,19 @@ export async function runStatus(ctx: CommandContext): Promise<void> {
       ),
     ),
   );
+  const stopped = await stopReasons(ctx.cwd, loaded);
   const run = await runSection(ctx.cwd);
-  ctx.print(`${[run, renderStatus(loaded, metrics, reasons)].filter(Boolean).join("\n\n")}\n`);
+  ctx.print(
+    `${[run, renderStatus(loaded, metrics, reasons, stopped)].filter(Boolean).join("\n\n")}\n`,
+  );
+}
+
+async function stopReasons(cwd: string, loaded: LoadedTask[]): Promise<Map<string, string>> {
+  const running = loaded.filter((item) => item.task?.meta.status === "in_progress");
+  const stops = await Promise.all(
+    running.map(async (item) => [item.id, (await lastStop(cwd, item.id))?.reason ?? ""] as const),
+  );
+  return new Map(stops.filter(([, reason]) => reason !== ""));
 }
 
 async function runSection(cwd: string): Promise<string> {
@@ -61,6 +72,7 @@ export function renderStatus(
   loaded: LoadedTask[],
   metrics?: RunMetrics,
   reasons: Map<string, string> = new Map(),
+  stopped: Map<string, string> = new Map(),
 ): string {
   const tasks = loaded.flatMap((item) => (item.task ? [item.task] : []));
   const phases = [...new Set(orderTasks(tasks).map((task) => task.meta.phase))];
@@ -76,6 +88,9 @@ export function renderStatus(
   const why = [...reasons]
     .filter(([, reason]) => reason !== "")
     .map(([id, reason]) => `${SYMBOLS.blocked} ${t("status.blockedReason", { id, reason })}`);
+  const halted = [...stopped].map(
+    ([id, reason]) => `${SYMBOLS.in_progress} ${t("status.stoppedReason", { id, reason })}`,
+  );
   const review = tasks
     .filter((task) => task.meta.status === "needs_review")
     .map(
@@ -85,6 +100,7 @@ export function renderStatus(
   return [
     ...blocks,
     ...(why.length > 0 ? [why.join("\n")] : []),
+    ...(halted.length > 0 ? [halted.join("\n")] : []),
     ...(review.length > 0 ? [review.join("\n")] : []),
     ...(invalid.length > 0 ? [invalid.join("\n")] : []),
     summary(tasks),

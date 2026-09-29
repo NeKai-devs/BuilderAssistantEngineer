@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runFile, writeFiles } from "../../helpers.js";
 import { taskFile } from "../../plan-sample.js";
-import { attempts, bypassRepo, FAIL, next, PASS, read, statusOf, TASK } from "./harness.js";
+import { attempts, bypassRepo, FAIL, next, PASS, read, statusOf, stops, TASK } from "./harness.js";
 
 describe("bypass 11: a task that can never pass does not hold the plan hostage", () => {
   it("blocks a task whose checks are refused before launching the agent, then moves on", async () => {
@@ -13,7 +13,8 @@ describe("bypass 11: a task that can never pass does not hold the plan hostage",
     expect(refused.code).toBe(1);
     expect(refused.calls).toHaveLength(0);
     expect(await statusOf(cwd)).toBe("blocked");
-    expect((await attempts(cwd))[0]).toMatchObject({ outcome: "blocked", stage: "refused" });
+    expect(await attempts(cwd)).toEqual([]);
+    expect(await stops(cwd)).toMatchObject([{ stage: "refused" }]);
     const following = await next(cwd, ["--yes", "--dry-run"], []);
     expect(following.log).toContain("T-002 · Do T-002");
     const printed: string[] = [];

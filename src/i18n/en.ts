@@ -114,6 +114,26 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
+  "trust.title": "Commands this repository makes bae run",
+  "trust.suite": "Project commands, before and after every task:",
+  "trust.checks": "Task checks (## Verification):",
+  "trust.allowed": "Also allowed when nobody confirms (verify.allow in .bae/config.json):",
+  "trust.confirm":
+    "bae has not run anything in this repository on this machine yet. It will run the commands above with your permissions, also under --yes and --headless, which do not answer this question. Do you trust them?",
+  "trust.changedTitle": "Commands that are new or changed since you approved this repository",
+  "trust.confirmChanged":
+    "These commands are new or changed since you last approved this repository's commands, for example after a pull or a replan. bae will run them with your permissions, also under --yes and --headless, which do not answer this question. Do you trust them?",
+  "trust.agentLoads":
+    "The agent will also load these from the repository when it starts (bae does not run them itself; check them before you go on):",
+  "trust.declined":
+    "Nothing was run. Read .bae/config.json and the ## Verification blocks in docs/plan/tasks, then run {{command}} again.",
+  "trust.noTerminal":
+    "Before bae runs this repository's commands for the first time, a person must approve them, and there is no terminal to ask in. Run {{command}} once in a terminal to approve them.",
+  "next.noChanges": "The agent changed no files for {{id}}, so bae did not run its checks.",
+  "next.stopped":
+    "{{reason}}\n{{id}} stays in progress, and this run does not count as one of its attempts. Fix the cause and run {{command}} again.",
+  "next.stoppedTitle": "Stopped before the checks (not counted as an attempt)",
+  "next.nothingRun": "Nothing was run. Fix the cause and run {{command}} again.",
   "next.blocked":
     "{{id}} is blocked: {{reason}} Logs: {{path}}. To try again, fix the cause, set `status: pending` in {{task}} and run {{command}}.",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
@@ -160,6 +180,8 @@ export const en = {
   "backend.timedOut":
     "`{{command}}` did not finish within {{minutes}} minutes and was stopped (agent.timeoutMinutes in .bae/config.json).",
   "backend.failed": "`{{command}}` exited with code {{code}}:\n{{details}}",
+  "backend.sessionFailed":
+    "`{{command}}` exited with code {{code}} before the task was finished (for example the folder-trust question was answered No, the CLI is logged out, or it crashed), so bae ran no checks.",
   "backend.apiNotConfigured":
     "The api backend needs ANTHROPIC_API_KEY, or OPENAI_BASE_URL/OPENAI_API_KEY for an OpenAI-compatible endpoint.",
   "backend.apiModelRequired": "Set BAE_MODEL to the model to use with {{baseUrl}}.",
@@ -224,6 +246,7 @@ export const en = {
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
   "status.blockedReason": "{{id}} is blocked: {{reason}}",
+  "status.stoppedReason": "{{id}} stopped: {{reason}}",
   "opencode.model": "opencode will use {{model}} (from {{source}}).",
   "opencode.weakModel":
     'opencode will use {{model}} (from {{source}}), which looks like a free or small model. A plan needs a strong model: pass --backend claude, or set a stronger "model" in opencode.json.',
@@ -235,6 +258,10 @@ export const en = {
     "{{count}} task(s) still have a Verification the CLI cannot accept: {{ids}}. They are written with status needs_review, and next will not run them until they are fixed.",
   "plan.needsReview":
     "{{count}} task(s) need review before next can run them: {{ids}}. Each file's review_note says what to fix in its Verification; then set its status to pending.",
+  "verification.commandsRetrying":
+    "Some project commands in the plan are ones bae does not run when nobody confirms them; asking the analyst to fix only those:\n{{notes}}",
+  "verification.commandsKept":
+    "These project commands stay in .bae/config.json, but next --headless and next --yes will refuse them until you change them or add their first words to verify.allow in .bae/config.json:\n{{notes}}",
   "verification.retrying":
     "{{count}} task(s) have a Verification the CLI cannot accept: {{kinds}}. Asking the analyst to fix only those. Details in {{report}}.",
   "verification.fixing": "The analyst is fixing the Verification of those tasks",
@@ -271,6 +298,8 @@ export const en = {
   "contract.scripts": "Changed {{detail}}, which the checks run.",
   "contract.runner": "Changed the test runner configuration.",
   "contract.restored": "Restored.",
+  "contract.sealed":
+    "bae keeps only a fingerprint of this file, because it can hold credentials, so it could not restore it: check it and put it back by hand.",
   "contract.removed": "Removed.",
   "findings.accepted": "Accepted with --accept-finding.",
   "findings.acceptedTitle": "Accepted findings",
@@ -304,7 +333,7 @@ export const en = {
     "`{{command}}` could not find a program it runs (exit 127): the project's dependencies are not installed, or a tool is missing. Another attempt would fail the same way; install them (for example `npm install`).",
   "next.budgetUsed": "The task already used its {{max}} automatic attempts.",
   "next.refusedBlocked":
-    "{{id}} is blocked before launching the agent, because its checks cannot run. Fix the task's Verification or the commands in .bae/config.json, then set the task back to pending.",
+    "{{id}} is blocked before launching the agent, because its checks cannot run; nothing was run and it does not count as an attempt. Fix the task's Verification or the commands in .bae/config.json, then set `status: pending` in {{task}}.",
   "capture.lateStop":
     "{{id}} is in progress without a capture from before its agent ran, so its checks have no trustworthy starting point. Set it back to pending, or run with --allow-skip.",
   "capture.noGit": "This is not a git repository, so the review cannot see the task's changes.",
@@ -382,6 +411,10 @@ export const en = {
     "A commit made during the task adds what looks like a credential ({{kind}}). It stays in the git history even if the file no longer has it, so rewrite those commits.",
   "mechanical.secretFileHistory":
     "A commit made during the task adds a secrets file. It stays in the git history even if the file is gone, so rewrite those commits.",
+  "regression.notYetCreated":
+    "`{{command}}` does not exist yet (its tool or script is not installed or written), so it is not compared now; once a task creates it, it must pass.",
+  "regression.stillAbsent":
+    "`{{command}}` still does not exist; the task that creates it must make it pass.",
   "regression.noTestsYet":
     "`{{command}}` has no tests to run yet, so there is no baseline for it; after the task it must pass and say how many tests ran.",
   "integrity.planned":

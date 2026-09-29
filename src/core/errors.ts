@@ -13,3 +13,7 @@ export class ExitCode extends Error {
     super(`exit ${code}`);
   }
 }
+
+export class EnvironmentError extends UserError {
+  override name = "EnvironmentError";
+}

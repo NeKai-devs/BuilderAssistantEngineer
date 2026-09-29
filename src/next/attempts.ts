@@ -1,6 +1,6 @@
 import type { CommandContext } from "../commands/context.js";
 import { CLI, isAgentBackend } from "../commands/shared.js";
-import { UserError } from "../core/errors.js";
+import { EnvironmentError, UserError } from "../core/errors.js";
 import { renderPrompt } from "../core/prompt-loader.js";
 import { displayPath } from "../core/state.js";
 import {
@@ -14,13 +14,16 @@ import { enforceContract } from "../gates/enforce.js";
 import { type Gate, type GateRun, runGate } from "../gates/gate.js";
 import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
+import { taskChanges } from "../review/changes.js";
 import { capturedTask } from "../review/run.js";
 import {
   type Attempt,
   attemptsLeft,
+  type GateStage,
   MAX_ATTEMPTS,
   readAttempts,
   recordAttempt,
+  recordStop,
 } from "../tasks/attempts.js";
 import { MAX_LOG_LINES } from "../tasks/handoff.js";
 import { learnFromFailure } from "../tasks/learn.js";
@@ -33,7 +36,7 @@ import { affectsChecks, agentCommands, briefCommands, ruleHint } from "./permiss
 
 const REVIEW_FAILURES_FOR_LESSON = 2;
 
-type Launched = { ok: true } | { ok: false; reason: string };
+type Launched = { ok: true } | { ok: false; reason: string; environment: boolean };
 
 export async function attemptOnce(
   ctx: CommandContext,
@@ -49,9 +52,17 @@ export async function attemptOnce(
   const launched = await launch(ctx, run, startedAt, false, () =>
     backend.run(prompt, { cwd: ctx.cwd, interactive: true }),
   );
-  if (!launched.ok) return notDone(ctx, capture);
+  if (!launched.ok) {
+    return launched.environment
+      ? stop(ctx, capture, "agent", launched.reason)
+      : notDone(ctx, capture);
+  }
+  if (await changedNothing(ctx, run)) {
+    return stop(ctx, capture, "agent", t("next.noChanges", { id: capture.id }));
+  }
   const result = await gate(ctx, run);
   await writeRunLog(ctx.cwd, capture.id, result.report);
+  if (result.environment) return stop(ctx, capture, result.stage ?? "agent", result.environment);
   const outcome = result.passed ? "done" : result.stage === "refused" ? "blocked" : "failed";
   await record(ctx, run, startedAt, false, { outcome, gate: result });
   if (result.passed) return complete(ctx, run);
@@ -100,19 +111,28 @@ export async function headlessLoop(
       left === 0,
     );
     if (!launched.ok) {
+      if (launched.environment) return stop(ctx, capture, "agent", launched.reason);
       return left === 0 ? block(ctx, capture, launched.reason) : notDone(ctx, capture);
+    }
+    if (await changedNothing(ctx, run)) {
+      const reason = t("next.noChanges", { id: capture.id });
+      ctx.prompter.warn(reason);
+      await record(ctx, run, startedAt, true, {
+        outcome: left === 0 ? "blocked" : "failed",
+        stage: "agent",
+        reason,
+      });
+      return left === 0 ? block(ctx, capture, reason) : notDone(ctx, capture);
     }
     const result = await gate(ctx, run);
     await writeRunLog(ctx.cwd, capture.id, `# Attempt ${attempt}\n\n${result.report}`);
     const cause = result.passed ? undefined : environmentCause(backend.name, denied, result);
+    if (cause) return stop(ctx, capture, result.stage ?? "agent", cause);
     const blocked =
-      !result.passed &&
-      (cause !== undefined || result.stage === "refused" || (result.retryable && left === 0));
+      !result.passed && (result.stage === "refused" || (result.retryable && left === 0));
     const outcome = result.passed ? "done" : blocked ? "blocked" : "failed";
-    const recorded = cause ? { ...result, reason: cause } : result;
-    await record(ctx, run, startedAt, true, { outcome, gate: recorded });
+    await record(ctx, run, startedAt, true, { outcome, gate: result });
     if (result.passed) return complete(ctx, run);
-    if (cause) return block(ctx, capture, cause, false);
     if (blocked) return block(ctx, capture, result.reason ?? "");
     if (!result.retryable) return notDone(ctx, capture);
     await learnFromReviews(ctx, capture, result);
@@ -159,11 +179,23 @@ async function launch(
   await enforceContract(ctx, run.capture, run.acceptance);
   await clearActive(ctx.cwd);
   const reason = failure instanceof Error ? failure.message : String(failure);
-  const outcome = final ? "blocked" : "failed";
-  await record(ctx, run, startedAt, headless, { outcome, stage: "agent", reason });
+  const environment = failure instanceof EnvironmentError;
+  if (!environment) {
+    const outcome = final ? "blocked" : "failed";
+    await record(ctx, run, startedAt, headless, { outcome, stage: "agent", reason });
+  }
   if (!(failure instanceof UserError)) throw failure;
-  ctx.prompter.warn(reason);
-  return { ok: false, reason };
+  if (!environment) ctx.prompter.warn(reason);
+  return { ok: false, reason, environment };
+}
+
+async function changedNothing(ctx: CommandContext, run: GateRun): Promise<boolean> {
+  const view = await taskChanges(ctx.cwd, run.capture);
+  if (!view.ok || view.changes.files.length > 0 || view.late.length > 0) return false;
+  run.tampered.splice(0);
+  await enforceContract(ctx, run.capture, run.acceptance);
+  await clearActive(ctx.cwd);
+  return true;
 }
 
 async function gate(ctx: CommandContext, run: GateRun): Promise<Gate> {
@@ -203,14 +235,9 @@ async function record(
   });
 }
 
-async function block(
-  ctx: CommandContext,
-  capture: Capture,
-  reason: string,
-  learn = true,
-): Promise<boolean> {
+async function block(ctx: CommandContext, capture: Capture, reason: string): Promise<boolean> {
   await setTaskStatus(ctx.cwd, capturedTask(capture), "blocked");
-  if (learn) await learnFromFailure(ctx, capture, "blocked");
+  await learnFromFailure(ctx, capture, "blocked");
   const path = displayPath(runDir(ctx.cwd, capture.id));
   const task = capture.path;
   ctx.prompter.outro(
@@ -221,6 +248,18 @@ async function block(
 
 function notDone(ctx: CommandContext, capture: Capture): boolean {
   ctx.prompter.outro(t("next.notDone", { id: capture.id, command: `${CLI} next` }));
+  return false;
+}
+
+async function stop(
+  ctx: CommandContext,
+  capture: Capture,
+  stage: GateStage,
+  reason: string,
+): Promise<boolean> {
+  await recordStop(ctx.cwd, capture.id, { at: new Date().toISOString(), stage, reason });
+  await writeRunLog(ctx.cwd, capture.id, `# ${t("next.stoppedTitle")}\n\n${reason}`);
+  ctx.prompter.outro(t("next.stopped", { id: capture.id, reason, command: `${CLI} next` }));
   return false;
 }
 

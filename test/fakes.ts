@@ -1,5 +1,6 @@
 import type { Backend, RunOptions } from "../src/backends/types.js";
 import type { Backend as BackendName } from "../src/config/schema.js";
+import { t } from "../src/i18n/index.js";
 import type { Prompter } from "../src/ui/prompter.js";
 
 export function fakePrompter(answers: unknown[]) {
@@ -63,4 +64,14 @@ export function scriptedBackend(steps: Step[], name: BackendName = "claude") {
     },
   };
   return { backend, calls };
+}
+
+export function trusting(prompter: Prompter): Prompter {
+  return {
+    ...prompter,
+    confirm: async (message, initial) =>
+      message === t("trust.confirm") || message === t("trust.confirmChanged")
+        ? true
+        : prompter.confirm(message, initial),
+  };
 }

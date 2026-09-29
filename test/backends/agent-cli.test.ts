@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AGENT_SPECS, type ProcessRunner } from "../../src/backends/agent-cli.js";
 import { createBackend } from "../../src/backends/index.js";
+import { EnvironmentError } from "../../src/core/errors.js";
 import type { CommandResult } from "../../src/core/process.js";
 import { tempDir, writeFiles } from "../helpers.js";
 
@@ -55,6 +56,8 @@ describe("agent CLI backends", () => {
           "Read,Grep,Glob",
           "--setting-sources",
           "user",
+          "--strict-mcp-config",
+          "--disable-slash-commands",
         ],
         input: "PROMPT",
         mode: "run",
@@ -224,5 +227,53 @@ describe("agent CLI backends", () => {
     await expect(createBackend("claude", { runner: failing }).run("P", { cwd })).rejects.toThrow(
       /code 2:\nauth required/,
     );
+  });
+
+  it("treats a failed agent CLI as an environment problem, but not a timeout", async () => {
+    const cwd = await tempDir();
+    const session = fakeRunner({ exitCode: 1 }).runner;
+    const opened = createBackend("claude", { runner: session }).run("TASK", {
+      cwd,
+      interactive: true,
+    });
+    await expect(opened).rejects.toBeInstanceOf(EnvironmentError);
+    await expect(opened).rejects.toThrow(
+      "`claude` exited with code 1 before the task was finished",
+    );
+    const exited = fakeRunner({ exitCode: 0 }).runner;
+    await expect(
+      createBackend("claude", { runner: exited }).run("TASK", { cwd, interactive: true }),
+    ).resolves.toBe("");
+    const loggedOut = fakeRunner({ exitCode: 1, stderr: "Invalid API key" }).runner;
+    await expect(
+      createBackend("claude", { runner: loggedOut }).run("P", { cwd }),
+    ).rejects.toBeInstanceOf(EnvironmentError);
+    const missing = fakeRunner({ notFound: true, exitCode: -1 }).runner;
+    await expect(
+      createBackend("opencode", { runner: missing }).run("P", { cwd, interactive: true }),
+    ).rejects.toBeInstanceOf(EnvironmentError);
+    const slow = fakeRunner({ exitCode: -1, timedOut: true }).runner;
+    const timedOut = createBackend("claude", { runner: slow }).run("P", { cwd, timeoutMs: 60_000 });
+    await expect(timedOut).rejects.toThrow("did not finish within 1 minutes");
+    await expect(timedOut).rejects.not.toBeInstanceOf(EnvironmentError);
+  });
+
+  it("says whether the agent CLI is installed", async () => {
+    const backend = createBackend("claude");
+    expect(typeof (await backend.available?.())).toBe("boolean");
+    expect(createBackend("manual").available).toBeUndefined();
+  });
+
+  it("gives the read-only analyst and reviewer none of the user's MCP connectors or skills (audit A8)", async () => {
+    const cwd = await tempDir();
+    const read = fakeRunner();
+    await createBackend("claude", { runner: read.runner }).run("P", { cwd, access: "read" });
+    expect(read.calls[0]?.args).toEqual(
+      expect.arrayContaining(["--strict-mcp-config", "--disable-slash-commands"]),
+    );
+    expect(read.calls[0]?.args).not.toContain("--mcp-config");
+    const edit = fakeRunner();
+    await createBackend("claude", { runner: edit.runner }).run("P", { cwd, access: "edit" });
+    expect(edit.calls[0]?.args).not.toContain("--strict-mcp-config");
   });
 });

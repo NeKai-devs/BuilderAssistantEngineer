@@ -18,7 +18,14 @@ import { t } from "../i18n/index.js";
 import { setFrontmatterFields } from "../tasks/frontmatter.js";
 import { findTruncation, mergeContinuation } from "./continuation.js";
 import { describeUnverified, findUnverified, type Unverified } from "./evidence.js";
-import { type ParsedPlan, PLAN_FORMAT, parseFileBlocks, parsePlan, renderPlan } from "./parser.js";
+import {
+  type ParsedPlan,
+  PLAN_FORMAT,
+  parseConfigBlock,
+  parseFileBlocks,
+  parsePlan,
+  renderPlan,
+} from "./parser.js";
 import { repairPlan } from "./repair.js";
 import {
   newPlanStats,
@@ -69,8 +76,9 @@ export async function generatePlan(
   const requireReviewer = config.targets.some(
     (target) => target === "claude-code" || target === "opencode",
   );
+  const allow = config.verify.allow;
   const parse: Parse = (text) =>
-    parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer });
+    parsePlan(text, { knownTaskIds: request.knownTaskIds, requireReviewer, allow });
   try {
     const parsed = await requestPlan(ctx, backend, parse, prompt, stats);
     const checked = await checkEvidence(ctx, backend, parsed, parse, stats, config.mode);
@@ -141,24 +149,34 @@ async function reviewVerification(
   parse: Parse,
   stats: PlanStats,
 ): Promise<ParsedPlan> {
-  if (plan.reviews.length === 0) return plan;
+  if (plan.reviews.length === 0 && plan.configNotes.length === 0) return plan;
   stats.verificationRetries++;
-  ctx.prompter.warn(
-    t("verification.retrying", {
-      count: plan.reviews.length,
-      kinds: describeReviews(plan.reviews),
-      report: shown(ctx.cwd, join(baePaths(ctx.cwd).tmp, PLAN_REPORT)),
-    }),
-  );
+  if (plan.reviews.length > 0) {
+    ctx.prompter.warn(
+      t("verification.retrying", {
+        count: plan.reviews.length,
+        kinds: describeReviews(plan.reviews),
+        report: shown(ctx.cwd, join(baePaths(ctx.cwd).tmp, PLAN_REPORT)),
+      }),
+    );
+  }
+  if (plan.configNotes.length > 0) {
+    ctx.prompter.warn(t("verification.commandsRetrying", { notes: plan.configNotes.join("\n") }));
+  }
   const fixed = await ctx.prompter.spinner(t("verification.fixing"), () =>
     fixVerification(ctx, backend, plan, parse, stats),
   );
   const current = fixed ?? plan;
-  if (current.reviews.length === 0) {
-    ctx.prompter.success(t("verification.fixed"));
-    return current;
+  const kept =
+    current.configNotes.length > 0
+      ? [t("verification.commandsKept", { notes: current.configNotes.join("\n") })]
+      : [];
+  const checked = { ...current, warnings: [...current.warnings, ...kept] };
+  if (checked.reviews.length === 0) {
+    if (kept.length === 0) ctx.prompter.success(t("verification.fixed"));
+    return checked;
   }
-  return markForReview(ctx, current, parse, stats);
+  return markForReview(ctx, checked, parse, stats);
 }
 
 async function fixVerification(
@@ -169,14 +187,21 @@ async function fixVerification(
   stats: PlanStats,
 ): Promise<ParsedPlan | undefined> {
   const paths = new Set(plan.reviews.map((review) => review.path));
+  const config =
+    plan.configNotes.length > 0
+      ? [`<<<CONFIG>>>\n${JSON.stringify({ commands: plan.commands })}\n<<<END CONFIG>>>`]
+      : [];
   const prompt = renderPrompt(await loadPrompt("fix-verification", ctx.cwd), {
-    problems: plan.reviews
-      .flatMap((review) => review.notes.map((note) => `- ${review.path}: ${note}`))
-      .join("\n"),
-    files: plan.files
-      .filter((file) => paths.has(file.path))
-      .map((file) => `<<<FILE: ${file.path}>>>\n${file.content.trimEnd()}\n<<<END FILE>>>`)
-      .join("\n\n"),
+    problems: [
+      ...plan.reviews.flatMap((review) => review.notes.map((note) => `- ${review.path}: ${note}`)),
+      ...plan.configNotes.map((note) => `- CONFIG: ${note}`),
+    ].join("\n"),
+    files: [
+      ...config,
+      ...plan.files
+        .filter((file) => paths.has(file.path))
+        .map((file) => `<<<FILE: ${file.path}>>>\n${file.content.trimEnd()}\n<<<END FILE>>>`),
+    ].join("\n\n"),
   });
   let reply: string;
   try {
@@ -232,15 +257,18 @@ function mergeFiles(
   paths: Set<string>,
   parse: Parse,
 ): ParsedPlan | undefined {
+  const text = repairPlan(reply, undefined).text;
   const replaced = new Map(
-    parseFileBlocks(repairPlan(reply, undefined).text)
+    parseFileBlocks(text)
       .filter((file) => paths.has(file.path))
       .map((file) => [file.path, file]),
   );
-  if (replaced.size === 0) return undefined;
+  const commands = parseConfigBlock(text);
+  if (replaced.size === 0 && !commands) return undefined;
   const files = plan.files.map((file) => replaced.get(file.path) ?? file);
   try {
-    return { ...parse(renderPlan({ ...plan, files })), warnings: plan.warnings };
+    const merged = { ...plan, files, commands: commands ?? plan.commands };
+    return { ...parse(renderPlan(merged)), warnings: plan.warnings };
   } catch (error) {
     if (error instanceof FormatError) return undefined;
     throw error;

@@ -50,6 +50,7 @@ export async function enforceContract(
 ): Promise<Enforced> {
   const changes = await checkContract(ctx.cwd, {
     protected: capture.protected,
+    sealed: capture.sealed,
     shadows: capture.shadows,
     ignore: capture.ignore,
     taskPath: capture.path,
@@ -167,7 +168,9 @@ function settled(change: ContractChange, finding: ReviewFinding): ReviewFinding 
   const done =
     finding.severity !== "blocker"
       ? t("findings.accepted")
-      : t(change.change === "created" ? "contract.removed" : "contract.restored");
+      : change.sealed
+        ? t("contract.sealed")
+        : t(change.change === "created" ? "contract.removed" : "contract.restored");
   return { ...finding, message: `${finding.message} ${done}` };
 }
 

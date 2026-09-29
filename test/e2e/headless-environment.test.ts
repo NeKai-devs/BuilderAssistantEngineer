@@ -13,7 +13,9 @@ import {
   next,
   PASS,
   REVIEW_PASS,
+  read,
   statusOf,
+  stops,
   TASK,
 } from "./bypass/harness.js";
 
@@ -81,19 +83,19 @@ describe("next --headless and the agent's environment", () => {
     expect(run.calls[0]?.prompt).not.toContain("This run is unattended");
   });
 
-  it("blocks at once, naming the command, when the agent was denied a command it needed", async () => {
+  it("stops at once, naming the command, when the agent was denied a command it needed, without counting an attempt", async () => {
     const cwd = await bypassRepo({ task: { command: FAIL } });
     const run = await next(cwd, HEADLESS, [deniedWork(cwd, ["npm --version", "npx biome init"])]);
     expect(run.code).toBe(1);
     expect(run.calls).toHaveLength(1);
-    expect(await statusOf(cwd)).toBe("blocked");
+    expect(await statusOf(cwd)).toBe("in_progress");
     expect(run.log).toContain(
       "claude was not allowed to run `npx biome init`, so another attempt would fail the same way.",
     );
     expect(run.log).toContain("a rule such as `Bash(npx biome *)`");
-    const [attempt] = await attempts(cwd);
-    expect(attempt).toMatchObject({ outcome: "blocked", stage: "verification" });
-    expect(attempt.reason).toContain("was not allowed to run `npx biome init`");
+    expect(run.log).toContain("does not count as one of its attempts");
+    expect(await attempts(cwd)).toEqual([]);
+    expect(await stops(cwd)).toMatchObject([{ stage: "verification" }]);
   });
 
   it("names the missing program first when the agent was also denied an install", async () => {
@@ -110,14 +112,16 @@ describe("next --headless and the agent's environment", () => {
     expect(run.log).not.toContain("`npm --version`");
   });
 
-  it("blocks at once when a check cannot find its program", async () => {
+  it("stops at once when a check cannot find its program, without a lesson or an attempt", async () => {
     const cwd = await bypassRepo({ task: { command: 'node -e "process.exit(127)"' } });
     const run = await next(cwd, HEADLESS, [agent(cwd, { "src/feature.ts": "x\n" })]);
     expect(run.code).toBe(1);
     expect(run.calls).toHaveLength(1);
-    expect(await statusOf(cwd)).toBe("blocked");
+    expect(await statusOf(cwd)).toBe("in_progress");
     expect(run.log).toContain("could not find a program it runs (exit 127)");
-    expect(run.log).toContain("set `status: pending`");
+    expect(run.log).toContain("does not count as one of its attempts");
+    expect(await attempts(cwd)).toEqual([]);
+    expect(await read(cwd, "AGENTS.md")).toBe("# Rules\n");
   });
 
   it("retries when the agent was only denied lookups that cannot affect the checks", async () => {
@@ -147,7 +151,7 @@ describe("next --headless and the agent's environment", () => {
     const run = await next(cwd, HEADLESS, [agent(cwd, { "src/feature.ts": "x\n" })]);
     expect(run.code).toBe(1);
     expect(run.calls).toHaveLength(1);
-    expect(await statusOf(cwd)).toBe("blocked");
+    expect(await statusOf(cwd)).toBe("in_progress");
     expect(run.log).toContain("could not find a program it runs (exit 127)");
   });
 });

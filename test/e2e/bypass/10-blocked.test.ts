@@ -11,6 +11,7 @@ import {
   next,
   REVIEW_PASS,
   statusOf,
+  stops,
   TASK,
 } from "./harness.js";
 
@@ -72,7 +73,7 @@ describe("bypass 10: blocked cannot be dodged by crashing or restarting", () => 
     expect(run.calls[0]?.options.timeoutMs).toBe(300_000);
   });
 
-  it("records a reviewer that never returns valid JSON as a failed attempt instead of crashing", async () => {
+  it("stops on a reviewer that never returns valid JSON, without crashing or counting an attempt", async () => {
     const cwd = await bypassRepo();
     const run = await next(
       cwd,
@@ -81,8 +82,8 @@ describe("bypass 10: blocked cannot be dodged by crashing or restarting", () => 
     );
     expect(run.code).toBe(1);
     expect(run.log).toContain("The reviewer could not give a verdict");
-    const [only] = await attempts(cwd);
-    expect([only.outcome, only.stage]).toEqual(["failed", "review"]);
+    expect(await attempts(cwd)).toEqual([]);
+    expect(await stops(cwd)).toMatchObject([{ stage: "review" }]);
     expect(await statusOf(cwd)).toBe("in_progress");
   });
 });

@@ -98,7 +98,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (refused || !bash) {
     const reason = refused ?? t("verify.noBash");
     ctx.prompter.warn(reason);
-    return fail("refused", reason, reason, false);
+    return { ...fail("refused", reason, reason, false), ...(bash ? {} : { environment: reason }) };
   }
   const baseline = suiteBaseline(capture);
   const excluded = new Set(baseline?.excluded ?? []);
@@ -211,7 +211,8 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (review.status !== "pass") {
     const reason = review.reason ?? t("review.noVerdict");
     if (!run.allowSkip) {
-      return fail("review", joinSections([...sections, reason]), reason, review.status === "error");
+      const failed = fail("review", joinSections([...sections, reason]), reason, false);
+      return review.status === "error" ? { ...failed, environment: reason } : failed;
     }
     skips.push(`review: ${reason}`);
     ctx.prompter.warn(t("skip.used", { what: reason }));
@@ -284,6 +285,9 @@ async function regressionStage(
   for (const item of check.regressions) ctx.prompter.warn(regressionMessage(item));
   for (const item of check.preexisting) {
     ctx.prompter.info(t("regression.stillFailing", { command: item.command, code: item.exitCode }));
+  }
+  for (const item of check.checks.filter((entry) => entry.verdict === "absent")) {
+    ctx.prompter.info(t("regression.stillAbsent", { command: item.command }));
   }
   if (check.passed) ctx.prompter.success(t("regression.passed"));
   return check;

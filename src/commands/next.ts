@@ -1,3 +1,5 @@
+import { AGENT_SPECS, type AgentName } from "../backends/agent-cli.js";
+import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import type { Capture } from "../gates/capture.js";
@@ -8,6 +10,7 @@ import { t } from "../i18n/index.js";
 import { attemptOnce, headlessLoop, permissionNote } from "../next/attempts.js";
 import { useRunBranch } from "../next/branch.js";
 import { checksFor, recoverInterrupted, start, withSuiteCommands } from "../next/start.js";
+import { requireTrust } from "../next/trust.js";
 import { capturedTask } from "../review/run.js";
 import { MAX_ATTEMPTS, readAttempts, sinceBlocked } from "../tasks/attempts.js";
 import { MAX_LOG_LINES, planContext } from "../tasks/handoff.js";
@@ -46,11 +49,13 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     ctx.prompter.outro(t("next.dryRunDone"));
     return;
   }
-  await useRunBranch(ctx, Boolean(options.newRun));
   const allowSkip = Boolean(options.allowSkip);
   const headless = Boolean(options.headless) && isAgentBackend(config.backend);
   const unattended = headless || Boolean(ctx.flags.yes);
-  const capture = await start(ctx, config, task, { allowSkip, unattended });
+  await preflight(ctx, config.backend);
+  await requireTrust(ctx, config, tasks);
+  const enter = () => useRunBranch(ctx, Boolean(options.newRun));
+  const capture = await start(ctx, config, task, { allowSkip, unattended, enter });
   if (!capture) throw new ExitCode(1);
   const run: GateRun = {
     capture,
@@ -68,6 +73,16 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     ? await headlessLoop(ctx, run, prompt)
     : await attemptOnce(ctx, run, prompt);
   if (!done) throw new ExitCode(1);
+}
+
+async function preflight(ctx: CommandContext, name: Config["backend"]): Promise<void> {
+  if (!isAgentBackend(name)) return;
+  const backend = ctx.createBackend(name);
+  if ((await backend.available?.()) !== false) return;
+  const command = AGENT_SPECS[name as AgentName]?.command ?? name;
+  ctx.prompter.warn(t("backend.notInstalled", { command }));
+  ctx.prompter.outro(t("next.nothingRun", { command: `${CLI} next` }));
+  throw new ExitCode(1);
 }
 
 async function exhaustedTasks(ctx: CommandContext, tasks: Task[]): Promise<Set<string>> {

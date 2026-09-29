@@ -49,10 +49,10 @@ To report a new case, including correct work that the gates stopped, use the [Re
 
 - `if <check>; then …; fi` without an `else` does not fail when the check fails. (medium)
 - The triviality rule accepts checks that cannot fail, such as `test -d src`, `diff f f`, or `grep` on a file the agent writes. (medium)
-- Background jobs (`&`) are refused, so a server cannot be started inside the block. Start it from the test runner instead. (medium)
+- A server may be started in the background (`python3 app.py &`, then `trap 'kill $!' EXIT`), but a check run in the background (`npm test &`) is refused, because its failure would be lost. (low)
 - Lines are judged by their exit code alone. `go test ./... -run Missing` passes with no tests run. (medium)
 - A package script that the same task creates can be a no-op, and a block that calls it passes. The reviewer sees the new script. (medium)
-- Unattended runs refuse `$( )`, `eval`, `docker`, and scripts run by path (`./script.sh`). Use `sh script.sh`, or add a prefix to `verify.allow`. (low)
+- Unattended runs refuse `$( )`, `eval`, `docker`, and scripts run by path (`./script.sh`); tools in the repository's `.venv/bin` or `venv/bin` are accepted when they are known runners. Use `sh script.sh`, or add a prefix to `verify.allow`. `plan` checks the same list and asks the analyst to fix what it would refuse. (low)
 - A block written to cheat, with `trap 'exit 0' ERR` or an early `exit 0`, passes. The block comes from the plan, not from the agent. (low)
 - With `pipefail`, a reader that stops early (`| head`, `| grep -q`) can fail a pipe that would otherwise pass. (low)
 

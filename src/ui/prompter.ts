@@ -12,4 +12,5 @@ export type Prompter = {
   text(message: string, placeholder?: string): Promise<string>;
   confirm(message: string, initial?: boolean): Promise<boolean>;
   spinner<R>(message: string, task: (update: (message: string) => void) => Promise<R>): Promise<R>;
+  canAsk?(): boolean;
 };

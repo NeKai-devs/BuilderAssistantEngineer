@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extractCitations, formatRatio, measurePlan, sumRatios } from "../scripts/eval/metrics.js";
-import { tempDir, writeFiles } from "./helpers.js";
+import { writeConfig } from "../src/config/store.js";
+import { tempDir, testConfig, writeFiles } from "./helpers.js";
 import { taskFile } from "./plan-sample.js";
 
 describe("eval metrics", () => {
@@ -23,6 +24,7 @@ describe("eval metrics", () => {
       "main.go": "package main\n\nfunc main() {}\n",
       "internal/a.go": "x\n",
     });
+    await writeConfig(repo, testConfig());
     const files = [
       {
         path: "AGENTS.md",
@@ -42,6 +44,7 @@ describe("eval metrics", () => {
       claims: { hits: 0, total: 0 },
       testsRequired: { hits: 0, total: 2 },
       tasksWithLog: { hits: 2, total: 2 },
+      unattended: { hits: 1, total: 2 },
     });
   });
 

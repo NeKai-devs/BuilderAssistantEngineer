@@ -37,12 +37,15 @@ export type ContractChange = {
   detail: string;
   restored: string | null;
   fingerprint?: string;
+  sealed?: boolean;
 };
 export type Protected = Record<string, string>;
+export type Sealed = Record<string, string>;
 export type ContractInputs = { suite: string[]; verification: string[]; own: string[] };
 export type Collected = { protected: Protected; shadows: string[] };
 export type ContractState = {
   protected: Protected;
+  sealed?: Sealed;
   shadows: string[];
   ignore: IgnoreSource[];
   taskPath: string;
@@ -107,14 +110,24 @@ export async function collectProtected(
 }
 
 export async function checkContract(cwd: string, state: ContractState): Promise<ContractChange[]> {
-  const captured = state.protected;
+  const sealed = Object.fromEntries(
+    Object.entries(state.sealed ?? {}).filter(([path]) => !Object.hasOwn(state.protected, path)),
+  );
+  const captured = { ...sealed, ...state.protected };
   const changes: ContractChange[] = [];
   for (const [path, before] of Object.entries(captured)) {
     const linked = (await lstat(absolute(cwd, path)).catch(() => undefined))?.isSymbolicLink();
     const after = linked
       ? undefined
       : await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
-    const change = compare(path, kindOf(path, state.taskPath), before, after);
+    const kind = kindOf(path, state.taskPath);
+    if (Object.hasOwn(sealed, path)) {
+      if (after !== undefined && sealHash(after) === before) continue;
+      const change = after === undefined ? "deleted" : "modified";
+      changes.push({ path, kind, change, detail: "", restored: null, sealed: true });
+      continue;
+    }
+    const change = compare(path, kind, before, after);
     if (change) changes.push({ ...change, fingerprint: fingerprint(after) });
   }
   const created = (path: string, kind: ContractKind): ContractChange => ({
@@ -150,7 +163,7 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
 
 export async function restoreContract(cwd: string, changes: ContractChange[]): Promise<void> {
   const failed: string[] = [];
-  for (const change of changes) {
+  for (const change of changes.filter((item) => !item.sealed)) {
     const target = absolute(cwd, change.path);
     try {
       await rm(target, { force: true, recursive: true });
@@ -335,6 +348,10 @@ async function listDir(path: string): Promise<Dirent[]> {
 
 function absolute(cwd: string, path: string): string {
   return join(cwd, ...path.split("/"));
+}
+
+export function sealHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
 }
 
 function fingerprint(text: string | undefined): string {

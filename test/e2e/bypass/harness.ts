@@ -5,7 +5,7 @@ import type { Config } from "../../../src/config/schema.js";
 import { writeConfig } from "../../../src/config/store.js";
 import { splitFrontmatter } from "../../../src/tasks/frontmatter.js";
 import { FAKE_FILES, vitest } from "../../fake-vitest.js";
-import { fakePrompter, type Step, scriptedBackend } from "../../fakes.js";
+import { fakePrompter, type Step, scriptedBackend, trusting } from "../../fakes.js";
 import { gitCommitAll, runFile, tempDir, writeFiles } from "../../helpers.js";
 import { type TaskOptions, taskFile } from "../../plan-sample.js";
 
@@ -69,12 +69,18 @@ export async function handoff(cwd: string, note = "Did the work; no traps.") {
   if (!text.includes(note)) await writeFile(path, `${text.trimEnd()}\n${note}\n`);
 }
 
-export async function next(cwd: string, args: string[], steps: Step[], answers: unknown[] = []) {
+export async function next(
+  cwd: string,
+  args: string[],
+  steps: Step[],
+  answers: unknown[] = [],
+  trusted = true,
+) {
   const ui = fakePrompter(answers);
   const ai = scriptedBackend(steps);
   const printed: string[] = [];
   const code = await main(["node", "bae", "next", ...args], cwd, {
-    prompter: ui.prompter,
+    prompter: trusted ? trusting(ui.prompter) : ui.prompter,
     createBackend: () => ai.backend,
     env: {},
     print: (text) => printed.push(text),
@@ -90,8 +96,19 @@ export async function read(cwd: string, path: string): Promise<string> {
   return readFile(join(cwd, ...path.split("/")), "utf8");
 }
 
+export async function stops(cwd: string, id = "T-001") {
+  return jsonLines(await readFile(runFile(cwd, id, "stops.jsonl"), "utf8").catch(() => ""));
+}
+
 export async function attempts(cwd: string, id = "T-001") {
   const text = await readFile(runFile(cwd, id, "attempts.jsonl"), "utf8").catch(() => "");
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function jsonLines(text: string) {
   return text
     .split("\n")
     .filter(Boolean)

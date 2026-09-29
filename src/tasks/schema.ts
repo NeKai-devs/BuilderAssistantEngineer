@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FormatError } from "../core/errors.js";
-import { trivialityProblems } from "./checks.js";
+import { allowlistProblems, type CheckProblem, trivialityProblems } from "./checks.js";
 import { splitFrontmatter } from "./frontmatter.js";
 import { logicalLines } from "./shell-words.js";
 
@@ -54,6 +54,9 @@ const TRIVIALITY: Record<string, string> = {
     "runs nothing that checks the task; use the project's test runner, a linter or a check with an expected result (test -f, grep -q, curl -f)",
 };
 
+const UNATTENDED =
+  "runs a command that bae does not run when nobody confirms it; use a known runner or check (package managers, language toolchains and the repository's .venv, test runners, linters, make, read-only git, test, grep, diff, curl, jq), run project scripts with `sh script.sh` or `node script.js` rather than by path, and avoid `$( )`, `eval` and nested shells";
+
 const COMMAND_BLOCK = /```(?:sh|bash|shell|console)[^\n]*\n([\s\S]*?)```/g;
 
 export function parseTask(path: string, text: string): Task {
@@ -81,16 +84,24 @@ export function sectionProblems(task: Task): string[] {
     .map((key) => `${task.path}: missing section "${SECTIONS[key][0]}"`);
 }
 
-export function verificationNotes(task: Task): string[] {
+export function verificationNotes(task: Task, allow?: string[]): string[] {
   if (sectionText(task.body, "verification") === undefined) return [];
   const notes =
     verificationCommands(task.body).length === 0
       ? ["Verification needs at least one command in a ```sh block"]
       : [];
-  for (const problem of trivialityProblems(verificationScript(task.body))) {
+  const script = verificationScript(task.body);
+  for (const problem of trivialityProblems(script)) {
     notes.push(`Verification ${TRIVIALITY[problem.reason]}: ${problem.command}`);
   }
+  for (const problem of allow ? allowlistProblems(script, allow) : []) {
+    notes.push(`Verification ${unattendedNote(problem)}`);
+  }
   return notes;
+}
+
+export function unattendedNote(problem: CheckProblem): string {
+  return `${UNATTENDED}: ${problem.command}`;
 }
 
 export function sectionText(body: string, key: SectionKey): string | undefined {

@@ -34,11 +34,15 @@ import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
 import { capturedTask } from "../review/run.js";
 import { scopePaths } from "../review/scope.js";
-import { recordAttempt } from "../tasks/attempts.js";
+import { recordStop } from "../tasks/attempts.js";
 import { type Task, verificationCommands, verificationScript } from "../tasks/schema.js";
 import { setTaskStatus } from "../tasks/status.js";
 
-export type StartOptions = { allowSkip: boolean; unattended: boolean };
+export type StartOptions = {
+  allowSkip: boolean;
+  unattended: boolean;
+  enter?: () => Promise<unknown>;
+};
 
 export function checksFor(task: Task, config: Config): Checks {
   return {
@@ -112,6 +116,7 @@ export async function start(
     if (reuse) allow(t("regression.lateStop", { id: task.meta.id }));
     baseline = await recordBaseline(ctx, config, task, { ...options, unrecognized, fresh }, skips);
   }
+  await options.enter?.();
   const started = await setTaskStatus(ctx.cwd, task, "in_progress");
   const capture = await prepareCapture(ctx.cwd, config, started);
   const late = !reuse && task.meta.status === "in_progress";
@@ -171,17 +176,24 @@ async function recordBaseline(
     throw new ExitCode(1);
   }
   const found = unusableBaseline(results, task.meta.tests === "fix");
-  const absent = options.fresh
-    ? found.filter((result) => result.key === "test" && result.exitCode !== -1)
+  const missing = results.filter((result) => result.absent);
+  const untested = options.fresh
+    ? found.filter(
+        (result) => result.key === "test" && result.exitCode !== -1 && !missing.includes(result),
+      )
     : [];
+  const absent = [...missing, ...untested];
   const unusable = found.filter((result) => !absent.includes(result));
   for (const result of results.filter((item) => item.exitCode !== 0)) {
-    if (unusable.includes(result)) continue;
+    if (unusable.includes(result) || absent.includes(result)) continue;
     ctx.prompter.warn(
       t("regression.preexisting", { command: result.command, code: result.exitCode }),
     );
   }
-  for (const result of absent) {
+  for (const result of missing) {
+    ctx.prompter.info(t("regression.notYetCreated", { command: result.command }));
+  }
+  for (const result of untested) {
     ctx.prompter.info(t("regression.noTestsYet", { command: result.command }));
   }
   for (const result of unusable) allowOrStop(ctx, options, skips, unusableMessage(result));
@@ -224,14 +236,10 @@ function allowOrStop(
 async function blockBeforeAgent(ctx: CommandContext, task: Task, reason: string): Promise<void> {
   ctx.prompter.warn(reason);
   await setTaskStatus(ctx.cwd, task, "blocked");
-  await recordAttempt(ctx.cwd, task.meta.id, {
-    startedAt: new Date().toISOString(),
-    durationMs: 0,
-    headless: false,
-    outcome: "blocked",
+  await recordStop(ctx.cwd, task.meta.id, {
+    at: new Date().toISOString(),
     stage: "refused",
-    regressions: [],
     reason,
   });
-  ctx.prompter.outro(t("next.refusedBlocked", { id: task.meta.id }));
+  ctx.prompter.outro(t("next.refusedBlocked", { id: task.meta.id, task: task.path }));
 }
