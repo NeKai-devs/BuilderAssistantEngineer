@@ -127,4 +127,17 @@ describe("safe repository state (audit A11)", () => {
     expect(allowed.code).toBe(0);
     expect(await read(cwd, "src/app.ts")).toContain("// WIP");
   });
+
+  it("warns when the plan itself was never committed", async () => {
+    const cwd = await bypassRepo();
+    await writeFiles(cwd, { "docs/plan/00-overview.md": "# Overview\n" });
+    const run = await next(cwd, ["--yes", "--dry-run"], []);
+    expect(run.log).not.toContain("plan file(s) are not committed");
+    const live = await next(
+      cwd,
+      ["--headless", "--yes"],
+      [agent(cwd, { "src/feature.ts": "x\n" }), REVIEW_PASS],
+    );
+    expect(live.log).toContain("1 plan file(s) are not committed");
+  });
 });

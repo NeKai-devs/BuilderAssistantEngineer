@@ -3,7 +3,7 @@ import { AGENT_SPECS, type AgentName } from "../backends/agent-cli.js";
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
 import { readTextIfExists } from "../core/fs.js";
-import { git, headCommit, isGitRepo } from "../core/git.js";
+import { git, gitPaths, headCommit, isGitRepo } from "../core/git.js";
 import { BAE_IGNORED } from "../core/gitignore.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
 import { type Capture, readCapture } from "../gates/capture.js";
@@ -68,6 +68,7 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   const resumed = previous !== undefined && !previous.finished;
   if (task.meta.status === "pending" && !resumed) {
     await checkClean(ctx, unattended, options.allowDirty);
+    await warnUncommittedPlan(ctx);
   }
   const enter = () => useRunBranch(ctx, Boolean(options.newRun));
   const capture = await start(ctx, config, task, { allowSkip, unattended, enter });
@@ -109,6 +110,21 @@ async function checkClean(
   if (!unattended && (await ctx.prompter.confirm(t("next.dirtyConfirm"), false))) return;
   ctx.prompter.outro(t("next.dirtyStop", { command: `${CLI} next` }));
   throw new ExitCode(1);
+}
+
+const PLAN_PATHS = ["docs/plan", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".bae/config.json"];
+
+async function warnUncommittedPlan(ctx: CommandContext): Promise<void> {
+  const loose = await gitPaths(ctx.cwd, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "--",
+    ...PLAN_PATHS,
+  ]);
+  if (loose && loose.length > 0) {
+    ctx.prompter.warn(t("next.planUncommitted", { count: loose.length }));
+  }
 }
 
 async function onlyBaeIgnored(cwd: string): Promise<boolean> {

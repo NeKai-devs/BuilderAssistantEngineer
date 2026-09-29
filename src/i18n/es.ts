@@ -121,6 +121,8 @@ export const es: Messages = {
     "¿Empezar la tarea igualmente? Estos archivos quedan fuera de su commit salvo que el agente también los cambie.",
   "next.dirtyStop":
     "No se ejecutó nada. Haz commit o stash de estos cambios y vuelve a ejecutar {{command}} (o añade --allow-dirty para empezar igualmente).",
+  "next.planUncommitted":
+    '{{count}} archivo(s) del plan no tienen commit (docs/plan, AGENTS.md o .bae/config.json), así que los commits de las tareas no los incluirán. Haz commit antes: git add docs/plan AGENTS.md CLAUDE.md .bae && git commit -m "chore(bae): plan"',
   "progress.thinking": "pensando",
   "progress.read": "leyendo {{detail}}",
   "progress.search": "buscando {{detail}}",

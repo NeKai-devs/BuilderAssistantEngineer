@@ -116,6 +116,8 @@ export const en = {
     "Start the task anyway? These files stay out of its commit unless the agent changes them too.",
   "next.dirtyStop":
     "Nothing was run. Commit or stash these changes, then run {{command}} again (or add --allow-dirty to start anyway).",
+  "next.planUncommitted":
+    '{{count}} plan file(s) are not committed (docs/plan, AGENTS.md or .bae/config.json), so the task commits will not include them. Commit them first: git add docs/plan AGENTS.md CLAUDE.md .bae && git commit -m "chore(bae): plan"',
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",
