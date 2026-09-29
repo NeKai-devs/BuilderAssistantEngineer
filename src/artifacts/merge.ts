@@ -62,15 +62,17 @@ async function changeFor(
   const before = await readTextIfExists(join(cwd, ...path.split("/")));
   if (existing?.task?.meta.status === "done")
     return { path, before, after: before ?? "", kind: "keep" };
-  const after = contentFor(file, before, existing);
+  const status = existing?.task?.meta.status;
+  const kept = contentFor(file, before, status);
+  const after =
+    status === "blocked" && kept !== before ? contentFor(file, before, "pending") : kept;
   const kind = before === undefined ? "create" : before === after ? "unchanged" : "update";
   return { path, before, after, kind };
 }
 
-function contentFor(file: PlanFile, before: string | undefined, existing?: LoadedTask): string {
+function contentFor(file: PlanFile, before: string | undefined, status?: string): string {
   if (MANAGED_FILES.has(file.path)) return mergeManaged(before, file.content, file.path);
   if (file.path === CHANGELOG) return prependChangelog(before, file.content);
-  const status = existing?.task?.meta.status;
   return status ? setFrontmatterFields(file.content, { status }) : file.content;
 }
 
