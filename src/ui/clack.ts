@@ -3,6 +3,8 @@ import { UserError } from "../core/errors.js";
 import { t } from "../i18n/index.js";
 import type { Choice, Prompter } from "./prompter.js";
 
+const INTERRUPTED = 130;
+
 export function createClackPrompter(): Prompter {
   return {
     intro: (title) => clack.intro(title),
@@ -28,7 +30,11 @@ export function createClackPrompter(): Prompter {
     canAsk: () => Boolean(process.stdin.isTTY),
     spinner: async (message, task) => {
       if (!process.stdout.isTTY) return staticSpinner(message, task);
-      const spin = clack.spinner({ indicator: "timer" });
+      const spin = clack.spinner({ indicator: "timer", cancelMessage: t("ui.interrupted") });
+      const interrupted = () => {
+        process.exitCode = INTERRUPTED;
+      };
+      process.on("exit", interrupted);
       spin.start(message);
       try {
         const result = await task((update) => spin.message(update));
@@ -37,6 +43,8 @@ export function createClackPrompter(): Prompter {
       } catch (error) {
         spin.error(message);
         throw error;
+      } finally {
+        process.removeListener("exit", interrupted);
       }
     },
   };

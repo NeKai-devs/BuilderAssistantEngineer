@@ -135,7 +135,7 @@ function describeTask(task: Task, checks: Checks): string {
 function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
   if (tasks.length === 0) {
     ctx.prompter.outro(t("next.noPlan", { command: `${CLI} plan` }));
-    return;
+    throw new ExitCode(1);
   }
   if (tasks.every((task) => task.meta.status === "done")) {
     ctx.prompter.outro(t("next.allDone"));
@@ -155,4 +155,5 @@ function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
     });
   ctx.prompter.note(stuck.join("\n"), t("next.nothingReady"));
   ctx.prompter.outro(t("next.unblock"));
+  throw new ExitCode(1);
 }

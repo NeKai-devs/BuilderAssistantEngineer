@@ -114,7 +114,7 @@ describe("plan and a Verification the CLI cannot accept", () => {
       env: {},
       print: () => {},
     });
-    expect(code).toBe(0);
+    expect(code).toBe(1);
     expect(ai.calls).toHaveLength(0);
     const log = ui.log.join("\n");
     expect(log).toContain("T-002 Do T-002 (needs review: Verification hides failures");

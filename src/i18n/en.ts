@@ -95,6 +95,7 @@ export const en = {
   "template.review":
     "---\ndescription: Review a task with bae's reviewer\n---\nDo not review or change files from this command. Tell the user to run, in a terminal at the repository root:\n\n    {{cli}} review $ARGUMENTS\n\n(a task id such as T-003, or nothing for the task in progress). Never change `status:` in a task file.",
   "progress.writing": "writing the answer",
+  "ui.interrupted": "Interrupted. Nothing was written; run the same command again to start over.",
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",

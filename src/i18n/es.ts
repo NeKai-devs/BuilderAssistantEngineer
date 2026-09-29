@@ -99,6 +99,8 @@ export const es: Messages = {
   "template.review":
     "---\ndescription: Revisa una tarea con el revisor de bae\n---\nNo revises ni cambies archivos desde este comando. Dile al usuario que ejecute, en una terminal en la raíz del repositorio:\n\n    {{cli}} review $ARGUMENTS\n\n(un id de tarea como T-003, o nada para la tarea en curso). Nunca cambies `status:` en un archivo de tarea.",
   "progress.writing": "escribiendo la respuesta",
+  "ui.interrupted":
+    "Interrumpido. No se escribió nada; vuelve a ejecutar el mismo comando para empezar de nuevo.",
   "progress.thinking": "pensando",
   "progress.read": "leyendo {{detail}}",
   "progress.search": "buscando {{detail}}",
