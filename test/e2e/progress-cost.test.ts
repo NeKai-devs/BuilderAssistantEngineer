@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { main } from "../../src/cli.js";
 import { writeConfig, writeInterview } from "../../src/config/store.js";
@@ -29,7 +30,7 @@ async function plan(cwd: string, steps: Step[]) {
     env: {},
     print: (text) => printed.push(text),
   });
-  return { code, log: ui.log, printed: printed.join("") };
+  return { code, log: ui.log, printed: stripVTControlCharacters(printed.join("")) };
 }
 
 const streamed =
