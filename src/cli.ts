@@ -90,6 +90,7 @@ export function buildProgram(deps: CommandDeps, root: string, cwd = root): Comma
     .option("--headless", t("option.headless"))
     .option("--accept-finding <id>", t("option.acceptFinding"), collect, [])
     .option("--allow-skip", t("option.allowSkip"))
+    .option("--allow-dirty", t("option.allowDirty"))
     .option("--new-run", t("option.newRun"))
     .option("--no-verify", t("option.noVerify"))
     .action((options: NextOptions, command: Command) =>

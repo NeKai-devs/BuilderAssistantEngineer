@@ -115,6 +115,12 @@ export const es: Messages = {
     "Esta carpeta no es un repositorio git. bae necesita git para comprobar cada tarea y hacer commit: ejecuta git init, haz commit de tus archivos y luego plan.",
   "init.notRoot":
     "Configurando bae en esta carpeta, no en la raíz del repositorio ({{root}}). Los comandos ejecutados desde cualquier carpeta por debajo usan esta configuración.",
+  "option.allowDirty": "empieza una tarea aunque haya cambios sin commit fuera del plan",
+  "next.dirtyTitle": "Cambios sin commit fuera del plan",
+  "next.dirtyConfirm":
+    "¿Empezar la tarea igualmente? Estos archivos quedan fuera de su commit salvo que el agente también los cambie.",
+  "next.dirtyStop":
+    "No se ejecutó nada. Haz commit o stash de estos cambios y vuelve a ejecutar {{command}} (o añade --allow-dirty para empezar igualmente).",
   "progress.thinking": "pensando",
   "progress.read": "leyendo {{detail}}",
   "progress.search": "buscando {{detail}}",

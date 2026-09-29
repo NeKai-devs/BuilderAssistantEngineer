@@ -1,9 +1,12 @@
+import { join } from "node:path";
 import { AGENT_SPECS, type AgentName } from "../backends/agent-cli.js";
 import type { Config } from "../config/schema.js";
 import { ExitCode } from "../core/errors.js";
-import { headCommit, isGitRepo } from "../core/git.js";
+import { readTextIfExists } from "../core/fs.js";
+import { git, headCommit, isGitRepo } from "../core/git.js";
+import { BAE_IGNORED } from "../core/gitignore.js";
 import { loadPrompt, renderPrompt } from "../core/prompt-loader.js";
-import type { Capture } from "../gates/capture.js";
+import { type Capture, readCapture } from "../gates/capture.js";
 import { newAcceptance } from "../gates/findings.js";
 import type { Checks, GateRun } from "../gates/gate.js";
 import { suiteCommands } from "../gates/regression.js";
@@ -23,6 +26,7 @@ import { CLI, isAgentBackend, loadValidTasks, requireConfig } from "./shared.js"
 
 export type NextOptions = {
   headless?: boolean;
+  allowDirty?: boolean;
   acceptFinding?: string[];
   allowSkip?: boolean;
   newRun?: boolean;
@@ -60,6 +64,11 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
   }
   await preflight(ctx, config.backend);
   await requireTrust(ctx, config, tasks);
+  const previous = await readCapture(ctx.cwd, task.meta.id);
+  const resumed = previous !== undefined && !previous.finished;
+  if (task.meta.status === "pending" && !resumed) {
+    await checkClean(ctx, unattended, options.allowDirty);
+  }
   const enter = () => useRunBranch(ctx, Boolean(options.newRun));
   const capture = await start(ctx, config, task, { allowSkip, unattended, enter });
   if (!capture) throw new ExitCode(1);
@@ -79,6 +88,40 @@ export async function runNext(ctx: CommandContext, options: NextOptions): Promis
     ? await headlessLoop(ctx, run, prompt)
     : await attemptOnce(ctx, run, prompt);
   if (!done) throw new ExitCode(1);
+}
+
+const OWN_PATHS = [".bae/", "docs/plan/tasks/"];
+
+async function checkClean(
+  ctx: CommandContext,
+  unattended: boolean,
+  allowed = false,
+): Promise<void> {
+  const status = (await git(ctx.cwd, ["status", "--porcelain", "--untracked-files=no"])) ?? "";
+  const dirty = status
+    .split("\n")
+    .map((line) => line.slice(3).replace(/^"|"$/g, ""))
+    .filter((path) => path && !OWN_PATHS.some((own) => path.startsWith(own)));
+  const ours = dirty.includes(".gitignore") && (await onlyBaeIgnored(ctx.cwd));
+  const others = ours ? dirty.filter((path) => path !== ".gitignore") : dirty;
+  if (others.length === 0 || allowed) return;
+  ctx.prompter.note(others.map((path) => `  ${path}`).join("\n"), t("next.dirtyTitle"));
+  if (!unattended && (await ctx.prompter.confirm(t("next.dirtyConfirm"), false))) return;
+  ctx.prompter.outro(t("next.dirtyStop", { command: `${CLI} next` }));
+  throw new ExitCode(1);
+}
+
+async function onlyBaeIgnored(cwd: string): Promise<boolean> {
+  const diff = (await git(cwd, ["diff", "--no-ext-diff", "-U0", "HEAD", "--", ".gitignore"])) ?? "";
+  const tracked = diff.trim() !== "";
+  const changes = tracked
+    ? diff.split("\n").filter((line) => /^[+-](?![+-]{2} )/.test(line))
+    : ((await readTextIfExists(join(cwd, ".gitignore"))) ?? "")
+        .split("\n")
+        .map((line) => `+${line}`);
+  return changes.every(
+    (line) => line === "+" || (line.startsWith("+") && BAE_IGNORED.includes(line.slice(1).trim())),
+  );
 }
 
 async function preflight(ctx: CommandContext, name: Config["backend"]): Promise<void> {

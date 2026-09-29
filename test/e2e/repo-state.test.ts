@@ -10,7 +10,7 @@ import { parseTask } from "../../src/tasks/schema.js";
 import { fakePrompter, type Step, scriptedBackend, trusting } from "../fakes.js";
 import { tempDir, testConfig, writeFiles } from "../helpers.js";
 import { planOutput } from "../plan-sample.js";
-import { bypassRepo, next, read, TASK } from "./bypass/harness.js";
+import { agent, bypassRepo, next, REVIEW_PASS, read, TASK } from "./bypass/harness.js";
 
 async function run(cwd: string, args: string[], steps: Step[] = [], answers: unknown[] = []) {
   const ui = fakePrompter(answers);
@@ -110,5 +110,21 @@ describe("safe repository state (audit A11)", () => {
     const planned = await run(cwd, ["plan", "--yes"], [() => planOutput()]);
     expect(planned.code).toBe(0);
     expect(planned.calls[0]?.options.timeoutMs).toBe(60 * 60_000);
+  });
+
+  it("does not start a task over a tracked file with uncommitted changes unless a person says so", async () => {
+    const cwd = await bypassRepo({ files: { "src/app.ts": "export const a = 1;\n" } });
+    await writeFiles(cwd, { "src/app.ts": "export const a = 1; // WIP\n" });
+    const work = agent(cwd, { "src/feature.ts": "x\n" });
+    const stopped = await next(cwd, ["--headless", "--yes"], [work]);
+    expect(stopped.code).toBe(1);
+    expect(stopped.calls).toHaveLength(0);
+    expect(stopped.log).toContain("Uncommitted changes outside the plan");
+    expect(stopped.log).toContain("src/app.ts");
+    const declined = await next(cwd, [], [], [false]);
+    expect(declined.calls).toHaveLength(0);
+    const allowed = await next(cwd, ["--headless", "--yes", "--allow-dirty"], [work, REVIEW_PASS]);
+    expect(allowed.code).toBe(0);
+    expect(await read(cwd, "src/app.ts")).toContain("// WIP");
   });
 });

@@ -110,6 +110,12 @@ export const en = {
     "This folder is not a git repository. bae needs git to check each task and commit it: run git init, commit your files, then run plan.",
   "init.notRoot":
     "Setting up bae in this folder, not at the repository root ({{root}}). Commands run from any folder below it use this setup.",
+  "option.allowDirty": "start a task although files outside the plan have uncommitted changes",
+  "next.dirtyTitle": "Uncommitted changes outside the plan",
+  "next.dirtyConfirm":
+    "Start the task anyway? These files stay out of its commit unless the agent changes them too.",
+  "next.dirtyStop":
+    "Nothing was run. Commit or stash these changes, then run {{command}} again (or add --allow-dirty to start anyway).",
   "progress.thinking": "thinking",
   "progress.read": "reading {{detail}}",
   "progress.search": "searching {{detail}}",
