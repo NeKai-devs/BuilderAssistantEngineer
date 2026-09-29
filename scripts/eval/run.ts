@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, stripVTControlCharacters } from "node:util";
 import { execa } from "execa";
 import type { PlanReport } from "../../src/plan/report.js";
+import { CALLS_ENV, type CallStats, claudeWrapper, collectCalls, sumCalls } from "./calls.js";
 import {
   type ArtifactFile,
   formatRatio,
@@ -22,14 +23,16 @@ type Result = PlanMetrics & {
   commands: number;
   durationMs: number;
   report: Partial<PlanReport>;
+  usage?: CallStats;
+  slashNext: number;
 };
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const CLI = join(ROOT, "dist", "bin.js");
 const FIXTURES = join(ROOT, "test", "fixtures", "repos");
 const BRIEFS = join(ROOT, "scripts", "eval", "briefs");
 const ARTIFACTS = ["AGENTS.md", "CLAUDE.md", "GEMINI.md", "docs/plan", ".claude", ".opencode"];
 const TIMEOUT_MS = 90 * 60_000;
+const SLASH_NEXT = /(^|[\s`'"(])\/next\b/m;
 
 const { values } = parseArgs({
   options: {
@@ -39,20 +42,26 @@ const { values } = parseArgs({
     only: { type: "string" },
     label: { type: "string" },
     out: { type: "string", default: join(ROOT, "eval") },
+    cli: { type: "string" },
   },
 });
+
+const CLI = values.cli ? resolve(values.cli) : join(ROOT, "dist", "bin.js");
+const CLI_ROOT = dirname(dirname(CLI));
 
 const fixtures = values.only ? values.only.split(",") : await briefNames();
 const runDir = await uniqueDir(
   join(values.out, values.label ?? new Date().toISOString().slice(0, 10)),
 );
 const toolCommit = (
-  await execa("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, reject: false })
+  await execa("git", ["rev-parse", "--short", "HEAD"], { cwd: CLI_ROOT, reject: false })
 ).stdout;
-const analystSha = await sha256(join(ROOT, "src", "prompts", "analyst.md"));
+const analystSha = await sha256(join(CLI_ROOT, "src", "prompts", "analyst.md"));
+const wrapper = values.backend === "claude" ? await claudeWrapper(join(runDir, ".bin")) : undefined;
 const results: Result[] = [];
 for (const fixture of fixtures) results.push(await evaluate(fixture));
 await writeFile(join(runDir, "summary.md"), summary(results));
+if (wrapper) await rm(wrapper, { recursive: true, force: true });
 console.log(`\nEval saved to ${relative(process.cwd(), runDir) || runDir}`);
 
 async function evaluate(fixture: string): Promise<Result> {
@@ -64,9 +73,11 @@ async function evaluate(fixture: string): Promise<Result> {
   try {
     const dry = await cli(repo, ["plan", "--dry-run"]);
     await writeFile(join(outDir, "prompt.md"), extractPrompt(dry.output));
+    const callsDir = join(outDir, ".calls");
     const started = Date.now();
-    const plan = await cli(repo, ["plan", "--yes"]);
+    const plan = await cli(repo, ["plan", "--yes"], { [CALLS_ENV]: callsDir });
     const durationMs = Date.now() - started;
+    const usage = wrapper ? await collectCalls(callsDir, join(outDir, "calls.jsonl")) : undefined;
     await writeFile(join(outDir, "cli-output.txt"), plan.output);
     const artifacts = await readArtifacts(repo);
     await copyArtifacts(repo, artifacts, join(outDir, "output"));
@@ -82,6 +93,8 @@ async function evaluate(fixture: string): Promise<Result> {
       commands: Object.keys(config.commands ?? {}).length,
       durationMs,
       report: await readReport(repo),
+      ...(usage ? { usage } : {}),
+      slashNext: slashNext(artifacts, plan.output),
       ...(await measurePlan(repo, artifacts)),
     };
     await writeFile(join(outDir, "meta.json"), `${JSON.stringify(meta(result), null, 2)}\n`);
@@ -110,7 +123,7 @@ async function prepareRepo(fixture: string, repo: string): Promise<string> {
   return repo;
 }
 
-async function cli(cwd: string, args: string[]) {
+async function cli(cwd: string, args: string[], extra: Record<string, string> = {}) {
   const result = await execa(
     process.execPath,
     [CLI, ...args, "--backend", values.backend, "--lang", values.lang],
@@ -119,11 +132,15 @@ async function cli(cwd: string, args: string[]) {
       all: true,
       reject: false,
       timeout: TIMEOUT_MS,
-      env: { NO_COLOR: "1", PWD: cwd },
+      env: { NO_COLOR: "1", PWD: cwd, ...toolPath(), ...extra },
       stdin: "ignore",
     },
   );
   return { exitCode: result.exitCode ?? -1, output: stripVTControlCharacters(result.all ?? "") };
+}
+
+function toolPath(): Record<string, string> {
+  return wrapper ? { PATH: `${wrapper}${delimiter}${process.env.PATH ?? ""}` } : {};
 }
 
 async function git(cwd: string, args: string[]) {
@@ -179,6 +196,11 @@ async function listFiles(root: string, entries: string[]): Promise<string[]> {
   return found.sort();
 }
 
+function slashNext(artifacts: ArtifactFile[], output: string): number {
+  const files = artifacts.filter((file) => SLASH_NEXT.test(file.text)).length;
+  return files + (SLASH_NEXT.test(output) ? 1 : 0);
+}
+
 function extractPrompt(output: string): string {
   const start = output.indexOf("You are the Analyst");
   const end = output.lastIndexOf("\n└");
@@ -223,8 +245,8 @@ function summary(results: Result[]): string {
     `- Language: ${values.lang}; targets: ${values.targets}`,
     `- analyst.md sha256: ${analystSha}; tool commit: ${toolCommit}; date: ${new Date().toISOString().slice(0, 10)}`,
     "",
-    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Existence claims verified | Questions (blocking) | Continuations | Format retries | Local repairs | Evidence retries | Unverified after retry | Not a plan | Verification fixes | Needs review | Runs unattended | Commands | tests: required | Empty Log | Minutes | Cost USD |",
-    `|${" --- |".repeat(24)}`,
+    "| Fixture | Mode | Exit | Files | Tasks | Tasks with verification | file:line refs valid | Cited paths that exist | Existence claims verified | Questions (blocking) | Continuations | Format retries | Local repairs | Evidence retries | Unverified after retry | Not a plan | Verification fixes | Needs review | Runs unattended | Commands | tests: required | Empty Log | Say /next | AI files | AI calls | Input tokens | Cache write tokens | Cache read tokens | Output tokens | Minutes | Cost USD |",
+    `|${" --- |".repeat(31)}`,
   ];
   return `${[...header, ...results.map(row), totals(results)].join("\n")}\n`;
 }
@@ -254,6 +276,9 @@ function row(result: Result): string {
     `${result.commands}/4`,
     formatRatio(result.testsRequired),
     formatRatio(result.tasksWithLog),
+    String(result.slashNext),
+    String(report.files ?? "-"),
+    ...usageCells(result.usage),
     minutes(result.durationMs),
     cost(report.costUsd),
   ]);
@@ -265,6 +290,7 @@ function totals(results: Result[]): string {
   const costs = results
     .map((result) => result.report.costUsd)
     .filter((value) => value !== undefined);
+  const usages = results.flatMap((result) => (result.usage ? [result.usage] : []));
   return cells([
     "**Total**",
     "",
@@ -288,9 +314,27 @@ function totals(results: Result[]): string {
     `${sum((result) => result.commands)}/${results.length * 4}`,
     formatRatio(sumRatios(results.map((result) => result.testsRequired))),
     formatRatio(sumRatios(results.map((result) => result.tasksWithLog))),
+    String(sum((result) => result.slashNext)),
+    String(sum((result) => result.report.files ?? 0)),
+    ...usageCells(usages.length > 0 ? sumCalls(usages) : undefined),
     minutes(sum((result) => result.durationMs)),
     costs.length > 0 ? cost(costs.reduce((total, value) => total + (value ?? 0), 0)) : "-",
   ]);
+}
+
+function usageCells(usage: CallStats | undefined): string[] {
+  if (!usage) return ["-", "-", "-", "-", "-"];
+  return [
+    String(usage.calls),
+    tokens(usage.inputTokens),
+    tokens(usage.cacheWriteTokens),
+    tokens(usage.cacheReadTokens),
+    tokens(usage.outputTokens),
+  ];
+}
+
+function tokens(count: number): string {
+  return `${(count / 1000).toFixed(1)}k`;
 }
 
 function cells(values: string[]): string {
