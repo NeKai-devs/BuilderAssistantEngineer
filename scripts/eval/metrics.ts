@@ -1,7 +1,10 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { readConfig } from "../../src/config/store.js";
 import { FormatError } from "../../src/core/errors.js";
 import { readTextIfExists } from "../../src/core/fs.js";
+import { refusal } from "../../src/gates/gate.js";
+import { checksFor } from "../../src/next/start.js";
 import { checkCitations } from "../../src/plan/evidence.js";
 import { logLines } from "../../src/tasks/handoff.js";
 import { parseTask, sectionText, type Task, verificationCommands } from "../../src/tasks/schema.js";
@@ -17,6 +20,7 @@ export type PlanMetrics = {
   claims: Ratio;
   testsRequired: Ratio;
   tasksWithLog: Ratio;
+  unattended: Ratio;
 };
 
 const CODE_SPAN = /`([^`\n]+)`/g;
@@ -33,6 +37,18 @@ export async function measurePlan(repo: string, files: ArtifactFile[]): Promise<
   const parsed = tasks.flatMap((task) => safeTask(task));
   const planFiles = files.map((file) => ({ path: file.path, content: file.text }));
   const evidence = await checkCitations(repo, { files: planFiles, tasks: parsed });
+  const config = await readConfig(repo);
+  const runnable = parsed.filter((task) => task.meta.status !== "needs_review");
+  const accepted = config
+    ? runnable.filter(
+        (task) =>
+          refusal(checksFor(task, config), {
+            unattended: true,
+            allow: config.verify.allow,
+            bash: "bash",
+          }) === undefined,
+      ).length
+    : 0;
   return {
     tasks: tasks.length,
     tasksWithVerification: { hits: verified, total: tasks.length },
@@ -49,6 +65,7 @@ export async function measurePlan(repo: string, files: ArtifactFile[]): Promise<
       ).length,
       total: tasks.length,
     },
+    unattended: { hits: accepted, total: tasks.length },
   };
 }
 
