@@ -161,13 +161,12 @@ describe("next", () => {
 
   it("blocks the task after two failed retries, keeps the logs and records a lesson", async () => {
     const cwd = await repo(FAIL);
-    const noop: Step = () => "";
     const lesson = () =>
       '{"root_cause": "The command was never implemented.", "rule": "Run the Verification commands before finishing."}';
     const { code, calls, ui } = await runNext(
       cwd,
       ["--headless", "--yes"],
-      [noop, noop, noop, lesson],
+      [writesFile(cwd, "a.txt"), writesFile(cwd, "b.txt"), writesFile(cwd, "c.txt"), lesson],
     );
     expect(code).toBe(1);
     expect(calls).toHaveLength(4);
@@ -394,15 +393,16 @@ describe("next regression gate", () => {
 
   it("stops when the user declines the baseline, unless --allow-skip turns the check off", async () => {
     const cwd = await repo(PASS, { commands: { test: TESTS_FAIL } });
-    const stopped = await runNext(cwd, [], [], [true, false]);
+    const stopped = await runNext(cwd, [], [], [false]);
     expect(stopped.code).toBe(1);
     expect(stopped.calls).toHaveLength(0);
+    expect(stopped.ui.asked.join("\n")).not.toContain("Create");
     expect(await statusOf(cwd, "docs/plan/tasks/T-001-first.md")).toBe("pending");
     const { code, ui } = await runNext(
       cwd,
       ["--allow-skip"],
       [writesFile(cwd, "a.txt"), REVIEW_PASS],
-      [false, true],
+      [false, true, true],
     );
     expect(code).toBe(0);
     expect(ui.log).toContain(

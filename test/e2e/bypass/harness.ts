@@ -90,8 +90,19 @@ export async function read(cwd: string, path: string): Promise<string> {
   return readFile(join(cwd, ...path.split("/")), "utf8");
 }
 
+export async function stops(cwd: string, id = "T-001") {
+  return jsonLines(await readFile(runFile(cwd, id, "stops.jsonl"), "utf8").catch(() => ""));
+}
+
 export async function attempts(cwd: string, id = "T-001") {
   const text = await readFile(runFile(cwd, id, "attempts.jsonl"), "utf8").catch(() => "");
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function jsonLines(text: string) {
   return text
     .split("\n")
     .filter(Boolean)

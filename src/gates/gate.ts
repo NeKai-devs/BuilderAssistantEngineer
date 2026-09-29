@@ -98,7 +98,7 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (refused || !bash) {
     const reason = refused ?? t("verify.noBash");
     ctx.prompter.warn(reason);
-    return fail("refused", reason, reason, false);
+    return { ...fail("refused", reason, reason, false), ...(bash ? {} : { environment: reason }) };
   }
   const baseline = suiteBaseline(capture);
   const excluded = new Set(baseline?.excluded ?? []);
@@ -211,7 +211,8 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   if (review.status !== "pass") {
     const reason = review.reason ?? t("review.noVerdict");
     if (!run.allowSkip) {
-      return fail("review", joinSections([...sections, reason]), reason, review.status === "error");
+      const failed = fail("review", joinSections([...sections, reason]), reason, false);
+      return review.status === "error" ? { ...failed, environment: reason } : failed;
     }
     skips.push(`review: ${reason}`);
     ctx.prompter.warn(t("skip.used", { what: reason }));

@@ -1,11 +1,12 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { UserError } from "../core/errors.js";
+import { EnvironmentError, UserError } from "../core/errors.js";
 import { readTextIfExists, writeText } from "../core/fs.js";
 import { asRecord, parseObject } from "../core/json.js";
 import { baePaths } from "../core/paths.js";
 import { type CommandResult, runCommand, runInteractive } from "../core/process.js";
+import { findExecutable } from "../core/which.js";
 import { t } from "../i18n/index.js";
 import type { Access, Backend, RunInfo, RunOptions } from "./types.js";
 
@@ -109,6 +110,7 @@ export const defaultRunner: ProcessRunner = { run: runCommand, interactive: runI
 export function createAgentBackend(spec: AgentSpec, runner = defaultRunner): Backend {
   return {
     name: spec.name,
+    available: async () => (await findExecutable(spec.command)) !== undefined,
     run: (prompt, options) =>
       options.interactive
         ? runSession(spec, runner, prompt, options)
@@ -221,19 +223,28 @@ async function runSession(
   const result = await runner.interactive(spec.command, spec.interactive(instruction), {
     cwd: options.cwd,
   });
-  if (result.notFound) throw new UserError(t("backend.notInstalled", { command: spec.command }));
+  if (result.notFound) {
+    throw new EnvironmentError(t("backend.notInstalled", { command: spec.command }));
+  }
+  if (result.exitCode !== 0) {
+    throw new EnvironmentError(
+      t("backend.sessionFailed", { command: spec.command, code: result.exitCode }),
+    );
+  }
   return "";
 }
 
 function assertSucceeded(spec: AgentSpec, result: CommandResult, timeoutMs?: number): void {
-  if (result.notFound) throw new UserError(t("backend.notInstalled", { command: spec.command }));
+  if (result.notFound) {
+    throw new EnvironmentError(t("backend.notInstalled", { command: spec.command }));
+  }
   if (result.timedOut) {
     const minutes = Math.round((timeoutMs ?? 0) / 60_000);
     throw new UserError(t("backend.timedOut", { command: spec.command, minutes }));
   }
   if (result.exitCode === 0) return;
   const details = (result.stderr.trim() || result.stdout.trim()).slice(-ERROR_TAIL);
-  throw new UserError(
+  throw new EnvironmentError(
     t("backend.failed", { command: spec.command, code: result.exitCode, details }),
   );
 }

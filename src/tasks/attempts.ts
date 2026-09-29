@@ -30,15 +30,37 @@ export type Attempt = {
   accepted?: string[];
 };
 
+export type Stop = { at: string; stage: GateStage; reason: string };
+
 export const MAX_ATTEMPTS = 3;
 
 const ATTEMPTS_FILE = "attempts.jsonl";
+const STOPS_FILE = "stops.jsonl";
 const OUTCOMES = new Set<string>(["done", "failed", "blocked"]);
 
 export async function recordAttempt(cwd: string, id: string, attempt: Attempt): Promise<void> {
   const dir = runDir(cwd, id);
   await mkdir(dir, { recursive: true });
   await appendFile(join(dir, ATTEMPTS_FILE), `${JSON.stringify(attempt)}\n`, "utf8");
+}
+
+export async function recordStop(cwd: string, id: string, stop: Stop): Promise<void> {
+  const dir = runDir(cwd, id);
+  await mkdir(dir, { recursive: true });
+  await appendFile(join(dir, STOPS_FILE), `${JSON.stringify(stop)}\n`, "utf8");
+}
+
+export async function lastStop(cwd: string, id: string): Promise<Stop | undefined> {
+  const text = (await readTextIfExists(join(runDir(cwd, id), STOPS_FILE))) ?? "";
+  const stops = text.split(/\r?\n/).flatMap((line) => {
+    const stop = toStop(line);
+    return stop ? [stop] : [];
+  });
+  const last = stops.at(-1);
+  if (!last) return undefined;
+  const attempts = await readAttempts(cwd, id);
+  const since = attempts.at(-1)?.startedAt ?? "";
+  return last.at > since ? last : undefined;
 }
 
 export async function readAttempts(cwd: string, id: string): Promise<Attempt[]> {
@@ -74,6 +96,18 @@ function toAttempt(line: string): Attempt | undefined {
   };
 }
 
+function toStop(line: string): Stop | undefined {
+  let data: Record<string, unknown>;
+  try {
+    data = asRecord(JSON.parse(line));
+  } catch {
+    return undefined;
+  }
+  const stage = GATE_STAGES.find((value) => value === data.stage);
+  if (typeof data.at !== "string" || typeof data.reason !== "string" || !stage) return undefined;
+  return { at: data.at, stage, reason: data.reason };
+}
+
 export function sinceBlocked(attempts: Attempt[]): Attempt[] {
   const last = attempts.map((attempt) => attempt.outcome).lastIndexOf("blocked");
   return attempts.slice(last + 1);
@@ -84,6 +118,8 @@ export async function attemptsLeft(cwd: string, id: string): Promise<number> {
 }
 
 export async function blockedReason(cwd: string, id: string): Promise<string | undefined> {
+  const stop = await lastStop(cwd, id);
+  if (stop?.stage === "refused") return stop.reason;
   return (await readAttempts(cwd, id)).filter((attempt) => attempt.outcome === "blocked").at(-1)
     ?.reason;
 }

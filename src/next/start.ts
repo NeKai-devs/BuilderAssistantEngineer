@@ -34,11 +34,15 @@ import { guardState } from "../gates/state-guard.js";
 import { t } from "../i18n/index.js";
 import { capturedTask } from "../review/run.js";
 import { scopePaths } from "../review/scope.js";
-import { recordAttempt } from "../tasks/attempts.js";
+import { recordStop } from "../tasks/attempts.js";
 import { type Task, verificationCommands, verificationScript } from "../tasks/schema.js";
 import { setTaskStatus } from "../tasks/status.js";
 
-export type StartOptions = { allowSkip: boolean; unattended: boolean };
+export type StartOptions = {
+  allowSkip: boolean;
+  unattended: boolean;
+  enter?: () => Promise<unknown>;
+};
 
 export function checksFor(task: Task, config: Config): Checks {
   return {
@@ -112,6 +116,7 @@ export async function start(
     if (reuse) allow(t("regression.lateStop", { id: task.meta.id }));
     baseline = await recordBaseline(ctx, config, task, { ...options, unrecognized, fresh }, skips);
   }
+  await options.enter?.();
   const started = await setTaskStatus(ctx.cwd, task, "in_progress");
   const capture = await prepareCapture(ctx.cwd, config, started);
   const late = !reuse && task.meta.status === "in_progress";
@@ -224,14 +229,10 @@ function allowOrStop(
 async function blockBeforeAgent(ctx: CommandContext, task: Task, reason: string): Promise<void> {
   ctx.prompter.warn(reason);
   await setTaskStatus(ctx.cwd, task, "blocked");
-  await recordAttempt(ctx.cwd, task.meta.id, {
-    startedAt: new Date().toISOString(),
-    durationMs: 0,
-    headless: false,
-    outcome: "blocked",
+  await recordStop(ctx.cwd, task.meta.id, {
+    at: new Date().toISOString(),
     stage: "refused",
-    regressions: [],
     reason,
   });
-  ctx.prompter.outro(t("next.refusedBlocked", { id: task.meta.id }));
+  ctx.prompter.outro(t("next.refusedBlocked", { id: task.meta.id, task: task.path }));
 }

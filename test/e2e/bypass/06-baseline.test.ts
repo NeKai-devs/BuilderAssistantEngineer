@@ -17,12 +17,12 @@ import {
 describe("bypass 06: the baseline cannot be declined, taken late or partial", () => {
   it("stops when the baseline is declined, and records the skip when --allow-skip overrides it", async () => {
     const cwd = await bypassRepo({ config: { commands: { test: vitest() } } });
-    const declined = await next(cwd, [], [], [true, false]);
+    const declined = await next(cwd, [], [], [false]);
     expect(declined.code).toBe(1);
     expect(declined.calls).toHaveLength(0);
     expect(await statusOf(cwd)).toBe("pending");
     const work = agent(cwd, { "src/feature.ts": "x\n" });
-    const skipped = await next(cwd, ["--allow-skip"], [work, REVIEW_PASS], [false, true]);
+    const skipped = await next(cwd, ["--allow-skip"], [work, REVIEW_PASS], [false, true, true]);
     expect(skipped.code).toBe(0);
     expect((await attempts(cwd))[0].skips).toEqual([
       "Without running lint and tests first there is no baseline, so the task could not be done.",

@@ -16,5 +16,6 @@ export type RunOptions = {
 
 export type Backend = {
   name: BackendName;
+  available?(): Promise<boolean>;
   run(prompt: string, options: RunOptions): Promise<string>;
 };

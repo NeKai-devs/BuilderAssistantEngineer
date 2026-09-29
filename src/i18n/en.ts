@@ -114,6 +114,11 @@ export const en = {
   "next.attempt": "Attempt {{attempt}} of {{max}} with {{backend}} (headless, accept edits)",
   "next.done": "{{id}} is done. Next: {{command}}",
   "next.notDone": "{{id}} stays in progress. Fix it and run {{command}} again.",
+  "next.noChanges": "The agent changed no files for {{id}}, so bae did not run its checks.",
+  "next.stopped":
+    "{{reason}}\n{{id}} stays in progress, and this run does not count as one of its attempts. Fix the cause and run {{command}} again.",
+  "next.stoppedTitle": "Stopped before the checks (not counted as an attempt)",
+  "next.nothingRun": "Nothing was run. Fix the cause and run {{command}} again.",
   "next.blocked":
     "{{id}} is blocked: {{reason}} Logs: {{path}}. To try again, fix the cause, set `status: pending` in {{task}} and run {{command}}.",
   "next.noPlan": "There are no tasks yet. Run {{command}} first.",
@@ -160,6 +165,8 @@ export const en = {
   "backend.timedOut":
     "`{{command}}` did not finish within {{minutes}} minutes and was stopped (agent.timeoutMinutes in .bae/config.json).",
   "backend.failed": "`{{command}}` exited with code {{code}}:\n{{details}}",
+  "backend.sessionFailed":
+    "`{{command}}` exited with code {{code}} before the task was finished (for example the folder-trust question was answered No, the CLI is logged out, or it crashed), so bae ran no checks.",
   "backend.apiNotConfigured":
     "The api backend needs ANTHROPIC_API_KEY, or OPENAI_BASE_URL/OPENAI_API_KEY for an OpenAI-compatible endpoint.",
   "backend.apiModelRequired": "Set BAE_MODEL to the model to use with {{baseUrl}}.",
@@ -224,6 +231,7 @@ export const en = {
   "lesson.skipped": "Rule not added; it stays in {{path}}.",
   "lesson.failed": "Could not get a lesson from the agent: {{details}}",
   "status.blockedReason": "{{id}} is blocked: {{reason}}",
+  "status.stoppedReason": "{{id}} stopped: {{reason}}",
   "opencode.model": "opencode will use {{model}} (from {{source}}).",
   "opencode.weakModel":
     'opencode will use {{model}} (from {{source}}), which looks like a free or small model. A plan needs a strong model: pass --backend claude, or set a stronger "model" in opencode.json.',
@@ -304,7 +312,7 @@ export const en = {
     "`{{command}}` could not find a program it runs (exit 127): the project's dependencies are not installed, or a tool is missing. Another attempt would fail the same way; install them (for example `npm install`).",
   "next.budgetUsed": "The task already used its {{max}} automatic attempts.",
   "next.refusedBlocked":
-    "{{id}} is blocked before launching the agent, because its checks cannot run. Fix the task's Verification or the commands in .bae/config.json, then set the task back to pending.",
+    "{{id}} is blocked before launching the agent, because its checks cannot run; nothing was run and it does not count as an attempt. Fix the task's Verification or the commands in .bae/config.json, then set `status: pending` in {{task}}.",
   "capture.lateStop":
     "{{id}} is in progress without a capture from before its agent ran, so its checks have no trustworthy starting point. Set it back to pending, or run with --allow-skip.",
   "capture.noGit": "This is not a git repository, so the review cannot see the task's changes.",

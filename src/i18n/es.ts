@@ -118,6 +118,12 @@ export const es: Messages = {
   "next.attempt": "Intento {{attempt}} de {{max}} con {{backend}} (headless, acepta ediciones)",
   "next.done": "{{id}} está hecha. Siguiente paso: {{command}}",
   "next.notDone": "{{id}} sigue en curso. Corrígela y vuelve a ejecutar {{command}}.",
+  "next.noChanges":
+    "El agente no cambió ningún archivo para {{id}}, así que bae no ejecutó sus comprobaciones.",
+  "next.stopped":
+    "{{reason}}\n{{id}} sigue en curso, y esta ejecución no cuenta como uno de sus intentos. Corrige la causa y vuelve a ejecutar {{command}}.",
+  "next.stoppedTitle": "Parada antes de las comprobaciones (no cuenta como intento)",
+  "next.nothingRun": "No se ejecutó nada. Corrige la causa y vuelve a ejecutar {{command}}.",
   "next.blocked":
     "{{id}} queda bloqueada: {{reason}} Logs: {{path}}. Para reintentar, corrige la causa, pon `status: pending` en {{task}} y corre {{command}}.",
   "next.noPlan": "Todavía no hay tareas. Ejecuta primero {{command}}.",
@@ -183,6 +189,8 @@ export const es: Messages = {
   "backend.timedOut":
     "`{{command}}` no terminó en {{minutes}} minutos y se detuvo (agent.timeoutMinutes en .bae/config.json).",
   "backend.failed": "`{{command}}` terminó con código {{code}}:\n{{details}}",
+  "backend.sessionFailed":
+    "`{{command}}` terminó con código {{code}} antes de acabar la tarea (por ejemplo, se respondió No a la pregunta de confianza en la carpeta, la CLI no tiene sesión iniciada o falló), así que bae no ejecutó ninguna comprobación.",
   "backend.apiNotConfigured":
     "El backend api necesita ANTHROPIC_API_KEY, u OPENAI_BASE_URL/OPENAI_API_KEY para un endpoint compatible con OpenAI.",
   "backend.apiModelRequired": "Define BAE_MODEL con el modelo a usar en {{baseUrl}}.",
@@ -248,6 +256,7 @@ export const es: Messages = {
   "lesson.skipped": "Regla no añadida; queda en {{path}}.",
   "lesson.failed": "No se pudo obtener una lección del agente: {{details}}",
   "status.blockedReason": "{{id}} está bloqueada: {{reason}}",
+  "status.stoppedReason": "{{id}} se detuvo: {{reason}}",
   "status.metrics": "Métricas locales",
   "status.attempts": "intentos: {{attempts}} en {{tasks}} tarea(s), {{average}} por tarea",
   "status.firstAttempt": "hechas al primer intento: {{count}}/{{tasks}} ({{percent}}%)",
@@ -312,7 +321,7 @@ export const es: Messages = {
     "`{{command}}` no encontró un programa que ejecuta (exit 127): faltan las dependencias del proyecto o una herramienta. Otro intento fallaría igual; instálalas (por ejemplo `npm install`).",
   "next.budgetUsed": "La tarea ya usó sus {{max}} intentos automáticos.",
   "next.refusedBlocked":
-    "{{id}} queda bloqueada antes de lanzar el agente, porque sus chequeos no pueden correr. Corrige la Verificación de la tarea o los comandos de .bae/config.json y vuelve a ponerla en pending.",
+    "{{id}} queda bloqueada antes de lanzar el agente, porque sus comprobaciones no pueden ejecutarse; no se ejecutó nada y no cuenta como intento. Corrige su bloque ## Verification o los comandos de .bae/config.json y pon `status: pending` en {{task}}.",
   "capture.lateStop":
     "{{id}} está en curso sin una captura de antes de que corriera su agente, así que sus chequeos no tienen un punto de partida fiable. Vuelve a ponerla en pending, o corre con --allow-skip.",
   "capture.noGit":
