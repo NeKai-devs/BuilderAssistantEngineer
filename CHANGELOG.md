@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.4.0...v0.4.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* 0.4.1 contract false positive, Spanish remnants and commit casing ([9b9dde6](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/9b9dde654f70c2de31c4fe04a1b94954e0725c31))
+* **commit:** lowercase an accented first letter in a task's commit subject ([10b8454](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/10b8454e9e1e4458bd009d922cd85fcf71ef696d))
+* **contract:** stop guarding build output and ignored files the checks run ([4b91240](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/4b9124049985e1e97933c29d52c658810b306a90))
+* **i18n:** show confirmations, stuck tasks and secret kinds in the chosen language ([03cc637](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/03cc6373a7bbe684114b2a8907732d02051ea5bb))
+
 ## [0.4.0](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.3.3...v0.4.0) (2026-09-29)
 
 
