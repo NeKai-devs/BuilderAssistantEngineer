@@ -72,7 +72,7 @@ bae status    # dónde estás
 
 Tiempos y costes medidos en corridas reales con Claude Code y Opus 5.5; varían con el tamaño del repositorio, el modelo y cuánto pregunte el analista. Las capturas son de una corrida real de 0.4.0 sobre una API Express pequeña, con el brief de la sección 5.
 
-**`bae init`** pregunta el idioma (esta primera pregunta sale en inglés, porque aún no sabe cuál quieres), el tipo de proyecto, qué IA hará el análisis y qué agentes trabajarán en el repo, y luego hace la entrevista; con `--brief` el brief ya va cargado. Las confirmaciones sí/no aparecen como *Yes / No* en cualquier idioma.
+**`bae init`** pregunta el idioma (esta primera pregunta sale en inglés, porque aún no sabe cuál quieres), el tipo de proyecto, qué IA hará el análisis y qué agentes trabajarán en el repo, y luego hace la entrevista; con `--brief` el brief ya va cargado.
 
 ![Captura de bae init](img/01-init.png "init con --brief: el analista hizo una pregunta de seguimiento. 40 s y $0.17 en esta corrida.")
 
