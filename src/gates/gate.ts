@@ -79,15 +79,22 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
       reason,
     );
   }
+  const broken = (report: string, environment?: string): Gate =>
+    environment
+      ? { ...fail("contract", report, environment, false), environment }
+      : fail("contract", report, t("contract.failed"));
   const contract = await enforceContract(ctx, capture, acceptance);
-  if (contract.blocked) return fail("contract", contract.report, t("contract.failed"));
-  const recheck = async (): Promise<string | undefined> => {
+  if (contract.blocked) return broken(contract.report, contract.environment);
+  const recheck = async (): Promise<{ report: string; environment?: string } | undefined> => {
     const changed = await guard.verify();
     const again = await enforceContract(ctx, capture, acceptance);
     if (changed.length === 0 && !again.blocked) return undefined;
     const state = changed.length > 0 ? t("state.tampered", { files: changed.join(", ") }) : "";
     if (state) ctx.prompter.warn(state);
-    return joinSections([state, again.report]);
+    const report = joinSections([state, again.report]);
+    return state
+      ? { report }
+      : { report, ...(again.environment ? { environment: again.environment } : {}) };
   };
   const bash = await bashPath();
   const refused = refusal(checks, {
@@ -132,8 +139,9 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   }
   const sections = [contract.report, regression?.report];
   const afterSuite = await recheck();
-  if (afterSuite)
-    return fail("contract", joinSections([...sections, afterSuite]), t("contract.failed"));
+  if (afterSuite) {
+    return broken(joinSections([...sections, afterSuite.report]), afterSuite.environment);
+  }
   if (regression && !regression.passed) {
     const missing = regression.regressions.find((check) => check.exitCode === COMMAND_NOT_FOUND);
     return {
@@ -169,7 +177,10 @@ export async function runGate(ctx: CommandContext, run: GateRun): Promise<Gate> 
   sections.push(verificationReport(verification));
   const afterVerification = await recheck();
   if (afterVerification) {
-    return fail("contract", joinSections([...sections, afterVerification]), t("contract.failed"));
+    return broken(
+      joinSections([...sections, afterVerification.report]),
+      afterVerification.environment,
+    );
   }
   if (!verification.passed) {
     const reason = t("verify.failed", {

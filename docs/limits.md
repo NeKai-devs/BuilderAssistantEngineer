@@ -27,6 +27,8 @@ To report a new case, including correct work that the gates stopped, use the [Re
 - When the Scope lists a lint config or a script, the task may change it. A change that keeps running the same tool can still narrow what the tool checks, for example new ignore patterns or fewer files. The reviewer sees the change. (medium)
 - Build files such as `pom.xml` or `build.gradle`, and the scripts of workspace packages other than the root `package.json`, are not protected. (medium)
 - `.claude/settings.local.json` is not protected, because interactive agents write their permissions there. (low)
+- Build output (`dist/`, `build/`, `out/`, `target/`, `.next/` and the other folders the digest skips) and files git ignores are not protected, even when a check runs them, because the build writes them again. When the project's build command is in the regression suite it rebuilds them before the Verification runs; without one, an agent could leave a hand-written file there for the Verification to run. The reviewer does not see ignored files. (medium)
+- A tracked script that a check runs is protected. When the checks themselves rewrite it (a generated file the repository commits outside the build folders), `next` stops without spending an attempt; the same stop covers an agent that edits such a script, so that attempt is not counted either. (low)
 
 ## Regression and test counts
 
@@ -89,3 +91,10 @@ To report a new case, including correct work that the gates stopped, use the [Re
 ## Task commits
 
 - The commit keeps an acronym at the start of a task title as written, and commitlint's conventional config rejects a subject that starts with an uppercase letter. The analyst starts titles with a verb; when a title still starts with an acronym, a commitlint hook rejects the commit, the task stays done and the commit stays pending with a warning. (low)
+
+## CLI
+
+- `plan --only <group>` sends the whole analysis and costs as much as a full plan; it only filters what it writes. With a plan already there it still asks whether to regenerate the plan from scratch. (low)
+- `--accept-finding <id>` prints no confirmation. The accepted finding stays in the list as `[minor]` with its id, and the run log and the attempt record the acceptance. (low)
+- A follow-up question in `init` wider than the terminal breaks the frame of the note that shows it, because the question is the note's title. (low)
+- The keyboard hints under a choice (`↑/↓ to navigate • Enter: confirm`) come from the prompt library, which cannot translate them, so they stay in English with `--lang es`. For the same reason a `Sí / No` confirmation answers to the `y` and `n` keys, not `s`; the arrows and Enter work in every language. (low)

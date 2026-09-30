@@ -7,6 +7,7 @@ import { readTextIfExists, writeText } from "../core/fs.js";
 import { gitPaths, isGitRepo } from "../core/git.js";
 import { BAE_IGNORED } from "../core/gitignore.js";
 import { asRecord, parseObject } from "../core/json.js";
+import { isBuildOutput } from "../digest/files.js";
 import { scanFiles } from "../digest/walk.js";
 import { t } from "../i18n/index.js";
 import { inScope } from "../review/scope.js";
@@ -42,10 +43,12 @@ export type ContractChange = {
 export type Protected = Record<string, string>;
 export type Sealed = Record<string, string>;
 export type ContractInputs = { suite: string[]; verification: string[]; own: string[] };
-export type Collected = { protected: Protected; shadows: string[] };
+export type Executed = Record<string, string>;
+export type Collected = { protected: Protected; shadows: string[]; executed: Executed };
 export type ContractState = {
   protected: Protected;
   sealed?: Sealed;
+  executed?: Executed;
   shadows: string[];
   ignore: IgnoreSource[];
   taskPath: string;
@@ -76,11 +79,17 @@ export async function collectProtected(
   const suite = executedBy(inputs.suite, scripts);
   const verification = executedBy(inputs.verification, scripts);
   const own = (path: string) => inScope(path, inputs.own);
+  const generated = await generatedFiles(
+    cwd,
+    [...suite.programs, ...verification.programs],
+    listing,
+  );
+  const guarded = (path: string) => !generated.has(path);
   const candidates = [
     ...(await watchedFiles(cwd)),
     ...listing.filter(repoProtected),
-    ...suite.files,
-    ...verification.files.filter((path) => !own(path)),
+    ...suite.files.filter(guarded),
+    ...verification.files.filter((path) => !own(path) && guarded(path)),
     ...(await rootToolchain(cwd)),
     ...(await gitFiles(cwd)),
   ];
@@ -99,6 +108,7 @@ export async function collectProtected(
   const existing = new Set(listing);
   const shadows = shadowCandidates({
     files: [],
+    programs: [],
     modules: [...suite.modules, ...verification.modules],
     make: suite.make || verification.make,
   }).filter((entry) =>
@@ -106,7 +116,48 @@ export async function collectProtected(
       ? !listing.some((path) => path.startsWith(entry))
       : !existing.has(entry) && !Object.hasOwn(result, entry),
   );
-  return { protected: result, shadows };
+  const commands = [...inputs.suite, ...inputs.verification];
+  return { protected: result, shadows, executed: runBy(commands, scripts, result, own) };
+}
+
+function runBy(
+  commands: string[],
+  scripts: Record<string, unknown>,
+  guarded: Protected,
+  own: (path: string) => boolean,
+): Executed {
+  const executed: Executed = {};
+  for (const command of commands) {
+    for (const path of executedBy([command], scripts).programs) {
+      if (!Object.hasOwn(guarded, path) || Object.hasOwn(executed, path) || own(path)) continue;
+      if (repoProtected(path) || kindOf(path, "") !== "runner") continue;
+      executed[path] = command;
+    }
+  }
+  return executed;
+}
+
+async function generatedFiles(
+  cwd: string,
+  programs: string[],
+  listing: string[],
+): Promise<Set<string>> {
+  const listed = new Set(listing);
+  const unique = [...new Set(programs)];
+  const ignored = new Set(
+    await ignoredPaths(
+      cwd,
+      unique.filter((path) => listed.has(path)),
+    ),
+  );
+  return new Set(
+    unique.filter((path) => isBuildOutput(path) || !listed.has(path) || ignored.has(path)),
+  );
+}
+
+async function ignoredPaths(cwd: string, paths: string[]): Promise<string[]> {
+  if (paths.length === 0 || !(await isGitRepo(cwd))) return [];
+  return (await gitPaths(cwd, ["check-ignore", "--no-index", "--", ...paths])) ?? [];
 }
 
 export async function checkContract(cwd: string, state: ContractState): Promise<ContractChange[]> {
@@ -120,7 +171,8 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
     const after = linked
       ? undefined
       : await readTextIfExists(absolute(cwd, path)).catch(() => undefined);
-    const kind = kindOf(path, state.taskPath);
+    const run = state.executed?.[path];
+    const kind = run === undefined ? kindOf(path, state.taskPath) : "executed";
     if (Object.hasOwn(sealed, path)) {
       if (after !== undefined && sealHash(after) === before) continue;
       const change = after === undefined ? "deleted" : "modified";
@@ -128,7 +180,8 @@ export async function checkContract(cwd: string, state: ContractState): Promise<
       continue;
     }
     const change = compare(path, kind, before, after);
-    if (change) changes.push({ ...change, fingerprint: fingerprint(after) });
+    if (change)
+      changes.push({ ...change, detail: run ?? change.detail, fingerprint: fingerprint(after) });
   }
   const created = (path: string, kind: ContractKind): ContractChange => ({
     path,

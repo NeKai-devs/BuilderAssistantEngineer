@@ -16,19 +16,19 @@ export function createClackPrompter(): Prompter {
     warn: (message) => clack.log.warn(message),
     success: (message) => clack.log.success(message),
     select: async <T extends string>(message: string, choices: Choice<T>[], initial?: T) =>
-      unwrap(await clack.select<string>({ message, options: choices, initialValue: initial })) as T,
+      unwrap(
+        await clack.select<string>(localized({ message, options: choices, initialValue: initial })),
+      ) as T,
     multiselect: async <T extends string>(message: string, choices: Choice<T>[], initial: T[]) =>
       unwrap(
-        await clack.multiselect<string>({
-          message,
-          options: choices,
-          initialValues: initial,
-          required: true,
-        }),
+        await clack.multiselect<string>(
+          localized({ message, options: choices, initialValues: initial, required: true }),
+        ),
       ) as T[],
-    text: async (message, placeholder) => unwrap(await clack.text({ message, placeholder })) ?? "",
+    text: async (message, placeholder) =>
+      unwrap(await clack.text(localized({ message, placeholder }))) ?? "",
     confirm: async (message, initial) =>
-      unwrap(await clack.confirm({ message, initialValue: initial })),
+      unwrap(await clack.confirm(localized(confirmOptions(message, initial)))),
     canAsk: () => Boolean(process.stdin.isTTY),
     spinner: async (message, task) => {
       if (!process.stdout.isTTY) return staticSpinner(message, task);
@@ -51,6 +51,15 @@ export function createClackPrompter(): Prompter {
       }
     },
   };
+}
+
+export function confirmOptions(message: string, initial?: boolean) {
+  return { message, initialValue: initial, active: t("ui.yes"), inactive: t("ui.no") };
+}
+
+export function localized<T>(options: T): T {
+  clack.updateSettings({ messages: { cancel: t("ui.cancelled") } });
+  return options;
 }
 
 export function fitLine(text: string, columns: number): string {

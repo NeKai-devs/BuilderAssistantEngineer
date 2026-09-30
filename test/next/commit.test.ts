@@ -33,6 +33,19 @@ describe("taskMessage", () => {
     );
   });
 
+  it("lowercases a first letter with an accent or a tilde, as in Spanish titles", () => {
+    expect(taskMessage(meta("Añade el módulo hello", "feat"))[0]).toBe(
+      "feat: añade el módulo hello (T-007)",
+    );
+    expect(taskMessage(meta("Ámbito de los equipos", "docs"))[0]).toBe(
+      "docs: ámbito de los equipos (T-007)",
+    );
+    expect(taskMessage(meta("A\u0301mbito compuesto", "docs"))[0]).toBe(
+      "docs: ámbito compuesto (T-007)",
+    );
+    expect(taskMessage(meta("ÑANDÚ API", "docs"))[0]).toBe("docs: ÑANDÚ API (T-007)");
+  });
+
   it("shortens a long title so the header fits in 100 characters", () => {
     const header = taskMessage(meta(`Refactor ${"the store ".repeat(20)}`, "refactor"))[0] ?? "";
     expect(header).toHaveLength(100);

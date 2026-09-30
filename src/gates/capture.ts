@@ -44,6 +44,7 @@ const captureSchema = z.object({
   agentsMd: z.string().optional(),
   protected: z.record(z.string(), z.string()),
   sealed: z.record(z.string(), z.string()).default({}),
+  executed: z.record(z.string(), z.string()).default({}),
   shadows: z.array(z.string()).default([]),
   flagged: z.array(z.string()).default([]),
   baseline: suiteBaselineSchema.optional(),

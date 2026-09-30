@@ -12,7 +12,8 @@ export type ContractKind =
   | "scripts"
   | "runner"
   | "toolchain"
-  | "shadow";
+  | "shadow"
+  | "executed";
 
 export const TASKS_DIR = "docs/plan/tasks";
 export const WATCHED_DIRS = [
@@ -219,12 +220,17 @@ export function setupReferences(configPath: string, text: string): string[] {
   return found;
 }
 
-export type Executed = { files: string[]; modules: string[]; make: boolean };
+export type Executed = { files: string[]; programs: string[]; modules: string[]; make: boolean };
 
 export function executedBy(commands: string[], scripts: Record<string, unknown>): Executed {
   const files = new Set<string>();
+  const programs = new Set<string>();
   const modules = new Set<string>();
   let make = false;
+  const run = (path: string) => {
+    files.add(clean(path));
+    programs.add(clean(path));
+  };
   const seen = new Set<string>();
   const pending = [...commands];
   const visit = (name: string, args: string[]): void => {
@@ -242,7 +248,7 @@ export function executedBy(commands: string[], scripts: Record<string, unknown>)
       const flag = args.indexOf("-f");
       if (flag !== -1 && args[flag + 1]) files.add(clean(args[flag + 1] ?? ""));
     }
-    if (looksLikePath(name) || /^\.\/(gradlew|mvnw)$/.test(name)) files.add(clean(name));
+    if (looksLikePath(name) || /^\.\/(gradlew|mvnw)$/.test(name)) run(name);
     if (!INTERPRETERS.has(baseName(name))) return;
     const moduleIndex = args.indexOf("-m");
     if (PYTHONS.has(baseName(name)) && moduleIndex !== -1) {
@@ -251,7 +257,7 @@ export function executedBy(commands: string[], scripts: Record<string, unknown>)
       return;
     }
     const target = args.filter((arg) => !arg.startsWith("-") && arg !== "run")[0];
-    if (target && looksLikePath(target)) files.add(clean(target));
+    if (target && looksLikePath(target)) run(target);
   };
   while (pending.length > 0) {
     const command = pending.shift() ?? "";
@@ -262,7 +268,7 @@ export function executedBy(commands: string[], scripts: Record<string, unknown>)
       visit(name, args);
     }
   }
-  return { files: [...files], modules: [...modules], make };
+  return { files: [...files], programs: [...programs], modules: [...modules], make };
 }
 
 export function shadowCandidates(executed: Executed): string[] {

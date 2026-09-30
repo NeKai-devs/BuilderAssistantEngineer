@@ -43,7 +43,9 @@ describe("bypass 03: the checks run code the agent cannot quietly change", () =>
     });
     const run = await next(cwd, ["--yes"], [cheat]);
     expect(run.code).toBe(1);
-    expect(run.log).toContain("vitest.js: Changed the test runner configuration. Restored.");
+    expect(run.log).toContain(
+      "vitest.js: The checks run this file (`node vitest.js run`). Restored.",
+    );
     expect(run.log).toContain("vitest.config.ts: Changed the test runner configuration. Restored.");
     expect(await read(cwd, "vitest.js")).toBe(FAKE_RUNNER);
   });

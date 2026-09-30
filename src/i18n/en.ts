@@ -492,6 +492,27 @@ export const en = {
     "commit without the repository's pre-commit and commit-msg hooks, like git commit --no-verify",
   "option.newRun":
     "start a new bae/ branch from the current branch instead of continuing the recorded run",
+  "contract.executed": "The checks run this file (`{{detail}}`).",
+  "env.executedItem": "`{{path}}` (run by `{{command}}`)",
+  "env.executed":
+    "{{files}} changed during the task, and the checks run it, so it counts as part of them. bae restored it and stops here, because another attempt would fail the same way. If the file is generated, ignore it in .gitignore; if the task must change it, add it to the task's Scope; otherwise change the check that runs it.",
+  "ui.yes": "Yes",
+  "ui.no": "No",
+  "next.stuckBlocked": "blocked",
+  "secret.privateKey": "private key",
+  "secret.awsKey": "AWS access key",
+  "secret.slackWebhook": "Slack webhook",
+  "secret.githubToken": "GitHub token",
+  "secret.slackToken": "Slack token",
+  "secret.apiKey": "API key",
+  "secret.stripeKey": "Stripe key",
+  "secret.googleKey": "Google API key",
+  "secret.npmToken": "npm token",
+  "secret.gitlabToken": "GitLab token",
+  "secret.jwt": "JWT",
+  "secret.assigned": "hardcoded password or key",
+  "secret.connection": "credentials in a connection string",
+  "secret.random": "long random string",
 } as const;
 
 export type MessageKey = keyof typeof en;

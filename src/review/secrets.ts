@@ -34,6 +34,22 @@ const LABEL = /^[\p{L}\s.,:;!?¿¡'-]+$/u;
 const PLACEHOLDER =
   /^(?:\$|<|\{|%|\*+$)|^(?:x+|changeme|change[-_]me|example\w*|placeholder|password\d*|pass\d*|secret\d*|dummy|fake|test\w*|your[-_]\w+|my\w*|redacted|postgres|root|admin|dev|local|mysql|guest|user|sa|app)$/i;
 const MIN_ENTROPY = 4.5;
+const KIND_LABELS: Record<string, MessageKey> = {
+  "private key": "secret.privateKey",
+  "AWS access key": "secret.awsKey",
+  "Slack webhook": "secret.slackWebhook",
+  "GitHub token": "secret.githubToken",
+  "Slack token": "secret.slackToken",
+  "API key": "secret.apiKey",
+  "Stripe key": "secret.stripeKey",
+  "Google API key": "secret.googleKey",
+  "npm token": "secret.npmToken",
+  "GitLab token": "secret.gitlabToken",
+  JWT: "secret.jwt",
+  "hardcoded password or key": "secret.assigned",
+  "credentials in a connection string": "secret.connection",
+  "long random string": "secret.random",
+};
 
 export function secretFindings(
   changes: TaskChanges,
@@ -53,13 +69,12 @@ export function secretFindings(
       if (secretFile(item.path) || allowed(item.path)) return [];
       const kinds = secretKinds(item);
       if (kinds.length === 0) return [];
-      const kind = kinds.join(", ");
       return [
         {
           severity: "blocker",
-          id: findingId("secret", item.path, kind),
+          id: findingId("secret", item.path, kinds.join(", ")),
           file: item.path,
-          message: t(key, { kind }),
+          message: t(key, { kind: kinds.map(kindLabel).join(", ") }),
         },
       ];
     });
@@ -79,6 +94,11 @@ export function secretFindings(
     seen.add(finding.id ?? "");
     return true;
   });
+}
+
+function kindLabel(kind: string): string {
+  const key = KIND_LABELS[kind];
+  return key ? t(key) : kind;
 }
 
 export function secretFile(path: string): boolean {

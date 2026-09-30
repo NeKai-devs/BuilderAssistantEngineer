@@ -20,7 +20,12 @@ import { type Acceptance, accept, findingId } from "./findings.js";
 import { runnerHint } from "./results.js";
 import { expandCommand, TEST_RUNNERS } from "./runners.js";
 
-export type Enforced = { blocked: boolean; report: string; notes: ReviewFinding[] };
+export type Enforced = {
+  blocked: boolean;
+  report: string;
+  notes: ReviewFinding[];
+  environment?: string;
+};
 
 const MESSAGES: Record<ContractKind, MessageKey> = {
   task: "contract.task",
@@ -35,6 +40,7 @@ const MESSAGES: Record<ContractKind, MessageKey> = {
   gitdir: "contract.gitdir",
   toolchain: "contract.toolchain",
   shadow: "contract.shadow",
+  executed: "contract.executed",
 };
 const RUNNER_KEYS = ["jest", "mocha", "ava", "vitest"];
 const RISKY_SETTINGS = [
@@ -51,6 +57,7 @@ export async function enforceContract(
   const changes = await checkContract(ctx.cwd, {
     protected: capture.protected,
     sealed: capture.sealed,
+    executed: capture.executed,
     shadows: capture.shadows,
     ignore: capture.ignore,
     taskPath: capture.path,
@@ -100,11 +107,23 @@ export async function enforceContract(
   const list = formatFindings(findings);
   if (blocked) ctx.prompter.warn(t("contract.failed"));
   ctx.prompter.note(list, t("contract.title"));
+  const environment = flags.length === 0 ? checksChanged(restore) : undefined;
   return {
     blocked,
     report: `## ${t("contract.title")}\n\n${list}`,
     notes: findings.filter((finding) => finding.severity === "major"),
+    ...(environment ? { environment } : {}),
   };
+}
+
+function checksChanged(restored: ContractChange[]): string | undefined {
+  if (restored.length === 0 || restored.some((change) => change.kind !== "executed")) {
+    return undefined;
+  }
+  const files = restored
+    .map((change) => t("env.executedItem", { path: change.path, command: change.detail }))
+    .join(", ");
+  return t("env.executed", { files });
 }
 
 function weakening(
