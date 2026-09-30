@@ -9,7 +9,7 @@ const VITEST = resolve(import.meta.dirname, "../../../node_modules/vitest/vitest
   "/",
 );
 const has = async (name: string) => Boolean(await findExecutable(name));
-const SLOW = 180_000;
+const SLOW = process.platform === "win32" ? 720_000 : 180_000;
 
 type Project = {
   test: string;
