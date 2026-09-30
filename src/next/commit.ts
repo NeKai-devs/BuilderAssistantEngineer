@@ -94,8 +94,10 @@ export async function commitPaths(
 }
 
 function subject(title: string): string {
-  const trimmed = title.trim().replace(/\.+$/, "");
-  return /^[A-Z][a-z]/.test(trimmed) ? `${trimmed[0]?.toLowerCase()}${trimmed.slice(1)}` : trimmed;
+  const trimmed = title.trim().replace(/\.+$/, "").normalize("NFC");
+  if (!/^\p{Lu}\p{Ll}/u.test(trimmed)) return trimmed;
+  const [first = "", ...rest] = trimmed;
+  return `${first.toLowerCase()}${rest.join("")}`;
 }
 
 function fit(text: string, room: number): string {
