@@ -18,16 +18,16 @@ const SAME_IN_BOTH = [
   "replan.intro",
   "progress.tool",
   "artifacts.updated",
-  "ui.no",
   "secret.jwt",
 ];
 
 const SHOWN: Record<
   Lang,
-  { yes: string; blocked: string; waiting: string; secret: string; cancel: string }
+  { yes: string; no: string; blocked: string; waiting: string; secret: string; cancel: string }
 > = {
   en: {
     yes: "Yes",
+    no: "No",
     blocked: "T-001 Do T-001 (blocked)",
     waiting: "T-002 Do T-002 (waiting on T-001)",
     secret:
@@ -35,7 +35,8 @@ const SHOWN: Record<
     cancel: "Cancelled.",
   },
   es: {
-    yes: "Sí",
+    yes: "Sí (y)",
+    no: "No (n)",
     blocked: "T-001 Do T-001 (bloqueada)",
     waiting: "T-002 Do T-002 (espera a T-001)",
     secret: "Añade lo que parece una credencial (token de GitHub); léela del entorno.",
@@ -100,7 +101,7 @@ describe("i18n", () => {
       "docs/plan/tasks/T-002.md",
       taskFile("T-002", { dependsOn: ["T-001"] }),
     );
-    expect(confirmOptions("?", true)).toMatchObject({ active: shown.yes, inactive: "No" });
+    expect(confirmOptions("?", true)).toMatchObject({ active: shown.yes, inactive: shown.no });
     expect(stuckLine(blocked, [blocked, waiting])).toBe(shown.blocked);
     expect(stuckLine(waiting, [blocked, waiting])).toBe(shown.waiting);
     expect(tokenFinding()?.message).toBe(shown.secret);
