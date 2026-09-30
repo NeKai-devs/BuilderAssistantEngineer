@@ -97,4 +97,4 @@ To report a new case, including correct work that the gates stopped, use the [Re
 - `plan --only <group>` sends the whole analysis and costs as much as a full plan; it only filters what it writes. With a plan already there it still asks whether to regenerate the plan from scratch. (low)
 - `--accept-finding <id>` prints no confirmation. The accepted finding stays in the list as `[minor]` with its id, and the run log and the attempt record the acceptance. (low)
 - A follow-up question in `init` wider than the terminal breaks the frame of the note that shows it, because the question is the note's title. (low)
-- The keyboard hints under a choice (`↑/↓ to navigate • Enter: confirm`) come from the prompt library, which cannot translate them, so they stay in English with `--lang es`. (low)
+- The keyboard hints under a choice (`↑/↓ to navigate • Enter: confirm`) come from the prompt library, which cannot translate them, so they stay in English with `--lang es`. For the same reason a `Sí / No` confirmation answers to the `y` and `n` keys, not `s`; the arrows and Enter work in every language. (low)
