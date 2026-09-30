@@ -1,0 +1,284 @@
+:root {
+  --ink: #1b1f24;
+  --muted: #5b6470;
+  --rule: #d9dde3;
+  --accent: #0f6b5c;
+  --accent-soft: #e8f3f0;
+  --code-bg: #f3f4f6;
+  --warn-soft: #fbf3e4;
+  --warn: #9a6200;
+}
+
+@page {
+  size: A4;
+  margin: 16mm 17mm 17mm 17mm;
+  @bottom-left {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 7.5pt;
+    color: #5b6470;
+  }
+  @bottom-right {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-size: 7.5pt;
+    color: #5b6470;
+  }
+}
+
+@page :first {
+  margin: 0;
+  @bottom-left {
+    content: none;
+  }
+  @bottom-right {
+    content: none;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 9.4pt;
+  line-height: 1.45;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+}
+
+.cover {
+  height: 297mm;
+  padding: 58mm 22mm 0 24mm;
+  break-after: page;
+  border-left: 7mm solid var(--accent);
+}
+
+.cover-product {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 44pt;
+  letter-spacing: -1pt;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.cover-title {
+  font-size: 30pt;
+  font-weight: 600;
+  margin: 8mm 0 3mm;
+  line-height: 1.1;
+}
+
+.cover-subtitle {
+  font-size: 12pt;
+  color: var(--muted);
+  max-width: 130mm;
+  margin: 0 0 22mm;
+}
+
+.cover-facts {
+  display: grid;
+  grid-template-columns: 32mm 1fr;
+  row-gap: 2.5mm;
+  margin: 0;
+  padding-top: 6mm;
+  border-top: 0.6pt solid var(--rule);
+  max-width: 140mm;
+  font-size: 10pt;
+}
+
+.cover-facts dt {
+  color: var(--muted);
+}
+
+.cover-facts dd {
+  margin: 0;
+}
+
+h2 {
+  font-size: 14.5pt;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 2.5mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 0.8pt solid var(--rule);
+  break-after: avoid;
+}
+
+h2:not(:first-child) {
+  margin-top: 6mm;
+}
+
+h3 {
+  font-size: 10.6pt;
+  font-weight: 600;
+  margin: 4mm 0 1.2mm;
+  break-after: avoid;
+}
+
+p {
+  margin: 0 0 2.2mm;
+  orphans: 3;
+  widows: 3;
+}
+
+ul,
+ol {
+  margin: 0 0 2.4mm;
+  padding-left: 5mm;
+}
+
+li {
+  margin-bottom: 0.9mm;
+}
+
+li > p {
+  margin: 0;
+}
+
+strong {
+  font-weight: 600;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.9em;
+  white-space: nowrap;
+  background: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+}
+
+pre {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.2pt;
+  line-height: 1.4;
+  background: var(--code-bg);
+  border-left: 2.2pt solid var(--accent);
+  padding: 2mm 3mm;
+  margin: 0 0 2.6mm;
+  white-space: pre-wrap;
+  break-inside: avoid;
+}
+
+pre code {
+  white-space: inherit;
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+blockquote {
+  margin: 0 0 2.6mm;
+  padding: 1.8mm 3mm;
+  background: var(--accent-soft);
+  border-left: 2.2pt solid var(--accent);
+  break-inside: avoid;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.3pt;
+  line-height: 1.35;
+  margin: 0 0 3mm;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid;
+}
+
+th {
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 0.9pt solid var(--ink);
+  padding: 1.2mm 1.8mm 1.2mm 0;
+}
+
+td {
+  vertical-align: top;
+  border-bottom: 0.5pt solid var(--rule);
+  padding: 1.3mm 1.8mm 1.3mm 0;
+}
+
+td code,
+th code {
+  font-size: 0.92em;
+}
+
+figure {
+  margin: 1mm 0 3.5mm;
+  break-inside: avoid;
+}
+
+figure img {
+  display: block;
+  width: 100%;
+  border-radius: 1.5mm;
+}
+
+figcaption {
+  font-size: 8pt;
+  color: var(--muted);
+  margin-top: 1.2mm;
+}
+
+hr {
+  border: none;
+  break-after: page;
+  margin: 0;
+}
+
+.two {
+  column-count: 2;
+  column-gap: 7mm;
+}
+
+.flow {
+  display: flex;
+  gap: 1.6mm;
+  margin: 0 0 3.2mm;
+  font-size: 7.6pt;
+  line-height: 1.25;
+}
+
+.flow span {
+  flex: 1;
+  position: relative;
+  padding: 1.6mm 2mm;
+  background: var(--accent-soft);
+  border-top: 1.6pt solid var(--accent);
+  color: var(--muted);
+}
+
+.flow b {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 8.4pt;
+  color: var(--ink);
+}
+
+p:has(+ figure) {
+  break-inside: avoid;
+  break-after: avoid;
+}
