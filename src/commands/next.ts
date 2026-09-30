@@ -190,17 +190,18 @@ function reportNoTask(ctx: CommandContext, tasks: Task[]): void {
   }
   const stuck = tasks
     .filter((task) => task.meta.status !== "done")
-    .map((task) => {
-      const waiting = waitingOn(task, tasks);
-      const reason =
-        task.meta.status === "blocked"
-          ? "blocked"
-          : task.meta.status === "needs_review"
-            ? t("next.needsReview", { note: task.meta.review_note ?? "" })
-            : `waiting on ${waiting.join(", ")}`;
-      return `${task.meta.id} ${task.meta.title} (${reason})`;
-    });
+    .map((task) => stuckLine(task, tasks));
   ctx.prompter.note(stuck.join("\n"), t("next.nothingReady"));
   ctx.prompter.outro(t("next.unblock"));
   throw new ExitCode(1);
+}
+
+export function stuckLine(task: Task, tasks: Task[]): string {
+  const reason =
+    task.meta.status === "blocked"
+      ? t("next.stuckBlocked")
+      : task.meta.status === "needs_review"
+        ? t("next.needsReview", { note: task.meta.review_note ?? "" })
+        : t("status.waiting", { ids: waitingOn(task, tasks).join(", ") });
+  return `${task.meta.id} ${task.meta.title} (${reason})`;
 }
