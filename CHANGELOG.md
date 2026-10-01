@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.4.1...v0.4.2) (2026-10-01)
+
+
+### Bug Fixes
+
+* **i18n:** name the y and n keys on a Spanish confirmation ([8857b64](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/8857b640a3eaa97119228331d7e61aa16a19ecf7))
+* Spanish confirmation keys and Windows test timeouts ([a7c5a9d](https://github.com/NeKai-devs/BuilderAssistantEngineer/commit/a7c5a9db707a141964bca114ad3fbda5bc537f2e))
+
 ## [0.4.1](https://github.com/NeKai-devs/BuilderAssistantEngineer/compare/v0.4.0...v0.4.1) (2026-09-30)
 
 
