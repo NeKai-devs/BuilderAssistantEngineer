@@ -8,7 +8,7 @@ const verification = (port: number) =>
     "node src/server.js &",
     "trap 'kill $!' EXIT",
     "sleep 1",
-    `curl -sf http://127.0.0.1:${port}/ | grep -q ready`,
+    `curl -sf --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:${port}/ | grep -q ready`,
   ].join("\n");
 
 describe("false positive 39: a Verification may start a server in the background", () => {

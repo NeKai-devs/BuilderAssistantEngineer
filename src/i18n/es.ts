@@ -509,8 +509,8 @@ export const es: Messages = {
   "env.executedItem": "`{{path}}` (lo ejecuta `{{command}}`)",
   "env.executed":
     "{{files}} cambió durante la tarea y lo ejecutan los chequeos, así que cuenta como parte de ellos. bae lo restauró y se detiene aquí, porque otro intento fallaría igual. Si el archivo se genera, ignóralo en .gitignore; si la tarea debe cambiarlo, añádelo a su Scope; si no, cambia el chequeo que lo ejecuta.",
-  "ui.yes": "Sí",
-  "ui.no": "No",
+  "ui.yes": "Sí (y)",
+  "ui.no": "No (n)",
   "next.stuckBlocked": "bloqueada",
   "secret.privateKey": "clave privada",
   "secret.awsKey": "clave de acceso de AWS",
